@@ -1,0 +1,124 @@
+PRESENÇA DO COMPRADOR (indPres) E FINALIDADE DA NF-e (finNFe)
+Layout NF-e 4.00 – Explicação Completa para Uso Fiscal e ERP
+
+---
+
+1. PRESENÇA DO COMPRADOR (TAG: <indPres>)
+
+Definição:
+Indica como ocorreu a interação entre comprador e vendedor no momento da operação. Esse campo é essencial para classificação da operação (presencial, internet, marketplace, etc.) e tem impacto direto em validações fiscais e cruzamentos da Receita Federal e SEFAZ.
+
+Valores possíveis:
+
+0 - Não se aplica
+Utilizado em casos onde não há efetiva operação comercial tradicional, como NF-e complementar, ajuste ou devolução.
+
+1 - Operação presencial
+Venda realizada com presença física do cliente no estabelecimento.
+
+2 - Operação não presencial, pela Internet
+Venda realizada por e-commerce (site próprio).
+
+3 - Operação não presencial, Teleatendimento
+Venda realizada por telefone (call center).
+
+4 - NFC-e em operação com entrega a domicílio
+Mais comum em operações de varejo com entrega posterior.
+
+5 - Operação presencial, fora do estabelecimento
+Venda realizada por vendedor externo, representante ou visita comercial.
+
+9 - Operação não presencial, outros
+Utilizado quando não se enquadra nas opções anteriores. Muito comum em operações via marketplace, plataformas intermediadoras ou vendas B2B remotas.
+
+Aplicação prática:
+
+* 1 → Loja física
+* 2 → E-commerce próprio
+* 3 → Call center
+* 5 → Vendedor externo
+* 9 → Marketplace / integrações / vendas remotas
+
+Observação importante:
+O uso incorreto desse campo pode gerar inconsistências em cruzamentos fiscais, principalmente quando relacionado a vendas online ou operações intermediadas.
+
+---
+
+2. FINALIDADE DA NF-e (TAG: <finNFe>)
+
+Definição:
+Indica o objetivo da emissão da Nota Fiscal Eletrônica. Esse campo define o tratamento fiscal da operação, principalmente no que diz respeito a crédito, débito e escrituração no SPED.
+
+Valores possíveis:
+
+1 - NF-e normal
+Utilizada para operações comuns de venda, compra, transferência, etc.
+
+2 - NF-e complementar
+Utilizada para complementar valores ou impostos de uma NF-e já emitida.
+
+3 - NF-e de ajuste
+Utilizada para ajustes fiscais, sem circulação de mercadoria.
+
+4 - NF-e de devolução/retorno
+Utilizada para devolução de mercadoria ou retorno de operação anterior.
+
+Aplicação prática:
+
+* 1 → Venda padrão
+* 2 → Complemento de imposto ou valor
+* 3 → Ajustes contábeis/fiscais
+* 4 → Devolução de mercadoria
+
+Observação importante:
+A escolha incorreta da finalidade pode impactar diretamente na apuração de impostos e na consistência das obrigações acessórias (SPED Fiscal e Contribuições).
+
+---
+
+3. LOCALIZAÇÃO NO XML
+
+Esses campos estão localizados dentro do grupo <ide> da NF-e:
+
+<ide>
+   <finNFe>1</finNFe>
+   <indPres>9</indPres>
+</ide>
+
+---
+
+4. ALERTAS FISCAIS IMPORTANTES
+
+Combinação crítica:
+
+indPres = 2 ou 9
+indIntermed = 1
+
+Essa combinação indica operação com intermediação (marketplace).
+
+Impactos:
+
+* Obrigatoriedade de informar intermediador
+* Cruzamentos com plataformas digitais
+* Fiscalização sobre comissões e receitas
+* Reflexos no SPED Fiscal e EFD Contribuições
+
+---
+
+5. USO EM ERP (EX: SANKHYA)
+
+Valores aceitos:
+
+indPres: 0, 1, 2, 3, 4, 5, 9
+finNFe: 1, 2, 3, 4
+
+Recomendação:
+Esses campos devem ser parametrizados conforme o tipo de operação da empresa, evitando preenchimento manual incorreto.
+
+---
+
+6. CONCLUSÃO
+
+Os campos indPres e finNFe são fundamentais para a correta classificação fiscal da NF-e.
+Seu correto preenchimento evita inconsistências, autuações e problemas em cruzamentos eletrônicos com a Receita Federal e SEFAZ.
+
+---

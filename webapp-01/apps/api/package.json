@@ -1,0 +1,29 @@
+{
+  "name": "@webapp/api",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc && node scripts/copy-data.mjs",
+    "start": "node dist/server.js",
+    "dev": "node --watch dist/server.js"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.1",
+    "@fastify/helmet": "^12.0.1",
+    "@fastify/multipart": "^9.0.1",
+    "@fastify/rate-limit": "^10.1.1",
+    "@webapp/contracts": "0.1.0",
+    "@webapp/nfe-core": "0.1.0",
+    "bullmq": "^5.25.6",
+    "fastify": "^5.1.0",
+    "ioredis": "^5.4.1",
+    "jose": "^5.9.6",
+    "pino": "^9.5.0",
+    "unzipper": "^0.12.3",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "typescript": "^5.6.3"
+  }
+}

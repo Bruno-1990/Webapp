@@ -1,0 +1,3 @@
+# Scripts Windows: CRLF evita erros estranhos no CMD com arquivos salvos como LF (Cursor/Unix)
+*.bat text eol=crlf
+*.cmd text eol=crlf

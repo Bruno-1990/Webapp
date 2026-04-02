@@ -1,0 +1,30 @@
+# Build a partir da pasta pai do monorepo (onde estão webapp-01 e webapp-02):
+# docker compose --profile sped build worker-sped
+FROM node:22-bookworm-slim AS build-js
+WORKDIR /workspace/webapp-01
+COPY webapp-01/package.json webapp-01/package-lock.json ./
+COPY webapp-01/tsconfig.base.json ./
+COPY webapp-01/packages ./packages
+COPY webapp-01/apps ./apps
+COPY webapp-01/frontend ./frontend
+RUN npm ci --workspaces --include-workspace-root 2>/dev/null || npm install --workspaces --include-workspace-root
+RUN npm run build -w @webapp/contracts && npm run build -w @webapp/worker-sped-bridge
+
+FROM node:22-bookworm-slim
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3 python3-venv \
+  && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY --from=build-js /workspace/webapp-01/package.json ./
+COPY --from=build-js /workspace/webapp-01/node_modules ./node_modules
+COPY --from=build-js /workspace/webapp-01/packages ./packages
+COPY --from=build-js /workspace/webapp-01/apps/worker-sped-bridge ./apps/worker-sped-bridge
+COPY webapp-02/sped_engine /app/sped_engine
+COPY webapp-02/requirements.txt /tmp/sped-requirements.txt
+RUN python3 -m venv /opt/sped \
+  && /opt/sped/bin/pip install --no-cache-dir -r /tmp/sped-requirements.txt \
+  && rm /tmp/sped-requirements.txt
+ENV NODE_ENV=production
+ENV SPED_ENGINE_DIR=/app/sped_engine
+ENV PYTHON_CMD=/opt/sped/bin/python
+CMD ["node", "apps/worker-sped-bridge/dist/index.js"]

@@ -1,0 +1,26 @@
+# Dependências e build (Node)
+node_modules/
+**/node_modules/
+**/dist/
+*.tsbuildinfo
+
+# Ambiente e jobs locais
+.env
+.env.local
+**/temp_jobs/
+coverage/
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+.venv/
+**/venv/
+
+# SPED / PyInstaller (webapp-02)
+webapp-02/sped_engine/build/
+
+# Logs e SO
+*.log
+.DS_Store
+Thumbs.db

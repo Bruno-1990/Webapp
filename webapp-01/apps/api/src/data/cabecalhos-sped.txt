@@ -1,0 +1,215 @@
+========================
+BLOCO 0 – CADASTRO
+========================
+0000 — Abertura do Arquivo Digital e Identificação da Entidade
+REG | COD_VER | COD_FIN | DT_INI | DT_FIN | NOME | CNPJ | CPF | UF | IE | COD_MUN | IM | SUFRAMA | IND_PERFIL | IND_ATIV
+
+0001 — Abertura do Bloco 0
+REG | IND_MOV
+
+0005 — Dados Complementares da Entidade
+REG | FANTASIA | CEP | END | NUM | COMPL | BAIRRO | FONE | FAX | EMAIL
+
+0100 — Dados do Contabilista
+REG | NOME | CPF | CRC | CNPJ | CEP | END | NUM | COMPL | BAIRRO | FONE | FAX | EMAIL | COD_MUN
+
+0150 — Participantes
+REG | COD_PART | NOME | COD_PAIS | CNPJ | CPF | IE | COD_MUN | SUFRAMA | END | NUM | COMPL | BAIRRO
+
+0200 — Itens (produtos/serviços)
+REG | COD_ITEM | DESCR_ITEM | COD_BARRA | COD_ANT_ITEM | UNID_INV | TIPO_ITEM | COD_NCM | EX_IPI | COD_GEN | COD_LST | ALIQ_ICMS | CEST
+
+0190 — Identificação das Unidades de Medida
+REG | UNID | DESCR
+
+0205 — Alteração do Item
+REG | DESCR_ANT_ITEM | DT_INI | DT_FIN | COD_ANT_ITEM
+
+0220 — Fatores de Conversão de Unidades
+REG | UNID_CONV | FAT_CONV | COD_BARRA | COD_BARRA_ANT
+
+0400 — Tabela de Natureza da Operação / Prestação
+REG | COD_NAT | DESCR_NAT
+
+0450 — Tabela de Informação Complementar do Documento Fiscal
+REG | COD_INF | TXT
+
+0460 — Tabela de Observações do Lançamento Fiscal
+REG | COD_OBS | TXT
+
+0500 — Plano de Contas Contábeis
+REG | DT_ALT | COD_NAT_CC | IND_CTA | NIVEL | COD_CTA | NOME_CTA
+
+0990 — Encerramento do Bloco 0
+REG | QTD_LIN_0
+
+
+========================
+BLOCO 1 – OUTRAS INFORMAÇÕES
+========================
+1001 — Abertura do Bloco 1
+REG | IND_MOV
+
+1010 — Obrigatoriedade de Registros do Bloco 1
+REG | IND_EXP | IND_CCRF | IND_COMB | IND_USINA | IND_VA | IND_EE | IND_CART | IND_FORM | IND_AER | IND_GIAF1 | IND_GIAF2 | IND_GIAF3 | IND_GIAF4 | IND_REST_RESSARC_COMPL | IND_SIMPL | IND_RTR
+
+1990 — Encerramento do Bloco 1
+REG | QTD_LIN_1
+
+
+========================
+BLOCO 9 – CONTROLE E ENCERRAMENTO
+========================
+9001 — Abertura do Bloco 9
+REG | IND_MOV
+
+9900 — Registros do Arquivo
+REG | REG_BLC | QTD_REG_BLC
+
+9990 — Encerramento do Bloco 9
+REG | QTD_LIN_9
+
+9999 — Encerramento do Arquivo Digital
+REG | QTD_LIN
+
+
+========================
+BLOCO B – ISSQN
+========================
+B001 — Abertura do Bloco B
+REG | IND_MOV
+
+B990 — Encerramento do Bloco B
+REG | QTD_LIN_B
+
+
+========================
+BLOCO C – DOCUMENTOS FISCAIS I – MERCADORIAS (ICMS/IPI)
+========================
+C001 — Abertura do Bloco C
+REG | IND_MOV
+
+C101 — Informação Complementar dos Documentos Fiscais quando das Operações Interestaduais Destinadas a Consumidor Final Não Contribuinte EC 87/15
+REG | VL_FCP_UF_DEST | VL_ICMS_UF_DEST | VL_ICMS_UF_REM
+
+C110 — Informação Complementar da Nota Fiscal
+REG | COD_INF | TXT_COMPL
+
+C113 — Documento Fiscal Referenciado
+REG | IND_OPER | IND_EMIT | COD_PART | COD_MOD | SER | SUB | NUM_DOC | DT_DOC | CHV_DOCE
+
+C195 — Observações do Lançamento Fiscal
+REG | COD_OBS | TXT_COMPL
+
+C197 — Outras Obrigações Tributárias, Ajustes e Informações de Valores Provenientes de Documento Fiscal
+REG | COD_AJ | DESCR_COMPL_AJ | COD_ITEM | VL_BC_ICMS | ALIQ_ICMS | VL_ICMS | VL_OUTROS
+
+C100 — Documento fiscal (exportação XLSX — alinhado ao motor)
+REG | IND_OPER | IND_EMIT | COD_PART | COD_MOD | COD_SIT | SER | NUM_DOC | CHV_NFE | DT_DOC | DT_E_S | VL_DOC | IND_PGTO | VL_DESC | VL_ABAT_NT | VL_MERC | IND_FRT | VL_FRT | VL_SEG | VL_OUT_DA | VL_BC_ICMS | VL_ICMS | VL_BC_ICMS_ST | VL_ICMS_ST | VL_IPI | VL_PIS | VL_COFINS | VL_PIS_ST | VL_COFINS_ST
+
+C170 — Itens do documento fiscal (exportação XLSX)
+REG | NUM_DOC | CHV_NFE | NUM_ITEM | COD_ITEM | DESCR_COMPL | QTD | UNID | VL_ITEM | VL_DESC | IND_MOV | CST_ICMS | CFOP | COD_NAT | VL_BC_ICMS | ALIQ_ICMS | VL_ICMS | VL_BC_ICMS_ST | ALIQ_ST | VL_ICMS_ST | IND_APUR | CST_IPI | COD_ENQ | VL_BC_IPI | ALIQ_IPI | VL_IPI | CST_PIS | VL_BC_PIS | ALIQ_PIS | QUANT_BC_PIS | ALIQ_PIS_R | VL_PIS | CST_COFINS | VL_BC_COFINS | ALIQ_COFINS | QUANT_BC_COFINS | ALIQ_COFINS_R | VL_COFINS | COD_CTA | VL_ABAT_NT
+
+C190 — Registro analítico do documento (exportação XLSX)
+REG | NUM_DOC | CHV_NFE | CST_ICMS | CFOP | ALIQ_ICMS | VL_OPR | VL_BC_ICMS | VL_ICMS | VL_BC_ICMS_ST | VL_ICMS_ST | VL_RED_BC | VL_IPI | COD_OBS
+
+C500 — Nota de energia, gás, água e comunicação (exportação XLSX)
+REG | IND_OPER | IND_EMIT | COD_PART | COD_MOD | COD_SIT | SER | SUB | COD_CONS | NUM_DOC | DT_DOC | DT_E_S | VL_DOC | VL_DESC | VL_FORN | VL_SERV_NT | VL_TERC | VL_DA | VL_BC_ICMS | VL_ICMS | VL_BC_ICMS_ST | VL_ICMS_ST | COD_INF | VL_PIS | VL_COFINS | TP_LIGACAO | COD_GRUPO_TENSAO
+
+C590 — Registro analítico (C500) (exportação XLSX)
+REG | NUM_DOC | CST_ICMS | CFOP | ALIQ_ICMS | VL_OPR | VL_BC_ICMS | VL_ICMS | VL_BC_ICMS_ST | VL_ICMS_ST | VL_RED_BC | COD_OBS
+
+C990 — Encerramento do Bloco C
+REG | QTD_LIN_C
+
+
+========================
+BLOCO D – DOCUMENTOS FISCAIS II – SERVIÇOS
+========================
+D001 — Abertura do Bloco D
+REG | IND_MOV
+
+D100 — Documento de transporte (CT-e — exportação XLSX)
+REG | IND_OPER | IND_EMIT | COD_PART | COD_MOD | COD_SIT | SER | SUB | NUM_DOC | CHV_CTE | DT_DOC | DT_A_P | TP_CTE | CHV_CTE_REF | VL_DOC | VL_DESC | IND_FRT | VL_SERV | VL_BC_ICMS | VL_ICMS | VL_NT | COD_INF | COD_CTA | COD_MUN_ORIG | COD_MUN_DEST
+
+D190 — Registro analítico do CT-e (exportação XLSX)
+REG | NUM_DOC | CHV_CTE | CST_ICMS | CFOP | ALIQ_ICMS | VL_OPR | VL_BC_ICMS | VL_ICMS | VL_RED_BC | COD_OBS
+
+D500 — Nota de serviço de comunicação e telecomunicação (exportação XLSX)
+REG | IND_OPER | IND_EMIT | COD_PART | COD_MOD | COD_SIT | SER | SUB | NUM_DOC | DT_DOC | DT_A_P | VL_DOC | VL_DESC | VL_SERV | VL_SERV_NT | VL_TERC | VL_DA | VL_BC_ICMS | VL_ICMS | COD_INF | VL_PIS | VL_COFINS | TP_ASSINANTE
+
+D590 — Registro analítico (D500) (exportação XLSX)
+REG | NUM_DOC | CST_ICMS | CFOP | ALIQ_ICMS | VL_OPR | VL_BC_ICMS | VL_ICMS | VL_BC_ICMS_UF | VL_ICMS_UF | VL_RED_BC | COD_OBS
+
+D990 — Encerramento do Bloco D
+REG | QTD_LIN_D
+
+
+========================
+BLOCO E – APURAÇÃO DO ICMS E IPI
+========================
+E001 — Abertura do Bloco E
+REG | IND_MOV
+
+E100 — Período da Apuração do ICMS / IPI
+REG | DT_INI | DT_FIN
+
+E110 — Apuração do ICMS – Operações Próprias
+REG | VL_TOT_DEBITOS | VL_AJ_DEBITOS | VL_TOT_AJ_DEBITOS | VL_ESTORNOS_CRED | VL_TOT_CREDITOS | VL_AJ_CREDITOS | VL_TOT_AJ_CREDITOS | VL_ESTORNOS_DEB | VL_SLD_CREDOR_ANT | VL_SLD_APURADO | VL_TOT_DED | VL_ICMS_RECOLHER | VL_SLD_CREDOR_TRANSPORTAR | DEB_ESP
+
+E111 — Ajuste / Benefício / Incentivo da Apuração do ICMS
+REG | COD_AJ_APUR | DESCR_COMPL_AJ | VL_AJ_APUR
+
+E116 — Obrigações do ICMS a Recolher – Operações Próprias
+REG | COD_OR | VL_OR | DT_VCTO | COD_REC | NUM_PROC | IND_PROC | PROC | TXT_COMPL
+
+E300 — Período de Apuração do ICMS – Substituição Tributária
+REG | UF | DT_INI | DT_FIN
+
+E310 — Apuração do ICMS – Substituição Tributária
+REG | VL_TOT_DEBITOS_ST | VL_AJ_DEBITOS_ST | VL_TOT_AJ_DEBITOS_ST | VL_ESTORNOS_CRED_ST | VL_TOT_CREDITOS_ST | VL_AJ_CREDITOS_ST | VL_TOT_AJ_CREDITOS_ST | VL_ESTORNOS_DEB_ST | VL_SLD_CREDOR_ANT_ST | VL_SLD_DEV_ANT_ST | VL_DEDUCOES_ST | VL_ICMS_RECOL_ST | VL_SLD_CREDOR_ST_TRANSPORTAR | DEB_ESP_ST
+
+E316 — Obrigações do ICMS a Recolher – Substituição Tributária
+REG | COD_OR | VL_OR | DT_VCTO | COD_REC | NUM_PROC | IND_PROC | PROC | TXT_COMPL
+
+E990 — Encerramento do Bloco E
+REG | QTD_LIN_E
+
+
+========================
+BLOCO G – CIAP
+========================
+G001 — Abertura do Bloco G
+REG | IND_MOV
+
+G990 — Encerramento do Bloco G
+REG | QTD_LIN_G
+
+
+========================
+BLOCO H – INVENTÁRIO FÍSICO
+========================
+H001 — Abertura do Bloco H
+REG | IND_MOV
+
+H990 — Encerramento do Bloco H
+REG | QTD_LIN_H
+
+
+========================
+BLOCO K – CONTROLE DA PRODUÇÃO E DO ESTOQUE
+========================
+K001 — Abertura do Bloco K
+REG | IND_MOV
+
+K010 — Período de Apuração do ICMS/IPI
+REG | DT_INI | DT_FIN
+
+K100 — Período de Apuração do ICMS/IPI
+REG | DT_INI | DT_FIN
+
+K200 — Estoque Escriturado
+REG | DT_EST | COD_ITEM | QTD | IND_EST | COD_PART
+
+K990 — Encerramento do Bloco K
+REG | QTD_LIN_K

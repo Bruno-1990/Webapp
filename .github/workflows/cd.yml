@@ -1,0 +1,17 @@
+# Esqueleto: preencha secrets (SSH_HOST, SSH_USER, SSH_KEY) e ajuste comandos na VPS.
+name: CD
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  deploy-placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: |
+          echo "Configure SSH na VPS, docker compose pull/up ou registry."
+          echo "Secrets sugeridos: SSH_HOST, SSH_USER, SSH_KEY, JWT_SECRET"

@@ -1,0 +1,113 @@
+========================
+BLOCO 0 – CADASTRO
+========================
+
+0000 – Abertura
+REG | COD_VER | DT_INI | DT_FIN | NOME | CNPJ | UF | COD_MUN | IE | COD_ATIV | IND_PERFIL
+
+0002 – Classificação do estabelecimento industrial
+REG | CLAS_ESTAB_IND
+
+0100 – Contador
+REG | NOME | CPF | CRC | UF | CEP | END | NUM | COMPL | BAIRRO | COD_MUN | FONE | FAX | EMAIL
+
+0150 – Participantes
+REG | COD_PART | NOME | COD_PAIS | CNPJ | CPF | IE | COD_MUN | SUFRAMA | END | NUM | COMPL | BAIRRO
+
+0200 – Itens
+REG | COD_ITEM | DESCR_ITEM | UNID_INV | TIPO_ITEM | COD_NCM | EX_IPI | COD_GEN | COD_LST | ALIQ_ICMS
+
+0400 – Natureza da operação
+REG | COD_NAT | DESCR_NAT
+
+
+========================
+BLOCO C – DOCUMENTOS FISCAIS
+========================
+
+C100 – Nota Fiscal
+REG | IND_OPER | IND_EMIT | COD_PART | COD_MOD | COD_SIT | SER | NUM_DOC | CHV_NFE | DT_DOC | DT_E_S | VL_DOC | IND_PGTO | VL_DESC | VL_ABAT_NT | VL_MERC | IND_FRT | VL_FRT | VL_SEG | VL_OUT_DA | VL_BC_ICMS | VL_ICMS | VL_BC_ICMS_ST | VL_ICMS_ST | VL_IPI | VL_PIS | VL_COFINS
+
+C170 – Itens da NF
+REG | NUM_ITEM | COD_ITEM | DESCR_COMPL | QTD | UNID | VL_ITEM | VL_DESC | IND_MOV | CST_ICMS | CFOP | COD_NAT | VL_BC_ICMS | ALIQ_ICMS | VL_ICMS
+
+C190 – Resumo por CFOP
+REG | CFOP | CST_ICMS | ALIQ_ICMS | VL_OPR | VL_BC_ICMS | VL_ICMS | VL_BC_ICMS_ST | VL_ICMS_ST | VL_RED_BC | VL_IPI
+
+C191 – Informações do FCP
+REG | VL_FCP_OP | VL_FCP_ST | VL_FCP_RET
+
+
+========================
+BLOCO D – SERVIÇOS
+========================
+
+D100 – Conhecimento de Transporte
+REG | IND_OPER | IND_EMIT | COD_PART | COD_MOD | COD_SIT | SER | SUB | NUM_DOC | CHV_CTE | DT_DOC | DT_A_P | VL_DOC | VL_DESC | IND_FRT | VL_SERV | VL_BC_ICMS | VL_ICMS
+
+D700 – NFCom
+REG | IND_OPER | IND_EMIT | COD_PART | COD_MOD | COD_SIT | SER | NUM_DOC | DT_DOC | DT_E_S | VL_DOC | VL_DESC | VL_SERV | VL_SERV_NT | VL_TERC | VL_DA | VL_BC_ICMS | VL_ICMS | COD_INF | VL_PIS | VL_COFINS | CHV_DOCe | FIN_DOCe | TIP_FAT | COD_MOD_DOC_REF | CHV_DOCe_REF | HASH_DOC_REF | SER_DOC_REF | NUM_DOC_REF | MES_DOC_REF | COD_MUN_DEST | DED
+
+D730 – Resumo da NFCom
+REG | CST_ICMS | CFOP | ALIQ_ICMS | VL_OPR | VL_BC_ICMS | VL_ICMS | VL_RED_BC | COD_OBS
+
+
+========================
+BLOCO E – APURAÇÃO
+========================
+
+E100 – Período
+REG | DT_INI | DT_FIN
+
+E110 – Apuração ICMS
+REG | VL_TOT_DEBITOS | VL_AJ_DEBITOS | VL_TOT_AJ_DEBITOS | VL_ESTORNOS_CRED | VL_TOT_CREDITOS | VL_AJ_CREDITOS | VL_TOT_AJ_CREDITOS | VL_ESTORNOS_DEB | VL_SLD_CREDOR_ANT | VL_SLD_APURADO | VL_TOT_DED | VL_ICMS_RECOLHER | VL_SLD_CREDOR_TRANSPORTAR | DEB_ESP
+
+
+========================
+BLOCO H – INVENTÁRIO
+========================
+
+H005 – Total do Inventário
+REG | DT_INV | VL_INV | MOT_INV
+
+H010 – Itens do Inventário
+REG | COD_ITEM | UNID | QTD | VL_UNIT | VL_ITEM | IND_PROP | COD_PART | TXT_COMPL | COD_CTA | VL_ITEM_IR
+
+
+========================
+BLOCO K – CONTROLE DE ESTOQUE / PRODUÇÃO
+========================
+
+K100 – Período
+REG | DT_INI | DT_FIN
+
+K200 – Estoque Escriturado
+REG | DT_EST | COD_ITEM | QTD | IND_EST | COD_PART
+
+K230 – Produção
+REG | DT_INI_OP | DT_FIN_OP | COD_DOC_OP | COD_ITEM | QTD_ENC
+
+K235 – Insumos Consumidos
+REG | DT_SAIDA | COD_ITEM | QTD | COD_INS_SUBST
+
+K250 – Industrialização efetuada por terceiros – itens produzidos
+REG | DT_PROD | COD_ITEM | QTD
+
+
+========================
+BLOCO 1 – OUTRAS INFORMAÇÕES
+========================
+
+1010 – Obrigatoriedades
+REG | IND_EXP | IND_CCRF | IND_COMB | IND_USINA | IND_VA | IND_EE | IND_CART | IND_FORM | IND_AER | IND_GIAF1 | IND_GIAF2 | IND_GIAF3 | IND_GIAF4 | IND_REST_RESSARC_COMPL | IND_SIMPL
+
+
+========================
+BLOCO 9 – ENCERRAMENTO
+========================
+
+9900 – Controle de Registros
+REG | REG_BLC | QTD_REG_BLC
+
+9999 – Encerramento
+REG | QTD_LIN

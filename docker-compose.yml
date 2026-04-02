@@ -1,0 +1,88 @@
+# Stack única do monorepo (webapp-01 + workers que embutem 02/03).
+# Da raiz webapp:  docker compose up -d --build
+# Com Python SPED completo:  docker compose --profile sped up -d --build
+#
+# Novo módulo no futuro = novo bloco "services:" aqui (ou outro arquivo com "include:").
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  api:
+    build:
+      context: ./webapp-01
+      dockerfile: docker/Dockerfile
+      target: api
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: "8000"
+      REDIS_URL: redis://redis:6379
+      TEMP_JOBS_ROOT: /data/jobs
+      JWT_SECRET: ${JWT_SECRET:-troque-este-segredo-minimo-16chars}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5176,http://192.168.0.47:5176}
+      MAX_UPLOAD_MB: "50"
+      MAX_XML_FILES: "5000"
+    volumes:
+      - job-data:/data/jobs
+    depends_on:
+      - redis
+
+  worker:
+    build:
+      context: ./webapp-01
+      dockerfile: docker/Dockerfile
+      target: worker
+    environment:
+      REDIS_URL: redis://redis:6379
+      TEMP_JOBS_ROOT: /data/jobs
+    volumes:
+      - job-data:/data/jobs
+    depends_on:
+      - redis
+
+  worker-sped:
+    profiles: ["sped"]
+    build:
+      context: .
+      dockerfile: webapp-01/docker/Dockerfile.worker-sped
+    environment:
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - job-data:/data/jobs
+    depends_on:
+      - redis
+
+  worker-sped-merge:
+    profiles: ["sped"]
+    build:
+      context: .
+      dockerfile: webapp-01/docker/Dockerfile.worker-sped-merge
+    environment:
+      REDIS_URL: redis://redis:6379
+      TEMP_JOBS_ROOT: /data/jobs
+    volumes:
+      - job-data:/data/jobs
+    depends_on:
+      - redis
+
+  worker-comparacao-planilhas:
+    profiles: ["comparacao"]
+    build:
+      context: .
+      dockerfile: webapp-01/docker/Dockerfile.worker-comparacao
+    environment:
+      REDIS_URL: redis://redis:6379
+      TEMP_JOBS_ROOT: /data/jobs
+    volumes:
+      - job-data:/data/jobs
+    depends_on:
+      - redis
+
+volumes:
+  redis-data:
+  job-data:
