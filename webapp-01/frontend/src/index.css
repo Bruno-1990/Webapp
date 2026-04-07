@@ -23,29 +23,6 @@
 }
 
 @layer components {
-  .btn-grad {
-    margin: 10px;
-    padding: 15px 45px;
-    text-align: center;
-    text-transform: uppercase;
-    transition: 0.5s;
-    background-image: linear-gradient(to right, #183844 0%, #447f98 50%, #183844 100%);
-    background-size: 200% auto;
-    color: #d6ebf3;
-    box-shadow: 0 4px 18px rgb(24 56 68 / 0.22);
-    border-radius: 10px;
-    display: block;
-    outline: none;
-    border: 1px solid rgb(42 79 96 / 0.35);
-    cursor: pointer;
-  }
-
-  .btn-grad:hover {
-    background-position: right center;
-    color: #ffffff;
-    text-decoration: none;
-  }
-
   .pill-grad-cyan {
     background-image: linear-gradient(to right, #183844 0%, #447f98 50%, #183844 100%);
     background-size: 200% auto;

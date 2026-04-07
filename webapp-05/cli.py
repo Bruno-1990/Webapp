@@ -16,16 +16,6 @@ def progress(value: int):
     emit("progress", value=max(0, min(100, value)))
 
 
-def read_spreadsheets(paths: list[str]) -> list[pd.DataFrame]:
-    frames = []
-    for p in paths:
-        if p.lower().endswith(".csv"):
-            frames.append(pd.read_csv(p, sep=";", encoding="latin1"))
-        else:
-            frames.append(pd.read_excel(p))
-    return frames
-
-
 def processar(sefaz_paths: list[str], sci_paths: list[str], output: str):
     progress(5)
 

@@ -68,33 +68,3 @@ class PlanilhaSCI(PlanilhaBase):
                      .reset_index(drop=True)
         )
         return self
-
-
-class PlanilhaCliente(PlanilhaBase):
-    """Normaliza layout do Cliente (para uso no confronto)."""
-    def processar(self, df: pd.DataFrame) -> "PlanilhaCliente":
-        self.raw = df.copy()
-        mapa = {
-            "NOTA": "Nota", "Nota": "Nota", "NF": "Nota",
-            "CFOP": "CFOP",
-            "SOMA DE VLR. CONTABIL": "Vlr contábil", "SOMA DE VLR. CONTÁBIL": "Vlr contábil",
-            "SOMA DE BASE ICMS": "Base de ICMS",
-            "SOMA DE VLR. ICMS": "Valor do ICMS",
-            "SOMA DE BASE IPI": "Base de IPI",
-            "SOMA DE VLR. IPI": "Valor do IPI",
-        }
-        base = self._padronizar_nomes(self.raw, mapa)
-        require_columns(base, ["Nota", "CFOP"], "Cliente/padronização")
-
-        for c in NUM_COLS:
-            if c not in base.columns:
-                base[c] = 0.0
-
-        base = self._converter_numericos(base)
-        base["Nota"] = coerce_int_str(base["Nota"])
-        base["CFOP"] = coerce_cfop(base["CFOP"])
-
-        # Cliente já consolidado; usamos como 'final' para confronto
-        self.base = base.copy()
-        self.final = base.copy()
-        return self

@@ -8,6 +8,9 @@
     "redis:up": "npm run redis:up --prefix webapp-01",
     "install:app": "npm install --prefix webapp-01",
     "build": "npm run build --prefix webapp-01",
-    "test:sci-py": "npm run test:sci-py --prefix webapp-01"
+    "test:sci-py": "npm run test:sci-py --prefix webapp-01",
+    "ports": "node manage-ports.mjs",
+    "ports:set": "node manage-ports.mjs set",
+    "ports:reset": "node manage-ports.mjs reset"
   }
 }

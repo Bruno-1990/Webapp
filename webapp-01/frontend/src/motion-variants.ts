@@ -11,24 +11,6 @@ export const fadeUp = {
   exit: { opacity: 0, y: -8 },
 };
 
-export const listParent = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.035, delayChildren: 0.06 },
-  },
-};
-
-export const listItem = {
-  hidden: { opacity: 0, x: -14, scale: 0.98 },
-  show: {
-    opacity: 1,
-    x: 0,
-    scale: 1,
-    transition: { duration: 0.38, ease: easeOutExpo },
-  },
-};
-
 export const transitionSmooth = { duration: 0.5, ease: easeOutExpo };
 
 export const transitionFast = { duration: 0.28, ease: easeOutExpo };
