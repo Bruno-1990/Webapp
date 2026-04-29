@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Nfse>
+  <InfNfse>
+    <Numero>200002</Numero>
+    <PrestadorServico>
+      <IdentificacaoPrestador>
+        <Cnpj>11222333000181</Cnpj>
+      </IdentificacaoPrestador>
+    </PrestadorServico>
+    <TomadorServico>
+      <IdentificacaoTomador>
+        <CpfCnpj>
+          <Cnpj>55666777000155</Cnpj>
+        </CpfCnpj>
+      </IdentificacaoTomador>
+    </TomadorServico>
+  </InfNfse>
+</Nfse>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CompNfse>
+  <Nfse>
+    <InfNfse>
+      <Numero>300003</Numero>
+      <ChaveAcesso>11112222333344445555666677778888999900001111</ChaveAcesso>
+      <TomadorServico>
+        <IdentificacaoTomador>
+          <CpfCnpj>
+            <Cpf>12345678901</Cpf>
+          </CpfCnpj>
+        </IdentificacaoTomador>
+      </TomadorServico>
+    </InfNfse>
+  </Nfse>
+</CompNfse>

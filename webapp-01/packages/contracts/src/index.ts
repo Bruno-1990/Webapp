@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export { loadDotenvFromUpwards } from "./dotenv.js";
+
 export const API_PREFIX = "/api/v1" as const;
 
 export const QUEUE_NAME = "nfe-convert" as const;
@@ -148,3 +150,121 @@ export const ComparacaoPlanilhasJobPayloadSchema = z.object({
 });
 
 export type ComparacaoPlanilhasJobPayload = z.infer<typeof ComparacaoPlanilhasJobPayloadSchema>;
+
+/** Comparacao NFS-e: PDF (OCR via Gemini) × XML (parser) → divergencias (webapp-06). */
+export const COMPARACAO_NFSE_QUEUE_NAME = "comparacao-nfse" as const;
+
+export const ComparacaoNfseJobPayloadSchema = z.object({
+  jobId: z.string(),
+  pdfsDir: z.string(),
+  xmlsDir: z.string(),
+  outputXlsx: z.string(),
+  outputJson: z.string(),
+});
+
+export type ComparacaoNfseJobPayload = z.infer<typeof ComparacaoNfseJobPayloadSchema>;
+
+export const NfseEntrySchema = z.object({
+  cnpjTomador: z.string().nullable().optional(),
+  numeroNf: z.string().nullable().optional(),
+  chaveNf: z.string().nullable().optional(),
+  sourceFile: z.string(),
+  /** "local" = pdfplumber, "ocr" = Gemini, undefined = entry de XML. */
+  method: z.enum(["local", "ocr"]).nullable().optional(),
+  /** CNPJ do prestador (quem emitiu a nota). */
+  cnpjPrestador: z.string().nullable().optional(),
+  /** Razao Social do prestador. */
+  razaoSocialPrestador: z.string().nullable().optional(),
+  /** Razao Social do tomador (usada no nome do arquivo). */
+  razaoSocialTomador: z.string().nullable().optional(),
+});
+
+export type NfseEntry = z.infer<typeof NfseEntrySchema>;
+
+export const NfseFailureSchema = z.object({
+  file: z.string(),
+  reason: z.string(),
+});
+
+export type NfseFailure = z.infer<typeof NfseFailureSchema>;
+
+export const NfseExtractStatsSchema = z.object({
+  /** PDFs extraidos localmente (pdfplumber, gratis e instantaneo). */
+  local: z.number(),
+  /** PDFs que cairam no OCR Gemini (so imagem ou layout incomum). */
+  ocr: z.number(),
+  /** Imagens (.jpg/.png) processadas via Gemini. */
+  imagens: z.number(),
+  /** True se a chave Gemini estava configurada (false desabilita OCR fallback). */
+  ocr_disponivel: z.boolean(),
+});
+
+export type NfseExtractStats = z.infer<typeof NfseExtractStatsSchema>;
+
+/** Tipo de falha global do job NFS-e (alem das falhas individuais em pdfFalhos). */
+export const NfseFailureKindSchema = z.enum([
+  "quota", // Cota Gemini esgotada (circuit breaker aberto)
+  "auth", // Chave Gemini invalida / sem permissao
+  "timeout", // Job excedeu o limite de duracao
+  "internal", // Crash do Python ou erro inesperado
+]);
+
+export type NfseFailureKind = z.infer<typeof NfseFailureKindSchema>;
+
+/** Grupo de PDFs duplicados (mesma chave OU mesmo cnpj+numero). */
+export const NfseDuplicateGroupSchema = z.object({
+  chaveNf: z.string().nullable().optional(),
+  cnpjTomador: z.string().nullable().optional(),
+  numeroNf: z.string().nullable().optional(),
+  entries: z.array(NfseEntrySchema),
+});
+
+export type NfseDuplicateGroup = z.infer<typeof NfseDuplicateGroupSchema>;
+
+/** Totalizadores que fecham com a entrega: enviados = lidos + falhos. */
+export const NfseTotalsSchema = z.object({
+  pdfEnviados: z.number(),
+  pdfLidos: z.number(),
+  xmlEnviados: z.number(),
+  xmlLidos: z.number(),
+  matched: z.number(),
+  soPdf: z.number(),
+  soXml: z.number(),
+});
+
+export type NfseTotals = z.infer<typeof NfseTotalsSchema>;
+
+export const ComparacaoNfseResultSchema = z.object({
+  soPdf: z.array(NfseEntrySchema),
+  soXml: z.array(NfseEntrySchema),
+  matchedCount: z.number(),
+  xmlIgnorados: z.array(z.string()).optional(),
+  pdfFalhos: z.array(z.union([z.string(), NfseFailureSchema])).optional(),
+  extractStats: NfseExtractStatsSchema.optional(),
+  /** Marcado quando o job parou por erro estrutural (nao falhas individuais). */
+  failureKind: NfseFailureKindSchema.optional(),
+  /** Tempo em segundos ate poder tentar de novo (so quando failureKind=quota). */
+  retryAfterSec: z.number().optional(),
+  /** Nome amigavel para download: "Comparacao NFSE - <tomador> - YYYY-MM-DD HHhMM.xlsx". */
+  outputName: z.string().optional(),
+  /** Totalizadores que fecham com o universo entregue. */
+  totals: NfseTotalsSchema.optional(),
+  /** Grupos de PDFs duplicados na entrada. */
+  duplicadosPdf: z.array(NfseDuplicateGroupSchema).optional(),
+});
+
+export type ComparacaoNfseResult = z.infer<typeof ComparacaoNfseResultSchema>;
+
+/** Estado do circuit breaker exposto pelo endpoint /tools/comparacao-nfse/health. */
+export const NfseHealthSchema = z.object({
+  /** True se a chave Gemini foi configurada e o circuit esta fechado. */
+  geminiAvailable: z.boolean(),
+  /** ISO timestamp de quando o circuit volta para HALF_OPEN, ou null se fechado. */
+  circuitOpenUntil: z.string().nullable(),
+  /** Quantos jobs estao em fila / processando agora. */
+  queueDepth: z.number(),
+  /** Estimativa em segundos ate um novo job ser atendido (heuristica). */
+  estimatedWaitSec: z.number(),
+});
+
+export type NfseHealth = z.infer<typeof NfseHealthSchema>;

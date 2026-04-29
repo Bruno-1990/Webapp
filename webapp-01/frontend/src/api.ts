@@ -154,6 +154,15 @@ function defaultToolsManifest(): ToolManifestEntry[] {
       route: "/tools/comparacao-planilhas",
       available: true,
     },
+    {
+      id: "webapp-06",
+      title: "Comparador NFS-e",
+      subtitle: "PDF/Imagem × XML",
+      description:
+        "Envie a pasta com PDFs ou imagens (JPG/PNG) das notas de serviço tomadas e a pasta com XMLs; identificamos as que estão só em um lado.",
+      route: "/tools/comparacao-nfse",
+      available: true,
+    },
   ];
 }
 
@@ -651,4 +660,172 @@ export async function getComparacaoPlanilhasJob(id: string): Promise<JobResponse
 
 export function comparacaoPlanilhasDownloadUrl(id: string, token: string): string {
   return `${baseUrl()}${API_PREFIX}/tools/comparacao-planilhas/jobs/${id}/download?token=${encodeURIComponent(token)}`;
+}
+
+// ── Comparador NFS-e (PDF × XML) ─────────────────────────────────────────
+
+export type NfseEntry = {
+  cnpjTomador?: string | null;
+  numeroNf?: string | null;
+  chaveNf?: string | null;
+  sourceFile: string;
+  method?: "local" | "ocr" | null;
+  cnpjPrestador?: string | null;
+  razaoSocialPrestador?: string | null;
+  razaoSocialTomador?: string | null;
+};
+
+export type NfseFailure = { file: string; reason: string };
+
+export type NfseExtractStats = {
+  local: number;
+  ocr: number;
+  imagens: number;
+  ocr_disponivel: boolean;
+};
+
+export type NfseFailureKind = "quota" | "auth" | "timeout" | "internal";
+
+export type NfseDuplicateGroup = {
+  chaveNf?: string | null;
+  cnpjTomador?: string | null;
+  numeroNf?: string | null;
+  entries: NfseEntry[];
+};
+
+export type NfseTotals = {
+  pdfEnviados: number;
+  pdfLidos: number;
+  xmlEnviados: number;
+  xmlLidos: number;
+  matched: number;
+  soPdf: number;
+  soXml: number;
+};
+
+export type ComparacaoNfseResult = {
+  soPdf: NfseEntry[];
+  soXml: NfseEntry[];
+  matchedCount: number;
+  xmlIgnorados?: string[];
+  pdfFalhos?: Array<string | NfseFailure>;
+  extractStats?: NfseExtractStats;
+  failureKind?: NfseFailureKind;
+  retryAfterSec?: number;
+  outputName?: string;
+  totals?: NfseTotals;
+  duplicadosPdf?: NfseDuplicateGroup[];
+};
+
+export type NfseJobResponse = JobResponse & {
+  result?: ComparacaoNfseResult;
+  estimatedWaitSec?: number;
+};
+
+export async function createComparacaoNfseJob(): Promise<{ id: string }> {
+  const res = await fetch(`${baseUrl()}${API_PREFIX}/tools/comparacao-nfse/jobs`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? res.statusText);
+  }
+  return res.json() as Promise<{ id: string }>;
+}
+
+export async function uploadComparacaoNfseChunk(
+  id: string,
+  field: "pdfs" | "xmls",
+  files: File[]
+): Promise<{ savedPdfs: number; savedXmls: number }> {
+  if (files.length === 0) return { savedPdfs: 0, savedXmls: 0 };
+  const fd = new FormData();
+  for (const f of files) fd.append(field, f);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl()}${API_PREFIX}/tools/comparacao-nfse/jobs/${id}/chunk`, {
+      method: "POST",
+      body: fd,
+      signal: controller.signal,
+    });
+  } catch (e) {
+    if (!baseUrl() && isFetchNetworkError(e)) {
+      throw new Error(apiOfflineMessage());
+    }
+    throw e;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? res.statusText);
+  }
+  return res.json() as Promise<{ savedPdfs: number; savedXmls: number }>;
+}
+
+/** Erro lancado pelo `/start` quando a quota Gemini esta esgotada. */
+export class NfseQuotaError extends Error {
+  retryAfterSec: number;
+  constructor(message: string, retryAfterSec: number) {
+    super(message);
+    this.name = "NfseQuotaError";
+    this.retryAfterSec = retryAfterSec;
+  }
+}
+
+export async function startComparacaoNfseJob(id: string): Promise<void> {
+  const res = await fetch(`${baseUrl()}${API_PREFIX}/tools/comparacao-nfse/jobs/${id}/start`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      failureKind?: string;
+      retryAfterSec?: number;
+    };
+    if (err.failureKind === "quota") {
+      throw new NfseQuotaError(
+        err.error ?? "Cota do Gemini esgotada.",
+        err.retryAfterSec ?? 0,
+      );
+    }
+    throw new Error(err.error ?? res.statusText);
+  }
+}
+
+export type NfseHealth = {
+  geminiAvailable: boolean;
+  circuitOpenUntil: string | null;
+  queueDepth: number;
+  estimatedWaitSec: number;
+};
+
+export async function getNfseHealth(): Promise<NfseHealth> {
+  const res = await fetch(`${baseUrl()}${API_PREFIX}/tools/comparacao-nfse/health`);
+  if (!res.ok) {
+    throw new Error(`Health check falhou: ${res.statusText}`);
+  }
+  return res.json() as Promise<NfseHealth>;
+}
+
+export async function getComparacaoNfseJob(id: string): Promise<NfseJobResponse> {
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl()}${API_PREFIX}/tools/comparacao-nfse/jobs/${id}`);
+  } catch (e) {
+    if (!baseUrl() && isFetchNetworkError(e)) {
+      throw new Error(apiOfflineMessage());
+    }
+    throw e;
+  }
+  return res.json() as Promise<NfseJobResponse>;
+}
+
+export function comparacaoNfseDownloadUrl(id: string, token: string): string {
+  return `${baseUrl()}${API_PREFIX}/tools/comparacao-nfse/jobs/${id}/download?token=${encodeURIComponent(token)}`;
 }

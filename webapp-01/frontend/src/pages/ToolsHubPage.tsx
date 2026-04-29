@@ -1,7 +1,18 @@
-import { ArrowRight, CircleHelp, Combine, FileSpreadsheet, GitCompareArrows, ScrollText, Table2 } from "lucide-react";
+import {
+  ArrowRight,
+  CircleHelp,
+  Combine,
+  FileSearch,
+  FileSpreadsheet,
+  GitCompareArrows,
+  ScrollText,
+  Table2,
+} from "lucide-react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchToolsManifest, type ToolManifestEntry } from "../api.js";
+import { Modal } from "../components/Modal.js";
 
 const TOOL_ICONS: Record<string, typeof FileSpreadsheet> = {
   nfe: FileSpreadsheet,
@@ -9,6 +20,7 @@ const TOOL_ICONS: Record<string, typeof FileSpreadsheet> = {
   "webapp-03": Combine,
   "webapp-04": Table2,
   "webapp-05": GitCompareArrows,
+  "webapp-06": FileSearch,
 };
 
 const TOOL_OWNER: Record<string, string> = {
@@ -17,6 +29,7 @@ const TOOL_OWNER: Record<string, string> = {
   "webapp-03": "Bruno",
   "webapp-04": "Bruno",
   "webapp-05": "João",
+  "webapp-06": "Bruno",
 };
 
 const TOOL_ACCENT: Record<string, string> = {
@@ -25,10 +38,12 @@ const TOOL_ACCENT: Record<string, string> = {
   "webapp-03": "from-[#3d7390] to-[#629bb5]",
   "webapp-04": "from-[#4a7f95] via-[#5a8fab] to-[#447f98]",
   "webapp-05": "from-[#3a6d85] via-[#4d8da6] to-[#5a9cb5]",
+  "webapp-06": "from-[#2f6378] via-[#4583a0] to-[#6aa6be]",
 };
 
 export default function ToolsHubPage() {
   const [tools, setTools] = useState<ToolManifestEntry[] | null>(null);
+  const [infoTool, setInfoTool] = useState<ToolManifestEntry | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,17 +90,56 @@ export default function ToolsHubPage() {
                 : "flex h-full min-h-0"
             }
           >
-            <ToolCard tool={tool} />
+            <ToolCard tool={tool} onInfo={() => setInfoTool(tool)} />
           </li>
         ))}
       </ul>
+
+      <Modal
+        open={!!infoTool}
+        onClose={() => setInfoTool(null)}
+        tone="info"
+        title={infoTool?.title}
+        primaryLabel="Fechar"
+      >
+        {infoTool && (
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#3c7f97]">
+              {infoTool.subtitle}
+            </p>
+            <p className="text-sm leading-relaxed text-[#1e3d4d]">
+              {infoTool.description}
+            </p>
+            {TOOL_OWNER[infoTool.id] && (
+              <p className="pt-1 text-xs text-[#7eaabb]">
+                Mantida por <span className="font-semibold">{TOOL_OWNER[infoTool.id]}</span>
+              </p>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
 
-function ToolCard({ tool }: { tool: ToolManifestEntry }) {
+function ToolCard({
+  tool,
+  onInfo,
+}: {
+  tool: ToolManifestEntry;
+  onInfo: () => void;
+}) {
   const Icon = TOOL_ICONS[tool.id] ?? FileSpreadsheet;
   const accent = TOOL_ACCENT[tool.id] ?? TOOL_ACCENT.nfe;
+
+  const handleInfoClick = (e: ReactMouseEvent) => {
+    /** Card inteiro eh um <Link>; o botao "?" precisa interceptar antes da
+     * navegacao. preventDefault() impede o Link, stopPropagation() impede
+     * bubble. */
+    e.preventDefault();
+    e.stopPropagation();
+    onInfo();
+  };
 
   const inner = (
     <div className="relative flex min-h-0 flex-1 flex-col gap-2.5">
@@ -106,24 +160,14 @@ function ToolCard({ tool }: { tool: ToolManifestEntry }) {
               {tool.title}
             </h2>
             <div className="flex shrink-0 items-start gap-1.5">
-              <span
-                className="group/help relative inline-flex h-6 w-6 items-center justify-center rounded-full border border-[#bddae5] bg-[#eef7fb] text-[#2d6a82] shadow-[inset_0_1px_0_rgb(255_255_255/0.55)] transition-all duration-200 hover:-translate-y-px hover:border-[#91c2d4] hover:bg-[#def0f8] hover:shadow-[0_5px_12px_-8px_rgb(37_87_109/0.55)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#447f98]/55"
-                aria-label={`Descrição da ferramenta ${tool.title}`}
-                title={tool.description}
-                tabIndex={0}
+              <button
+                type="button"
+                onClick={handleInfoClick}
+                aria-label={`Sobre ${tool.title}`}
+                className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-[#bddae5] bg-[#eef7fb] text-[#2d6a82] shadow-[inset_0_1px_0_rgb(255_255_255/0.55)] transition-all duration-200 hover:-translate-y-px hover:border-[#91c2d4] hover:bg-[#def0f8] hover:shadow-[0_5px_12px_-8px_rgb(37_87_109/0.55)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#447f98]/55"
               >
                 <CircleHelp className="h-3.5 w-3.5" strokeWidth={2.15} />
-                <span
-                  role="tooltip"
-                  className="pointer-events-none absolute bottom-full right-0 z-20 mb-2 w-60 rounded-xl border border-[#a9ccda] bg-white/98 px-3 py-2.5 text-left font-sans text-[11px] font-medium leading-snug text-[#244958] opacity-0 shadow-[0_14px_34px_-14px_rgb(37_87_109/0.55)] ring-1 ring-white/70 backdrop-blur-[1px] transition-all duration-150 group-hover/help:-translate-y-0.5 group-hover/help:opacity-100 group-focus-visible/help:-translate-y-0.5 group-focus-visible/help:opacity-100"
-                >
-                  {tool.description}
-                  <span
-                    aria-hidden
-                    className="absolute right-2 top-full h-2.5 w-2.5 -translate-y-[5px] rotate-45 border-b border-r border-[#a9ccda] bg-white"
-                  />
-                </span>
-              </span>
+              </button>
               {!tool.available && (
                 <span className="shrink-0 rounded-lg bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">
                   Breve

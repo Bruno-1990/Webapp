@@ -1,0 +1,6 @@
+google-generativeai>=0.8.0
+pdfplumber>=0.11
+xlsxwriter>=3.1
+redis>=5.0
+pytest>=8.0
+fakeredis[lua]>=2.20

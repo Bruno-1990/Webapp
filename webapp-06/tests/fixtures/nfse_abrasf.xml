@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CompNfse xmlns="http://www.abrasf.org.br/nfse.xsd">
+  <Nfse>
+    <InfNfse Id="nfse_001">
+      <Numero>100001</Numero>
+      <CodigoVerificacao>ABC123</CodigoVerificacao>
+      <DataEmissao>2026-03-01T10:00:00</DataEmissao>
+      <ChaveAcesso>35260311222333000181551000001000000001000000001234</ChaveAcesso>
+      <ValoresNfse>
+        <ValorLiquidoNfse>1500.00</ValorLiquidoNfse>
+      </ValoresNfse>
+      <PrestadorServico>
+        <IdentificacaoPrestador>
+          <Cnpj>11222333000181</Cnpj>
+          <InscricaoMunicipal>123456</InscricaoMunicipal>
+        </IdentificacaoPrestador>
+        <RazaoSocial>Prestador LTDA</RazaoSocial>
+      </PrestadorServico>
+      <TomadorServico>
+        <IdentificacaoTomador>
+          <CpfCnpj>
+            <Cnpj>99888777000166</Cnpj>
+          </CpfCnpj>
+        </IdentificacaoTomador>
+        <RazaoSocial>Tomador Exemplo SA</RazaoSocial>
+      </TomadorServico>
+    </InfNfse>
+  </Nfse>
+</CompNfse>
