@@ -1,11 +1,17 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
+import { loadDotenvFromUpwards } from "@webapp/contracts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function defaultWebapp03Dir(): string {
   return path.resolve(__dirname, "../../../../webapp-03");
+}
+
+const _loadedEnv = loadDotenvFromUpwards(__dirname);
+if (_loadedEnv) {
+  console.log(`[worker-sped-merge] .env carregado de ${_loadedEnv}`);
 }
 
 const EnvSchema = z.object({

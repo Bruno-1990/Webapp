@@ -1,5 +1,5 @@
 @echo off
-setlocal EnableExtensions
+setlocal EnableExtensions EnableDelayedExpansion
 
 REM Duplo clique fecha a janela rapido demais: abrimos um CMD novo que permanece aberto (/k)
 if /i not "%~1"=="_RUN" (
@@ -9,6 +9,19 @@ if /i not "%~1"=="_RUN" (
 )
 
 title Webapp - Central de conversoes
+
+REM .env: NAO precisamos mais carregar aqui no shell. API, workers e docker-compose
+REM leem direto do .env da raiz (loadDotenvFromUpwards no Node, env_file no compose).
+REM So mostramos uma dica se o arquivo nao existe.
+if not exist "%~dp0.env" (
+  if exist "%~dp0.env.example" (
+    echo.
+    echo [Dica] Crie o arquivo  .env  copiando  .env.example  e preencha GEMINI_API_KEY
+    echo        para que o Comparador NFS-e processe PDFs escaneados via OCR.
+    echo.
+  )
+)
+
 cd /d "%~dp0webapp-01"
 
 if not exist "package.json" (
@@ -40,7 +53,7 @@ if errorlevel 1 (
 if not exist "temp_jobs\" mkdir "temp_jobs" 2>nul
 
 echo.
-echo npm install (links @webapp/* e dependencias; uteis apos mover pastas^)...
+echo npm install ^(links @webapp/* e dependencias; uteis apos mover pastas^)...
 call npm install
 if errorlevel 1 (
   echo Falha no npm install.
@@ -48,25 +61,45 @@ if errorlevel 1 (
   exit /b 1
 )
 
-where py >nul 2>&1
-if not errorlevel 1 goto after_pywarn
-where python >nul 2>&1
-if not errorlevel 1 goto after_pywarn
+REM Detecta Python (py launcher tem prioridade no Windows)
+set "PYEXE="
+where py >nul 2>&1 && set "PYEXE=py"
+if not defined PYEXE (
+  where python >nul 2>&1 && set "PYEXE=python"
+)
+
+if not defined PYEXE (
+  echo.
+  echo [Aviso] Python nao encontrado no PATH.
+  echo         SPED, XLSX-^>SPED, SCI e Comparador NFS-e precisam de py/python + pip ^(webapp-02..06^).
+  echo.
+  goto :after_python
+)
+
 echo.
-echo [Aviso] Python nao encontrado no PATH. SPED, XLSX-^>SPED e SCI precisam de py/python + pip (webapp-02, webapp-03, webapp-04).
-echo.
-:after_pywarn
+echo Instalando dependencias Python dos modulos ^(requirements.txt^)...
+for %%D in (webapp-02 webapp-03 webapp-04 webapp-05 webapp-06) do (
+  if exist "..\%%D\requirements.txt" (
+    echo   %%D ...
+    pushd "..\%%D"
+    %PYEXE% -m pip install -q -r requirements.txt
+    popd
+  )
+)
+
+:after_python
 
 echo.
 echo === Subindo stack ===
 echo   Frontend: http://localhost:5176   API proxy /api -^> porta 8000
+echo   Ferramentas: NFe, SPED, XLSX-^>SPED, SCI, Comparador Planilhas, Comparador NFS-e
 echo.
 
 docker info >nul 2>&1
 if errorlevel 1 (
   echo Docker indisponivel - usando npm run dev. Redis em 127.0.0.1:6379
   echo Com Docker: instale Docker Desktop e rode este script de novo.
-  echo/
+  echo.
   call npm run dev
 ) else (
   echo Redis via Docker + API + workers NFe/SPED/merge + Vite...
@@ -74,7 +107,7 @@ if errorlevel 1 (
 )
 
 if errorlevel 1 (
-  echo/
+  echo.
   echo Encerrado com erro. Dicas:
   echo   - Sem Docker: Redis na porta 6379 e na pasta webapp-01: npm run dev
   echo   - Erro de build: npm run build

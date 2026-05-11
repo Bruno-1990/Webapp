@@ -1,12 +1,18 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
+import { loadDotenvFromUpwards } from "@webapp/contracts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** Código Python do Consolidado SCI: pasta irmã webapp-04 (mesmo nível que webapp-01). */
 function defaultPythonDir(): string {
   return path.resolve(__dirname, "../../../../webapp-04");
+}
+
+const _loadedEnv = loadDotenvFromUpwards(__dirname);
+if (_loadedEnv) {
+  console.log(`[worker-sci] .env carregado de ${_loadedEnv}`);
 }
 
 const EnvSchema = z.object({

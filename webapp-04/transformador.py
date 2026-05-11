@@ -7,20 +7,14 @@ class TransformadorProdutos:
     def __init__(
         self,
         caminho_sci: str,
-        caminho_cliente: str | None,
         caminho_saida: str,
-        incluir_confronto: bool = True,
         sheet_name: str | None = None,
     ):
         self.caminho_sci = caminho_sci
-        self.caminho_cliente = caminho_cliente
         self.caminho_saida = caminho_saida
-        self.incluir_confronto = incluir_confronto
         self.sheet_name = sheet_name
 
         self.sci = None
-        self.df_cli_final = None
-        self.confronto = None
 
     def carregar_sci(self):
         df_sci_in = ExcelManager.carregar(self.caminho_sci)
@@ -37,16 +31,6 @@ class TransformadorProdutos:
                 df_sci_in = df_sci_in[keys[0]]
         self.sci = PlanilhaSCI(self.caminho_sci).processar(df_sci_in)
         return self.sci
-
-    def carregar_cliente(self):
-        if not self.incluir_confronto or not self.caminho_cliente:
-            return None
-        raise NotImplementedError("Confronto não suportado neste pacote headless.")
-
-    def gerar_confronto(self):
-        if not self.incluir_confronto:
-            return None
-        raise NotImplementedError("Confronto não suportado neste pacote headless.")
 
     def salvar(self, on_progress=None):
         abas = {
@@ -72,16 +56,7 @@ class TransformadorProdutos:
         wp.goto("Processamento")
         wp.set_message("Carregando e transformando dados…")
         self.carregar_sci()
-        wp.advance_local(40)
-        if self.incluir_confronto and self.caminho_cliente:
-            wp.set_message("Carregando base do Cliente…")
-            self.carregar_cliente()
-            wp.advance_local(75)
-            wp.set_message("Gerando Confronto…")
-            self.gerar_confronto()
-            wp.advance_local(100)
-        else:
-            wp.advance_local(100)
+        wp.advance_local(100)
 
         wp.goto("Configuração")
         wp.set_message("Ajustando metadados…")

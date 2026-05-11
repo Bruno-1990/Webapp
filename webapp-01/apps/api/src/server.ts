@@ -24,6 +24,7 @@ import {
   getRedis,
   getSciConsolidadoQueue,
   getComparacaoPlanilhasQueue,
+  getComparacaoNfseQueue,
   getSpedMergeQueue,
   getSpedQueue,
   type NfeJobPayload,
@@ -31,6 +32,7 @@ import {
   type SpedJobPayload,
   type SpedMergeJobPayload,
   type ComparacaoPlanilhasJobPayload,
+  type ComparacaoNfseJobPayload,
 } from "./queue.js";
 import { signDownloadToken, verifyDownloadToken } from "./tokens.js";
 import { buildSpedXlsxFileName, extractSpedRazaoFromBuffer } from "./sped-filename.js";
@@ -223,9 +225,11 @@ function validateSpedJobSheetsAndPresent(
 }
 
 const env = loadEnv();
+/** Limite global do body precisa cobrir tanto upload NFe quanto chunks do Comparador NFS-e. */
+const globalBodyLimitMb = Math.max(env.MAX_UPLOAD_MB, env.MAX_UPLOAD_NFSE_MB);
 const app = fastify({
   logger: { level: env.NODE_ENV === "production" ? "info" : "debug" },
-  bodyLimit: env.MAX_UPLOAD_MB * 1024 * 1024,
+  bodyLimit: globalBodyLimitMb * 1024 * 1024,
 });
 
 const origins = env.ALLOWED_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean);
@@ -237,20 +241,35 @@ const maxMultipartFileParts = Math.min(env.MAX_XML_FILES + 2_000, 20_000);
 
 await app.register(multipart, {
   limits: {
-    fileSize: env.MAX_UPLOAD_MB * 1024 * 1024,
+    fileSize: globalBodyLimitMb * 1024 * 1024,
     files: maxMultipartFileParts,
   },
 });
 await app.register(rateLimit, {
-  max: 30,
+  max: 600,
   timeWindow: "1 minute",
+  /** Polling do frontend faz ~60 GETs/min por job; com varios jobs em paralelo 30/min estoura rapido. */
+  allowList: (req) => req.method === "GET" && req.url.includes("/jobs/"),
 });
 
 app.setErrorHandler((err, req, reply) => {
-  if ((err as { code?: string }).code === "FST_FILES_LIMIT") {
+  const code = (err as { code?: string }).code;
+  if (code === "FST_FILES_LIMIT") {
     req.log.warn({ err }, "limite de partes multipart");
     return reply.code(413).send({
       error: `Envio com partes demais no formulário (máx. ${maxMultipartFileParts} arquivos por requisição). Envie em lotes menores ou use ZIP. Limite de XMLs após processar: ${env.MAX_XML_FILES}.`,
+    });
+  }
+  if (code === "FST_REQ_FILE_TOO_LARGE" || code === "FST_FILES_TOO_LARGE") {
+    req.log.warn({ err }, "arquivo individual excede fileSize");
+    return reply.code(413).send({
+      error: `Um dos arquivos excedeu o limite de ${globalBodyLimitMb} MB por arquivo. Reduza o tamanho ou divida em mais partes.`,
+    });
+  }
+  if (code === "FST_ERR_CTP_BODY_TOO_LARGE" || code === "FST_REQ_BODY_TOO_LARGE") {
+    req.log.warn({ err }, "body total excede bodyLimit");
+    return reply.code(413).send({
+      error: `Request excedeu o limite de ${globalBodyLimitMb} MB. Envie em lotes menores.`,
     });
   }
   return reply.send(err);
@@ -261,6 +280,7 @@ const spedQueue = getSpedQueue(env);
 const spedMergeQueue = getSpedMergeQueue(env);
 const sciConsolidadoQueue = getSciConsolidadoQueue(env);
 const comparacaoPlanilhasQueue = getComparacaoPlanilhasQueue(env);
+const comparacaoNfseQueue = getComparacaoNfseQueue(env);
 
 function jobDir(id: string): string {
   /** Absoluto para o payload BullMQ: o worker/Python usa outro cwd e paths relativos quebram (ex.: SPED). */
@@ -319,6 +339,15 @@ app.get(`${API_PREFIX}/tools`, async () => ({
       description:
         "Envie planilhas da SEFAZ e do SCI para identificar notas lançadas na SEFAZ que não constam no SCI.",
       route: "/tools/comparacao-planilhas",
+      available: true,
+    },
+    {
+      id: "webapp-06",
+      title: "Comparador NFS-e",
+      subtitle: "PDF/Imagem × XML",
+      description:
+        "Envie a pasta com PDFs ou imagens (JPG/PNG) das notas de serviço tomadas e a pasta com XMLs; identificamos as que estão só em um lado.",
+      route: "/tools/comparacao-nfse",
       available: true,
     },
   ],
@@ -1278,6 +1307,321 @@ app.get<{ Params: { id: string }; Querystring: { token?: string } }>(
     }
 
     const outPath = (job.data as ComparacaoPlanilhasJobPayload).outputPath;
+    if (!outPath || !fs.existsSync(outPath)) {
+      return reply.code(404).send({ error: "Arquivo não encontrado" });
+    }
+
+    const stream = fs.createReadStream(outPath);
+    reply.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    const fn = claims.fileName.replace(/[\r\n"]/g, "_");
+    const asciiFallback = fn.replace(/[^\x20-\x7e]/g, "_");
+    reply.header(
+      "Content-Disposition",
+      `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(fn)}`
+    );
+    return reply.send(stream);
+  }
+);
+
+// ── Comparação NFS-e (webapp-06) — PDF (OCR Gemini) × XML ────────────────
+
+const ALLOWED_NFSE_PDF_EXT = new Set([".pdf", ".jpg", ".jpeg", ".png"]);
+const ALLOWED_NFSE_XML_EXT = new Set([".xml"]);
+
+/** Mesma chave Redis usada pelo gemini_governor (Python). NAO mudar isolado. */
+const NFSE_CIRCUIT_KEY = "nfse:gemini:circuit";
+
+function nfseJobPaths(jobId: string) {
+  const base = jobDir(jobId);
+  const pdfsDir = path.join(base, "in", "pdfs");
+  const xmlsDir = path.join(base, "in", "xmls");
+  const outDir = path.join(base, "out");
+  return { base, pdfsDir, xmlsDir, outDir };
+}
+
+type NfseCircuitState = {
+  state: "closed" | "open" | "half_open";
+  openUntilSec: number; // epoch seconds; 0 se closed
+};
+
+async function readNfseCircuitState(): Promise<NfseCircuitState> {
+  try {
+    const redis = getRedis(env);
+    const raw = await redis.hmget(NFSE_CIRCUIT_KEY, "state", "open_until");
+    const state = (raw[0] as string | null) || "closed";
+    const openUntil = parseFloat((raw[1] as string | null) || "0") || 0;
+    if (state === "open" || state === "half_open") {
+      return { state, openUntilSec: openUntil };
+    }
+    return { state: "closed", openUntilSec: 0 };
+  } catch {
+    return { state: "closed", openUntilSec: 0 };
+  }
+}
+
+/** Heuristica simples: tempo medio de job * jobs aguardando + ativos. */
+function estimateWaitSec(queueDepth: number): number {
+  const AVG_JOB_SEC = 60; // estimativa conservadora (4000 PDFs / Tier 1)
+  const concurrency = 4; // espelha NFSE_WORKER_CONCURRENCY default
+  return Math.max(0, Math.ceil((queueDepth / concurrency) * AVG_JOB_SEC));
+}
+
+app.get(`${API_PREFIX}/tools/comparacao-nfse/health`, async () => {
+  const circuit = await readNfseCircuitState();
+  let queueDepth = 0;
+  try {
+    const counts = await comparacaoNfseQueue.getJobCounts(
+      "waiting",
+      "active",
+      "delayed",
+    );
+    queueDepth =
+      (counts.waiting ?? 0) + (counts.active ?? 0) + (counts.delayed ?? 0);
+  } catch {
+    /* ignore */
+  }
+  const geminiAvailable =
+    Boolean(env.GEMINI_API_KEY) && circuit.state !== "open";
+  const circuitOpenUntil =
+    circuit.state === "open" ? new Date(circuit.openUntilSec * 1000).toISOString() : null;
+  return {
+    geminiAvailable,
+    circuitOpenUntil,
+    queueDepth,
+    estimatedWaitSec: estimateWaitSec(queueDepth),
+  };
+});
+
+app.post(`${API_PREFIX}/tools/comparacao-nfse/jobs`, async (req, reply) => {
+  const jobId = randomUUID();
+  const { pdfsDir, xmlsDir, outDir } = nfseJobPaths(jobId);
+
+  try {
+    const pong = await getRedis(env).ping();
+    if (pong !== "PONG") throw new Error("Redis não respondeu");
+  } catch (e) {
+    req.log.warn({ err: e }, "redis indisponível ao criar job nfse");
+    return reply.code(503).send({
+      error:
+        "Redis não está acessível. Inicie o Redis e o worker Comparador NFS-e (worker-comparacao-nfse + Python webapp-06).",
+    });
+  }
+
+  await fs.promises.mkdir(pdfsDir, { recursive: true });
+  await fs.promises.mkdir(xmlsDir, { recursive: true });
+  await fs.promises.mkdir(outDir, { recursive: true });
+  return reply.code(201).send({ id: jobId });
+});
+
+app.post<{ Params: { id: string } }>(
+  `${API_PREFIX}/tools/comparacao-nfse/jobs/:id/chunk`,
+  async (req, reply) => {
+    const { id } = req.params;
+    if (!/^[0-9a-f-]{8,}$/i.test(id)) {
+      return reply.code(400).send({ error: "Id inválido" });
+    }
+    const { base, pdfsDir, xmlsDir } = nfseJobPaths(id);
+    if (!fs.existsSync(base)) {
+      return reply.code(404).send({ error: "Job não encontrado (inicie com POST /jobs)." });
+    }
+
+    let totalBytes = 0;
+    let savedPdfs = 0;
+    let savedXmls = 0;
+    const maxBytes = env.MAX_UPLOAD_NFSE_MB * 1024 * 1024;
+
+    const parts = req.parts();
+    for await (const part of parts) {
+      if (part.type !== "file") continue;
+      const originalName = (part.filename ?? "arquivo").replace(/[/\\]/g, "_");
+      const ext = path.extname(originalName).toLowerCase();
+      const field = part.fieldname;
+
+      let targetDir: string | null = null;
+      if (field === "pdfs" && ALLOWED_NFSE_PDF_EXT.has(ext)) {
+        targetDir = pdfsDir;
+      } else if (field === "xmls" && ALLOWED_NFSE_XML_EXT.has(ext)) {
+        targetDir = xmlsDir;
+      } else {
+        return reply.code(400).send({
+          error: `Arquivo ${originalName}: campo "${field}" não aceita extensão "${ext}". Use campo "pdfs" (.pdf, .jpg, .jpeg, .png) ou "xmls" (.xml).`,
+        });
+      }
+
+      const buf = await part.toBuffer();
+      totalBytes += buf.length;
+      if (totalBytes > maxBytes) {
+        return reply.code(413).send({
+          error: `Chunk excedeu ${env.MAX_UPLOAD_NFSE_MB} MB. Envie em lotes menores.`,
+        });
+      }
+      const uniq = randomUUID().slice(0, 8);
+      const dest = path.join(targetDir, `${uniq}_${originalName}`);
+      await fs.promises.writeFile(dest, buf);
+      if (targetDir === pdfsDir) savedPdfs += 1;
+      else savedXmls += 1;
+    }
+
+    return reply.send({ ok: true, savedPdfs, savedXmls });
+  }
+);
+
+app.post<{ Params: { id: string } }>(
+  `${API_PREFIX}/tools/comparacao-nfse/jobs/:id/start`,
+  async (req, reply) => {
+    const { id } = req.params;
+    const { base, pdfsDir, xmlsDir, outDir } = nfseJobPaths(id);
+    if (!fs.existsSync(base)) {
+      return reply.code(404).send({ error: "Job não encontrado." });
+    }
+
+    const xmlCount = (await fs.promises.readdir(xmlsDir).catch(() => [])).length;
+    const pdfCount = (await fs.promises.readdir(pdfsDir).catch(() => [])).length;
+    if (xmlCount === 0 && pdfCount === 0) {
+      return reply.code(400).send({
+        error: "Envie ao menos um XML ou um PDF antes de iniciar a comparação.",
+      });
+    }
+
+    /** Fail-fast quando o circuit esta aberto E o job tem PDFs (que precisariam
+     * de Gemini). Jobs so com XML nao tocam Gemini, entao podem prosseguir. */
+    if (pdfCount > 0) {
+      const circuit = await readNfseCircuitState();
+      if (circuit.state === "open") {
+        const retryAfterSec = Math.max(
+          0,
+          Math.ceil(circuit.openUntilSec - Date.now() / 1000),
+        );
+        return reply.code(503).send({
+          error:
+            "Cota do Gemini esgotada — aguarde antes de iniciar novos jobs com PDFs.",
+          failureKind: "quota" as const,
+          retryAfterSec,
+        });
+      }
+    }
+
+    const outputXlsx = path.join(outDir, "Comparador NFS-e.xlsx");
+    const outputJson = path.join(outDir, "result.json");
+
+    const payload: ComparacaoNfseJobPayload = {
+      jobId: id,
+      pdfsDir,
+      xmlsDir,
+      outputXlsx,
+      outputJson,
+    };
+
+    try {
+      await Promise.race([
+        comparacaoNfseQueue.add("nfse", payload, { jobId: id }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Fila timeout")), 15_000)
+        ),
+      ]);
+    } catch (e) {
+      req.log.error({ err: e }, "falha ao enfileirar job nfse");
+      return reply.code(503).send({
+        error:
+          "Não foi possível enfileirar o job. Verifique Redis e se o worker-comparacao-nfse está rodando.",
+      });
+    }
+
+    return reply.code(202).send({ id, status: "queued" as const });
+  }
+);
+
+app.get<{ Params: { id: string } }>(`${API_PREFIX}/tools/comparacao-nfse/jobs/:id`, async (req, reply) => {
+  const { id } = req.params;
+  const job = await comparacaoNfseQueue.getJob(id);
+  if (!job) {
+    const { base } = nfseJobPaths(id);
+    if (fs.existsSync(base)) {
+      return reply.send({ id, status: "queued" as const });
+    }
+    return reply.code(404).send({ id, status: "not_found" as const });
+  }
+  const state = await job.getState();
+  const status = mapBullState(state);
+  const progress =
+    typeof job.progress === "number" ? Math.round(job.progress) : undefined;
+
+  let downloadToken: string | undefined;
+  let fileName: string | undefined;
+  let error: string | undefined;
+  let result: unknown;
+
+  if (status === "done") {
+    const rv = job.returnvalue as { fileName?: string; result?: unknown; hasXlsx?: boolean } | undefined;
+    fileName =
+      rv?.fileName ??
+      path.basename(String((job.data as ComparacaoNfseJobPayload).outputXlsx ?? "Comparador NFS-e.xlsx"));
+    if (rv?.hasXlsx !== false) {
+      downloadToken = await signDownloadToken(env, id, fileName, "comparacao-nfse");
+    }
+    result = rv?.result;
+    if (result == null) {
+      const jsonPath = (job.data as ComparacaoNfseJobPayload).outputJson;
+      if (jsonPath && fs.existsSync(jsonPath)) {
+        try {
+          const raw = await fs.promises.readFile(jsonPath, "utf-8");
+          result = JSON.parse(raw);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+  if (status === "failed") {
+    error = job.failedReason?.slice(0, 500) ?? "Falha no processamento";
+  }
+
+  let estimatedWaitSec: number | undefined;
+  if (status === "queued") {
+    try {
+      const counts = await comparacaoNfseQueue.getJobCounts(
+        "waiting",
+        "active",
+        "delayed",
+      );
+      const depth =
+        (counts.waiting ?? 0) + (counts.active ?? 0) + (counts.delayed ?? 0);
+      estimatedWaitSec = estimateWaitSec(depth);
+    } catch {
+      /* ignore — campo opcional */
+    }
+  }
+
+  return {
+    id,
+    status,
+    progress,
+    error,
+    downloadToken,
+    fileName,
+    result,
+    estimatedWaitSec,
+  };
+});
+
+app.get<{ Params: { id: string }; Querystring: { token?: string } }>(
+  `${API_PREFIX}/tools/comparacao-nfse/jobs/:id/download`,
+  async (req, reply) => {
+    const { id } = req.params;
+    const token = req.query.token;
+    if (!token) return reply.code(401).send({ error: "Token ausente" });
+
+    const claims = await verifyDownloadToken(env, token);
+    if (!claims || claims.jobId !== id || claims.tool !== "comparacao-nfse") {
+      return reply.code(401).send({ error: "Token inválido" });
+    }
+
+    const job = await comparacaoNfseQueue.getJob(id);
+    if (!job || (await job.getState()) !== "completed") {
+      return reply.code(404).send({ error: "Job não concluído" });
+    }
+
+    const outPath = (job.data as ComparacaoNfseJobPayload).outputXlsx;
     if (!outPath || !fs.existsSync(outPath)) {
       return reply.code(404).send({ error: "Arquivo não encontrado" });
     }

@@ -5,9 +5,9 @@ import { useDropzone } from "react-dropzone";
 import { createSciConsolidadoJob, getSciConsolidadoJob, type JobResponse } from "../api.js";
 import { fileLabel } from "../dropFiles.js";
 import { ToolPageTitle } from "../components/ToolPageTitle.js";
+import { Modal } from "../components/Modal.js";
 import {
   toolDropzoneClass,
-  toolErrorBannerClass,
   toolPageShellClass,
   toolPanelClass,
   toolPrimaryButtonClass,
@@ -128,21 +128,13 @@ export default function SciConsolidadoHomePage() {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={springSoft}
       >
-        <AnimatePresence mode="wait">
-          {err && (
-            <motion.div
-              key="err"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={transitionFast}
-              className={toolErrorBannerClass}
-              role="alert"
-            >
-              {err}
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <Modal
+          open={!!err}
+          onClose={() => setErr(null)}
+          tone="error"
+          title="Algo deu errado"
+          message={err}
+        />
 
         <section {...getRootProps()} className={toolDropzoneClass(isDragActive)}>
           <input {...getInputProps()} />

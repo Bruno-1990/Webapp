@@ -6,10 +6,12 @@ import {
   SPED_MERGE_QUEUE_NAME,
   SPED_QUEUE_NAME,
   COMPARACAO_PLANILHAS_QUEUE_NAME,
+  COMPARACAO_NFSE_QUEUE_NAME,
   type SciConsolidadoJobPayload,
   type SpedJobPayload,
   type SpedMergeJobPayload,
   type ComparacaoPlanilhasJobPayload,
+  type ComparacaoNfseJobPayload,
 } from "@webapp/contracts";
 import type { Env } from "./env.js";
 
@@ -19,7 +21,13 @@ export type NfeJobPayload = {
   outputPath: string;
 };
 
-export type { SciConsolidadoJobPayload, SpedJobPayload, SpedMergeJobPayload, ComparacaoPlanilhasJobPayload };
+export type {
+  SciConsolidadoJobPayload,
+  SpedJobPayload,
+  SpedMergeJobPayload,
+  ComparacaoPlanilhasJobPayload,
+  ComparacaoNfseJobPayload,
+};
 
 let connection: Redis | null = null;
 let queue: Queue<NfeJobPayload> | null = null;
@@ -27,6 +35,7 @@ let spedQueue: Queue<SpedJobPayload> | null = null;
 let spedMergeQueue: Queue<SpedMergeJobPayload> | null = null;
 let sciConsolidadoQueue: Queue<SciConsolidadoJobPayload> | null = null;
 let comparacaoPlanilhasQueue: Queue<ComparacaoPlanilhasJobPayload> | null = null;
+let comparacaoNfseQueue: Queue<ComparacaoNfseJobPayload> | null = null;
 
 export function getRedis(env: Env): Redis {
   if (!connection) {
@@ -107,4 +116,18 @@ export function getComparacaoPlanilhasQueue(env: Env): Queue<ComparacaoPlanilhas
     });
   }
   return comparacaoPlanilhasQueue;
+}
+
+export function getComparacaoNfseQueue(env: Env): Queue<ComparacaoNfseJobPayload> {
+  if (!comparacaoNfseQueue) {
+    comparacaoNfseQueue = new Queue<ComparacaoNfseJobPayload>(COMPARACAO_NFSE_QUEUE_NAME, {
+      connection: getRedis(env),
+      defaultJobOptions: {
+        attempts: 1,
+        removeOnComplete: { count: 200 },
+        removeOnFail: { count: 100 },
+      },
+    });
+  }
+  return comparacaoNfseQueue;
 }

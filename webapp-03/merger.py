@@ -23,6 +23,18 @@ from line_builders import (
 )
 
 MERGE_HEADERS = merge_headers(HEADERS)
+
+# Índices dos campos que devem ficar vazios no C100 quando COD_MOD = 65 (NFC-e)
+_C100_CAMPOS_VAZIOS_MOD65 = {3, 22, 23, 24, 25, 26, 27, 28}
+
+
+def _limpar_campos_mod65(inner: list[str]) -> list[str]:
+    """Para C100 com COD_MOD=65 (NFC-e), campos proibidos devem ficar vazios."""
+    if len(inner) > 4 and inner[4].strip() == "65":
+        for idx in _C100_CAMPOS_VAZIOS_MOD65:
+            if idx < len(inner):
+                inner[idx] = ""
+    return inner
 REG_SHEET_RE = re.compile(r"^[0-9A-Z]{4}$")
 
 
@@ -147,6 +159,8 @@ def merge_sped_from_xlsx(sped_path: Path | None, xlsx_path: Path, output_path: P
                     template_value = orig_inner[i] if i < len(orig_inner) else None
                     inner.append(normalize_sped_field(c, row_dict.get(c, ""), template_value))
             inner = append_extras(inner, row_dict, cols, template_inner=orig_inner if from_original else None)
+            if sheet == "C100":
+                inner = _limpar_campos_mod65(inner)
             # Mantém a cardinalidade exata de campos da linha original para evitar
             # rejeições no PVA por "número de campos diferente do leiaute".
             if from_original:

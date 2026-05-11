@@ -183,6 +183,85 @@ def test_merge_sem_sped_original_gera_saida_por_linha(tmp_path: Path) -> None:
     assert lines[0].startswith("|C100|1|0|P|55|00|1|123|CHV|02022026|02022026|100,00|")
 
 
+def test_c100_mod65_campos_proibidos_ficam_vazios(tmp_path: Path) -> None:
+    """Para NFC-e (COD_MOD=65), COD_PART e campos ST/IPI/PIS/COFINS devem ficar vazios."""
+    xlsx = tmp_path / "mod65.xlsx"
+    out = tmp_path / "out_mod65.txt"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "C100"
+    headers = [
+        "_LINHA", "REG", "IND_OPER", "IND_EMIT", "COD_PART", "COD_MOD",
+        "COD_SIT", "SER", "NUM_DOC", "CHV_NFE", "DT_DOC", "DT_E_S",
+        "VL_DOC", "IND_PGTO", "VL_DESC", "VL_ABAT_NT", "VL_MERC",
+        "IND_FRT", "VL_FRT", "VL_SEG", "VL_OUT_DA", "VL_BC_ICMS",
+        "VL_ICMS", "VL_BC_ICMS_ST", "VL_ICMS_ST", "VL_IPI", "VL_PIS",
+        "VL_COFINS", "VL_PIS_ST", "VL_COFINS_ST",
+    ]
+    ws.append(headers)
+    ws.append([
+        1, "C100", "1", "0", "PART", "65", "00", "1", "6366",
+        "32-2603-04.635.570/0001-09-65-001-000.006.366-167.321.269-7",
+        "31032026", "31032026", "155,00", "0", "0", "0", "155,00",
+        "9", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0",
+    ])
+    wb.save(xlsx)
+
+    merge_sped_from_xlsx(None, xlsx, out)
+
+    lines = out.read_text(encoding="utf-8", errors="replace").splitlines()
+    assert len(lines) == 1
+    parts = lines[0].split("|")
+    inner = parts[1:-1]  # campos entre pipes
+
+    # COD_PART (índice 3) deve estar vazio
+    assert inner[3] == "", f"COD_PART deveria estar vazio, mas é {inner[3]!r}"
+    # VL_BC_ICMS_ST (22), VL_ICMS_ST (23), VL_IPI (24), VL_PIS (25),
+    # VL_COFINS (26), VL_PIS_ST (27), VL_COFINS_ST (28)
+    for idx, nome in [(22, "VL_BC_ICMS_ST"), (23, "VL_ICMS_ST"), (24, "VL_IPI"),
+                      (25, "VL_PIS"), (26, "VL_COFINS"), (27, "VL_PIS_ST"),
+                      (28, "VL_COFINS_ST")]:
+        assert inner[idx] == "", f"{nome} (idx {idx}) deveria estar vazio, mas é {inner[idx]!r}"
+
+    # COD_MOD deve permanecer "65"
+    assert inner[4] == "65"
+    # VL_DOC deve permanecer preenchido
+    assert inner[11] == "155,00"
+
+
+def test_c100_mod55_campos_permanecem_preenchidos(tmp_path: Path) -> None:
+    """Para NF-e (COD_MOD=55), os campos devem manter seus valores normalmente."""
+    xlsx = tmp_path / "mod55.xlsx"
+    out = tmp_path / "out_mod55.txt"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "C100"
+    headers = [
+        "_LINHA", "REG", "IND_OPER", "IND_EMIT", "COD_PART", "COD_MOD",
+        "COD_SIT", "SER", "NUM_DOC", "CHV_NFE", "DT_DOC", "DT_E_S",
+        "VL_DOC", "IND_PGTO", "VL_DESC", "VL_ABAT_NT", "VL_MERC",
+        "IND_FRT", "VL_FRT", "VL_SEG", "VL_OUT_DA", "VL_BC_ICMS",
+        "VL_ICMS", "VL_BC_ICMS_ST", "VL_ICMS_ST", "VL_IPI", "VL_PIS",
+        "VL_COFINS", "VL_PIS_ST", "VL_COFINS_ST",
+    ]
+    ws.append(headers)
+    ws.append([
+        1, "C100", "1", "0", "PART", "55", "00", "1", "123", "CHV",
+        "02022026", "02022026", "100,00", "0", "0", "0", "100,00",
+        "1", "0", "0", "0", "100,00", "18,00", "0", "0", "0", "0", "0", "0", "0",
+    ])
+    wb.save(xlsx)
+
+    merge_sped_from_xlsx(None, xlsx, out)
+
+    lines = out.read_text(encoding="utf-8", errors="replace").splitlines()
+    inner = lines[0].split("|")[1:-1]
+
+    # Para MOD=55, COD_PART e campos numéricos zerados devem permanecer
+    assert inner[3] == "PART"
+    assert inner[22] == "0"  # VL_BC_ICMS_ST mantém zero
+
+
 def test_merge_sem_sped_original_ajusta_k010_e_remove_cauda_vazia(tmp_path: Path) -> None:
     xlsx = tmp_path / "only_k.xlsx"
     out = tmp_path / "out_k.txt"
@@ -284,6 +363,35 @@ def test_merge_normaliza_data_e_valor_no_c100(tmp_path: Path) -> None:
     assert "2026-02-02" not in merged
     assert "16.664,42" not in merged
     assert "16664.42" not in merged
+
+
+def test_merge_bloco_e_campos_inteiros_sem_decimal(tmp_path: Path) -> None:
+    """Campos VL_ do Bloco E com template inteiro ('0') não devem virar '0,00'."""
+    sped = tmp_path / "orig_e.txt"
+    xlsx = tmp_path / "edit_e.xlsx"
+    out = tmp_path / "out_e.txt"
+    # E110 simplificado com campos inteiros "0"
+    sped.write_text(
+        "|0000|017|0|\n"
+        "|E110|0|0|0|0|0|\n",
+        encoding="utf-8",
+    )
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "E110"
+    # Simula o Excel montado pelo webapp-02 com VL_* formatados como "0,00"
+    ws.append(["_LINHA", "COL_01", "COL_02", "COL_03", "COL_04", "COL_05", "COL_06"])
+    ws.append([2, "E110", "0,00", "0,00", "0,00", "0,00", "0,00"])
+    wb.save(xlsx)
+
+    merge_sped_from_xlsx(sped, xlsx, out)
+
+    merged = out.read_text(encoding="utf-8", errors="replace")
+    e110_line = [l for l in merged.splitlines() if "|E110|" in l][0]
+    # Campos que eram "0" no SPED original devem permanecer "0", não "0,00"
+    assert e110_line == "|E110|0|0|0|0|0|"
+    assert "0,00" not in e110_line
 
 
 def test_inner_payload_c170_skips_injected() -> None:

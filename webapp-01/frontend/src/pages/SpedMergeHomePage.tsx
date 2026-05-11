@@ -10,10 +10,9 @@ import {
 } from "../api.js";
 import { fileLabel, getSpedFilesFromEvent } from "../dropFiles.js";
 import { ToolPageTitle } from "../components/ToolPageTitle.js";
+import { Modal } from "../components/Modal.js";
 import {
   toolDropzoneClass,
-  toolErrorBannerClass,
-  toolErrorPanelClass,
   toolPageShellClass,
   toolPanelClass,
   toolPrimaryButtonClass,
@@ -307,36 +306,23 @@ export default function SpedMergeHomePage() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {err && (
-          <motion.p
-            key="err"
-            className={toolErrorBannerClass}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={transitionSmooth}
-          >
-            {err}
-          </motion.p>
-        )}
-      </AnimatePresence>
+      <Modal
+        open={!!err}
+        onClose={() => setErr(null)}
+        tone="error"
+        title="Algo deu errado"
+        message={err}
+      />
 
-      <AnimatePresence>
-        {job?.status === "failed" && (
-          <motion.div
-            key="failed"
-            className={toolErrorPanelClass}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={transitionSmooth}
-          >
-            <p className="font-bold text-rose-700">Erro ao mesclar</p>
-            {job.error && <p className="mt-2 text-sm text-rose-600">{job.error}</p>}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <Modal
+        open={job?.status === "failed"}
+        onClose={() => setJob(null)}
+        tone="error"
+        title="Erro ao mesclar"
+        message={job?.status === "failed" ? job.error : undefined}
+        primaryLabel="Tentar de novo"
+        onPrimary={() => setJob(null)}
+      />
     </motion.div>
   );
 }

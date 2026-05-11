@@ -46,9 +46,7 @@ def main() -> int:
         ui = CliProgressUi()
         job = TransformadorProdutos(
             caminho_sci=str(inp.resolve()),
-            caminho_cliente=None,
             caminho_saida=str(out.resolve()),
-            incluir_confronto=False,
             sheet_name=args.sheet,
         )
         stages = [

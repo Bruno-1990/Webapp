@@ -15,10 +15,9 @@ import {
 } from "../api.js";
 import { fileLabel, getSpedFilesFromEvent } from "../dropFiles.js";
 import { ToolPageTitle } from "../components/ToolPageTitle.js";
+import { Modal } from "../components/Modal.js";
 import {
   toolDropzoneClass,
-  toolErrorBannerClass,
-  toolErrorPanelClass,
   toolPageShellClass,
   toolPanelClass,
   toolPrimaryButtonClass,
@@ -440,36 +439,23 @@ export default function SpedHomePage() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {err && (
-          <motion.p
-            key="err"
-            className={toolErrorBannerClass}
-            initial={{ opacity: 0, y: 12, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.98 }}
-            transition={transitionSmooth}
-          >
-            {err}
-          </motion.p>
-        )}
-      </AnimatePresence>
+      <Modal
+        open={!!err}
+        onClose={() => setErr(null)}
+        tone="error"
+        title="Algo deu errado"
+        message={err}
+      />
 
-      <AnimatePresence>
-        {job?.status === "failed" && (
-          <motion.div
-            key="failed"
-            className={toolErrorPanelClass}
-            initial={{ opacity: 0, y: 16, filter: "blur(6px)" }}
-            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            exit={{ opacity: 0, y: -10, filter: "blur(4px)" }}
-            transition={transitionSmooth}
-          >
-            <p className="font-bold text-rose-700">Erro ao processar</p>
-            {job.error && <p className="mt-2 text-sm text-rose-600">{job.error}</p>}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <Modal
+        open={job?.status === "failed"}
+        onClose={() => setJob(null)}
+        tone="error"
+        title="Erro ao processar"
+        message={job?.status === "failed" ? job.error : undefined}
+        primaryLabel="Tentar de novo"
+        onPrimary={() => setJob(null)}
+      />
     </motion.div>
   );
 }

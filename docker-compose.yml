@@ -1,8 +1,11 @@
-# Stack única do monorepo (webapp-01 + workers que embutem 02/03).
+# Stack única do monorepo (webapp-01 + workers que embutem 02..06).
 # Da raiz webapp:  docker compose up -d --build
-# Com Python SPED completo:  docker compose --profile sped up -d --build
+# Profiles disponiveis: sped, comparacao, nfse
 #
-# Novo módulo no futuro = novo bloco "services:" aqui (ou outro arquivo com "include:").
+# Variaveis de ambiente: lidas de ./.env (env_file). Variaveis tecnicas
+# fixas (REDIS_URL interno, TEMP_JOBS_ROOT no volume) ficam em `environment`
+# e sobrescrevem o que vier do .env — esses caminhos so fazem sentido dentro
+# do container.
 
 services:
   redis:
@@ -19,14 +22,12 @@ services:
       target: api
     ports:
       - "8000:8000"
+    env_file:
+      - ./.env
     environment:
       PORT: "8000"
       REDIS_URL: redis://redis:6379
       TEMP_JOBS_ROOT: /data/jobs
-      JWT_SECRET: ${JWT_SECRET:-troque-este-segredo-minimo-16chars}
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5176,http://192.168.0.47:5176}
-      MAX_UPLOAD_MB: "50"
-      MAX_XML_FILES: "5000"
     volumes:
       - job-data:/data/jobs
     depends_on:
@@ -37,6 +38,8 @@ services:
       context: ./webapp-01
       dockerfile: docker/Dockerfile
       target: worker
+    env_file:
+      - ./.env
     environment:
       REDIS_URL: redis://redis:6379
       TEMP_JOBS_ROOT: /data/jobs
@@ -50,6 +53,8 @@ services:
     build:
       context: .
       dockerfile: webapp-01/docker/Dockerfile.worker-sped
+    env_file:
+      - ./.env
     environment:
       REDIS_URL: redis://redis:6379
     volumes:
@@ -62,6 +67,8 @@ services:
     build:
       context: .
       dockerfile: webapp-01/docker/Dockerfile.worker-sped-merge
+    env_file:
+      - ./.env
     environment:
       REDIS_URL: redis://redis:6379
       TEMP_JOBS_ROOT: /data/jobs
@@ -75,6 +82,23 @@ services:
     build:
       context: .
       dockerfile: webapp-01/docker/Dockerfile.worker-comparacao
+    env_file:
+      - ./.env
+    environment:
+      REDIS_URL: redis://redis:6379
+      TEMP_JOBS_ROOT: /data/jobs
+    volumes:
+      - job-data:/data/jobs
+    depends_on:
+      - redis
+
+  worker-comparacao-nfse:
+    profiles: ["nfse"]
+    build:
+      context: .
+      dockerfile: webapp-01/docker/Dockerfile.worker-comparacao-nfse
+    env_file:
+      - ./.env
     environment:
       REDIS_URL: redis://redis:6379
       TEMP_JOBS_ROOT: /data/jobs

@@ -23,6 +23,15 @@ def processar(sefaz_paths: list[str], sci_paths: list[str], output: str):
     col_cnpj = "CNPJ/CPF"
     cols_sci_possiveis = ["Documento", "Nr. documento", "Nº NF."]
 
+    # Colunas que devem ser lidas como texto para preservar precisao
+    # (chave de 44 digitos vira notacao cientifica como float; CNPJ pode perder zeros)
+    text_dtype = {
+        "Chave Acesso": str,
+        "CNPJ/CPF": str,
+        "CNPJ/CPF Emitente": str,
+        "CNPJ/CPF Destinatário": str,
+    }
+
     # --- Carregar SEFAZ ---
     dados_sefaz = pd.DataFrame()
     total_files = len(sefaz_paths) + len(sci_paths)
@@ -30,9 +39,9 @@ def processar(sefaz_paths: list[str], sci_paths: list[str], output: str):
 
     for p in sefaz_paths:
         if p.lower().endswith(".csv"):
-            df = pd.read_csv(p, sep=";", encoding="latin1", skiprows=1)
+            df = pd.read_csv(p, sep=";", encoding="latin1", skiprows=1, dtype=text_dtype)
         else:
-            df = pd.read_excel(p, skiprows=1)
+            df = pd.read_excel(p, skiprows=1, dtype=text_dtype)
         df.rename(columns={
             "CNPJ/CPF Emitente": col_cnpj,
             "CNPJ/CPF Destinatário": col_cnpj,
@@ -107,11 +116,45 @@ def processar(sefaz_paths: list[str], sci_paths: list[str], output: str):
     sheet_name = "Notas Faltantes"
 
     with pd.ExcelWriter(str(out), engine="xlsxwriter") as writer:
-        dados_faltantes.to_excel(writer, index=False, sheet_name=sheet_name)
+        dados_faltantes.to_excel(writer, index=False, sheet_name=sheet_name, header=False, startrow=1)
+        wb = writer.book
         ws = writer.sheets[sheet_name]
-        larguras = {"#": 3, "Chave Acesso": 46}
+
+        header_fmt = wb.add_format({
+            "bold": True,
+            "align": "center",
+            "valign": "vcenter",
+            "bg_color": "#1e3d4d",
+            "font_color": "#ffffff",
+            "border": 1,
+            "border_color": "#0f2530",
+        })
+        cell_fmt = wb.add_format({
+            "align": "center",
+            "valign": "vcenter",
+            "border": 1,
+            "border_color": "#CECECE",
+        })
+        text_cell_fmt = wb.add_format({
+            "align": "center",
+            "valign": "vcenter",
+            "num_format": "@",
+            "border": 1,
+            "border_color": "#CECECE",
+        })
+        text_cols = {"Chave Acesso", col_cnpj}
+
+        ws.set_row(0, 25, header_fmt)
+        for row_idx in range(len(dados_faltantes)):
+            ws.set_row(row_idx + 1, 20)
+
         for idx, col_name in enumerate(dados_faltantes.columns):
-            ws.set_column(idx, idx, larguras.get(col_name, 18))
+            ws.write(0, idx, col_name, header_fmt)
+            series = dados_faltantes[col_name].astype(str)
+            max_data = int(series.map(len).max()) if len(series) else 0
+            width = min(max(len(str(col_name)), max_data) + 2, 60)
+            fmt = text_cell_fmt if col_name in text_cols else cell_fmt
+            ws.set_column(idx, idx, width, fmt)
 
     progress(100)
     return len(dados_faltantes)

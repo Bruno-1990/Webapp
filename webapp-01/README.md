@@ -49,9 +49,9 @@ O **Vite** (`dev:fe`) faz proxy de `http://<ip>:5176/api/*` → `http://127.0.0.
 
 - O Vite está encaminhando para a API em **8000**, mas **nada está escutando** → suba `npm run dev:backend` (ou `node apps/api/dist/server.js` manualmente após `npm run build`).
 - Confirme o **Redis** (`docker ps` ou teste `redis-cli ping`).
-- Produção / variáveis próprias: copie `.env.example` para `.env` e use `JWT_SECRET` com **16+ caracteres**; para só API/worker sem o script `dev:backend`, use os comandos `set`/`export` descritos na versão antiga do README ou rode `npm run dev:api:only` e `npm run dev:worker:only` **depois** de `npm run build` nos pacotes.
+- Produção / variáveis próprias: copie `../.env.example` (raiz do monorepo) para `../.env` e use `JWT_SECRET` com **16+ caracteres**; para só API/worker sem o script `dev:backend`, use os comandos `set`/`export` descritos na versão antiga do README ou rode `npm run dev:api:only` e `npm run dev:worker:only` **depois** de `npm run build` nos pacotes.
 
-Se a API estiver em outra máquina/porta, use `frontend/.env.local`:
+Se a API estiver em outra máquina/porta, use o `.env` da raiz do monorepo (mesmo arquivo lido por API e workers):
 
 - `VITE_API_PROXY_TARGET=http://192.168.0.47:8000` (proxy em dev), ou
 - `VITE_API_URL=http://192.168.0.47:8000` (chamada direta, sem proxy).

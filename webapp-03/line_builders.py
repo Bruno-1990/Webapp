@@ -143,6 +143,17 @@ def normalize_sped_field(field_name: str, value: Any, template_value: str | None
             t = template_value.strip()
             if "." in t and "," not in t:
                 return v.replace(",", ".")
+            # Template inteiro (sem separador decimal) → remover decimais zerados
+            # Ex: "0,00" → "0", "100,00" → "100", mas "16664,42" permanece "16664,42"
+            if t and "," not in t and "." not in t and re.fullmatch(r"-?\d+", t):
+                if "," in v:
+                    inteiro, dec = v.split(",", 1)
+                    if re.fullmatch(r"0+", dec):
+                        return inteiro
+                elif "." in v:
+                    inteiro, dec = v.split(".", 1)
+                    if re.fullmatch(r"0+", dec):
+                        return inteiro
         return v.replace(".", ",")
     if template_value is not None:
         return _sanitize_text(_normalize_with_template(value, template_value))

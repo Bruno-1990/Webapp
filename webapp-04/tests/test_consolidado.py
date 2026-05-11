@@ -21,9 +21,7 @@ def test_three_sheets_and_groupby_sums():
         out = Path(td) / "out.xlsx"
         job = TransformadorProdutos(
             caminho_sci=str(csv_path),
-            caminho_cliente=None,
             caminho_saida=str(out),
-            incluir_confronto=False,
             sheet_name=None,
         )
         job.executar(progress=None)
@@ -63,9 +61,7 @@ def test_multi_sheet_workbook_first_sheet_sorted_by_name(tmp_path: Path):
     out = tmp_path / "out.xlsx"
     job = TransformadorProdutos(
         caminho_sci=str(p),
-        caminho_cliente=None,
         caminho_saida=str(out),
-        incluir_confronto=False,
         sheet_name=None,
     )
     job.executar(progress=None)

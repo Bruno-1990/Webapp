@@ -31,7 +31,8 @@ def coerce_int_str(series: pd.Series) -> pd.Series:
     return pd.to_numeric(s, errors="coerce").fillna(0).astype(int)
 
 def coerce_cfop(series: pd.Series) -> pd.Series:
-    """Mantém zeros e remove lixo; devolve string limpa."""
-    return series.astype(str).str.replace(r'[^0-9]', '', regex=True).str.strip()
+    """Mantém apenas os 4 primeiros dígitos do CFOP."""
+    limpo = series.astype(str).str.replace(r'[^0-9]', '', regex=True).str.strip()
+    return limpo.str[:4]
 
 NUM_COLS = ["Vlr contábil", "Base de ICMS", "Valor do ICMS", "Base de IPI", "Valor do IPI"]

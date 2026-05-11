@@ -1,7 +1,13 @@
 import * as jose from "jose";
 import type { Env } from "./env.js";
 
-export type DownloadTool = "nfe" | "sped" | "sped-merge" | "sci-consolidado" | "comparacao-planilhas";
+export type DownloadTool =
+  | "nfe"
+  | "sped"
+  | "sped-merge"
+  | "sci-consolidado"
+  | "comparacao-planilhas"
+  | "comparacao-nfse";
 
 export async function signDownloadToken(
   env: Env,
@@ -33,6 +39,7 @@ export async function verifyDownloadToken(
     else if (rawTool === "sped-merge") tool = "sped-merge";
     else if (rawTool === "sci-consolidado") tool = "sci-consolidado";
     else if (rawTool === "comparacao-planilhas") tool = "comparacao-planilhas";
+    else if (rawTool === "comparacao-nfse") tool = "comparacao-nfse";
     return { jobId, fileName, tool };
   } catch {
     return null;

@@ -5,14 +5,18 @@ import react from "@vitejs/plugin-react";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fontDir = path.resolve(__dirname, "../Font");
+/** Raiz do monorepo (webapp/), onde mora o .env unico. */
+const monorepoRoot = path.resolve(__dirname, "../../");
 
 /** Sem VITE_API_URL, o frontend chama /api/... no mesmo host do Vite; o proxy encaminha para a API. */
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), "");
+  const env = loadEnv(mode, monorepoRoot, "");
   const apiTarget = env.VITE_API_PROXY_TARGET || "http://127.0.0.1:8000";
 
   return {
     plugins: [react()],
+    /** Le .env unico da raiz do monorepo (mesmo arquivo lido por API e workers). */
+    envDir: monorepoRoot,
     server: {
       fs: {
         /** Incluir a raiz do frontend: se `allow` só listar ../Font, o Vite bloqueia index.html (403). */

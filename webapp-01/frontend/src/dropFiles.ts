@@ -24,6 +24,16 @@ function allowSpedTxt(file: File): boolean {
   return file.name.toLowerCase().endsWith(".txt");
 }
 
+function allowPdfOrImage(file: File): boolean {
+  const n = file.name.toLowerCase();
+  return (
+    n.endsWith(".pdf") ||
+    n.endsWith(".jpg") ||
+    n.endsWith(".jpeg") ||
+    n.endsWith(".png")
+  );
+}
+
 function readEntriesAsync(reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> {
   return new Promise((resolve, reject) => {
     const acc: FileSystemEntry[] = [];
@@ -126,4 +136,83 @@ export async function getSpedFilesFromEvent(event: unknown): Promise<File[]> {
     return Array.from(t.files).filter(allowSpedTxt);
   }
   return [];
+}
+
+/** NFS-e dropzone: aceita .pdf, .jpg, .jpeg e .png (raiz e pastas). */
+export async function getPdfFilesFromEvent(event: unknown): Promise<File[]> {
+  const dt = dataTransferFrom(event);
+  if (dt) {
+    return extractFromDataTransfer(dt, allowPdfOrImage, allowPdfOrImage);
+  }
+  const t = (event as { target?: EventTarget | null }).target as HTMLInputElement | null;
+  if (t?.files?.length) {
+    return Array.from(t.files).filter(allowPdfOrImage);
+  }
+  return [];
+}
+
+/** NFS-e XML dropzone: aceita só `.xml` (diferente do NFe, que aceita .zip). */
+export async function getXmlOnlyFilesFromEvent(event: unknown): Promise<File[]> {
+  const dt = dataTransferFrom(event);
+  if (dt) {
+    return extractFromDataTransfer(dt, isXml, isXml);
+  }
+  const t = (event as { target?: EventTarget | null }).target as HTMLInputElement | null;
+  if (t?.files?.length) {
+    return Array.from(t.files).filter(isXml);
+  }
+  return [];
+}
+
+/* ─── File System Access API: picker de pasta sem o alert "Carregar N arquivos" ─── */
+
+/** True se o browser oferece o picker novo (Chrome/Edge >= 86 em https/localhost). */
+export function supportsDirectoryPicker(): boolean {
+  return typeof (window as { showDirectoryPicker?: unknown }).showDirectoryPicker === "function";
+}
+
+type FsHandle = {
+  kind: "file" | "directory";
+  name: string;
+  values: () => AsyncIterable<FsHandle>;
+  getFile: () => Promise<File>;
+};
+
+async function collectFromHandle(dir: FsHandle, accept: (f: File) => boolean): Promise<File[]> {
+  const out: File[] = [];
+  for await (const entry of dir.values()) {
+    if (entry.kind === "file") {
+      try {
+        const f = await entry.getFile();
+        if (accept(f)) out.push(f);
+      } catch {
+        /* arquivo sem permissao — ignora */
+      }
+    } else if (entry.kind === "directory") {
+      out.push(...(await collectFromHandle(entry, accept)));
+    }
+  }
+  return out;
+}
+
+/**
+ * Abre o picker de pasta nativo (sem o alert "Upload N files…") e retorna os
+ * arquivos filtrados. Lança se o browser não suportar; chame `supportsDirectoryPicker`
+ * antes de invocar.
+ */
+export async function pickDirectoryAndReadFiles(
+  accept: "pdf-or-image" | "xml-only",
+): Promise<File[] | null> {
+  const filter = accept === "pdf-or-image" ? allowPdfOrImage : isXml;
+  const showDirectoryPicker = (window as unknown as {
+    showDirectoryPicker: (opts?: { mode?: "read" | "readwrite" }) => Promise<FsHandle>;
+  }).showDirectoryPicker;
+  try {
+    const handle = await showDirectoryPicker({ mode: "read" });
+    return await collectFromHandle(handle, filter);
+  } catch (e) {
+    /** AbortError = user cancelou (Esc / fechou). Devolve null para sinalizar. */
+    if (e instanceof DOMException && e.name === "AbortError") return null;
+    throw e;
+  }
 }
