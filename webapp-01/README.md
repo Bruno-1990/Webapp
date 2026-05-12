@@ -6,13 +6,16 @@ Monorepo **Node.js + TypeScript**: API **Fastify**, fila **BullMQ** + **Redis**,
 
 Este repositório concentra a **plataforma** e as **ferramentas** atuais e futuras (NFe, SPED, etc.). Novas ferramentas entram como pastas/workers adicionais (ex.: [webapp-02](../webapp-02) para SPED) sem obrigar outro repositório.
 
-- **Hub:** `/` lista ferramentas (`GET /api/v1/tools` alimenta os cards).
+- **Hub:** `/` lista ferramentas (`GET /api/v1/tools` alimenta os cards). Categorias **Fiscais** e **Contábeis** no header (`?cat=contabil`).
 - **NFe XML → XLSX:** `/tools/nfe` (rotas legadas de API: `POST /api/v1/jobs` inalteradas).
 - **SPED → XLSX:** `/tools/sped`; motor Python em **[webapp-02](../webapp-02)/sped_engine** (worker `worker-sped-bridge`). A planilha exportada inclui a coluna **`_LINHA`** (número da linha no `.txt` original).
 - **XLSX → SPED (webapp-03):** `/tools/sped-merge`; mescla o XLSX editado de volta no `.txt` preservando linhas que não estão na planilha. Requer o XLSX gerado pela exportação atual (**com `_LINHA`**). Código Python em **[webapp-03](../webapp-03)**; worker Node `worker-sped-merge-bridge`.
 - **Consolidado SCI (webapp-04):** `/tools/sci-consolidado`; exportação SCI → **ProdutosSCI.xlsx**. Código Python em **[webapp-04](../webapp-04)**; worker Node `worker-sci-consolidado`.
+- **Comparador SEFAZ × SCI (webapp-05):** `/tools/comparacao-planilhas`; identifica notas SEFAZ que faltam no SCI. Código Python em **[webapp-05](../webapp-05)**.
+- **Comparador NFS-e PDF × XML (webapp-06):** `/tools/comparacao-nfse`; OCR via Gemini para PDFs vs parser XML. Código Python em **[webapp-06](../webapp-06)**.
+- **Extrator GNRE (webapp-07):** `/tools/gnre`; seleciona pasta com PDFs de guias GNRE → planilha (`Lançamentos` + `Falhas`) com dedupe SQLite persistente. Código Python em **[webapp-07](../webapp-07)**.
 
-**Pastas irmãs no disco:** `webapp-01`, `webapp-02`, `webapp-03` e `webapp-04` no mesmo diretório pai (caminhos padrão dos workers).
+**Pastas irmãs no disco:** `webapp-01` até `webapp-07` no mesmo diretório pai (caminhos padrão dos workers). **O `docker-compose.yml` e o serviço Redis ficam na raiz** (`../`).
 
 ---
 
@@ -22,11 +25,12 @@ Monorepo **Node.js + TypeScript** para XML NFe → XLSX: API **Fastify**, fila *
 
 ### Início rápido (um comando)
 
-1. **Redis** em `127.0.0.1:6379` (ex.: `npm run redis:up` com Docker ligado).
-2. Na pasta `webapp-01`: `npm install`
-3. **`npm run dev`** — compila API/workers e sobe **API + workers + Vite** (`dev:all`). Para SPED, XLSX→SPED e Consolidado SCI: **Python** com `pip install -r requirements.txt` em `webapp-02/sped_engine`, `webapp-03` e **`webapp-04`** (ou o mesmo venv).
+1. **Redis** em `127.0.0.1:6379` — **na raiz do monorepo** (`../`): `npm run redis:up` (Docker).
+2. **`npm install`** na pasta `webapp-01` (ou `npm run install:app` na raiz).
+3. **`npm run dev`** (na raiz **ou** em `webapp-01`) — compila API/workers e sobe **API + workers + Vite** (`dev:all`).
+   - Para SPED, XLSX→SPED, Consolidado SCI, Comparadores e GNRE: **Python** com `pip install -r requirements.txt` em cada `webapp-0X` (ou um venv único). Alternativa one-shot: `npm run dev:stack` na raiz (sobe Redis e em seguida o dev).
 
-**Só interface:** `npm run dev:fe` sobe apenas o Vite; aí é preciso **`npm run dev:backend`** (ou API na porta 8000) em outro terminal, senão o proxy dá `ECONNREFUSED`.
+**Só interface:** `npm run dev:fe` (em `webapp-01`) sobe apenas o Vite; aí é preciso **`npm run dev:backend`** (ou API na porta 8000) em outro terminal, senão o proxy dá `ECONNREFUSED`.
 
 ## Estrutura
 
@@ -39,9 +43,9 @@ Monorepo **Node.js + TypeScript** para XML NFe → XLSX: API **Fastify**, fila *
 
 ## Desenvolvimento local (detalhe)
 
-1. **Redis** em `127.0.0.1:6379` (`docker run -d -p 6379:6379 --name redis-nfe redis:7-alpine`).
+1. **Redis** em `127.0.0.1:6379` — `npm run redis:up` **na raiz** (`docker compose up -d redis`). Avulso: `docker run -d -p 6379:6379 --name redis-nfe redis:7-alpine`.
 2. `npm install` na pasta `webapp-01`.
-3. **`npm run dev`** (recomendado) **ou** `npm run dev:stack` (sobe Redis via Compose e depois o app) **ou** dois terminais: `npm run dev:backend` e `npm run dev:fe`.
+3. **`npm run dev`** (recomendado, raiz ou `webapp-01`) **ou** `npm run dev:stack` na raiz (sobe Redis e depois o app) **ou** dois terminais: `npm run dev:backend` e `npm run dev:fe`.
 
 O **Vite** (`dev:fe`) faz proxy de `http://<ip>:5176/api/*` → `http://127.0.0.1:8000`. Sem processo na porta **8000**, aparece `ECONNREFUSED` no terminal do Vite.
 
@@ -58,9 +62,11 @@ Se a API estiver em outra máquina/porta, use o `.env` da raiz do monorepo (mesm
 
 Abra `http://192.168.0.47:5176` (ou `http://localhost:5176`).
 
-## Docker Compose (API + worker + Redis)
+## Docker Compose (API + workers + Redis)
 
-Na raiz do projeto:
+O `docker-compose.yml` vive **só na raiz do monorepo** (`../docker-compose.yml`). Rode os comandos `docker compose ...` sempre a partir de lá.
+
+Na **raiz do projeto**:
 
 ```bash
 set JWT_SECRET=um-segredo-longo-e-aleatorio
@@ -69,13 +75,25 @@ docker compose up --build
 
 API em `http://0.0.0.0:8000`. O frontend em dev continua apontando `VITE_API_URL` para essa API.
 
-**SPED (Python):** a partir da pasta **pai** que contém `webapp-01` e `webapp-02` (e `webapp-03` para merge):
+### Profiles opcionais (workers Python)
+
+A stack base (`redis`, `api`, `worker` NFe) sobe sem profile. Workers Python entram via profile:
 
 ```bash
-docker compose -f webapp-01/docker-compose.yml --profile sped up --build worker-sped worker-sped-merge
+# SPED export + merge (webapp-02 + webapp-03)
+docker compose --profile sped up -d --build worker-sped worker-sped-merge
+
+# Consolidado SCI / Comparador SEFAZ × SCI (webapp-04 + webapp-05)
+docker compose --profile comparacao up -d --build
+
+# Comparador NFS-e PDF × XML (webapp-06, exige GEMINI_API_KEY)
+docker compose --profile nfse up -d --build
+
+# Extrator GNRE (webapp-07, volume persistente para SQLite em gnre-data:/data/gnre)
+docker compose --profile gnre up -d --build
 ```
 
-Ou inclua os serviços com profile `sped` junto da API conforme sua orquestração. O build do `worker-sped-merge` copia `webapp-02/sped_engine` e `webapp-03` para a imagem.
+Os Dockerfiles dos workers copiam o código Python da respectiva pasta irmã (`webapp-02..07`), então o build precisa rodar a partir da pasta-pai (que já é o cwd da raiz do monorepo).
 
 ## GitHub
 

@@ -1,4 +1,0 @@
-# Compose canônico na raiz do monorepo: ../docker-compose.yml
-# Mesmos comandos de sempre nesta pasta; caminhos de build vêm do arquivo incluído.
-include:
-  - path: ../docker-compose.yml

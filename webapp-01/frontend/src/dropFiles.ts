@@ -34,6 +34,10 @@ function allowPdfOrImage(file: File): boolean {
   );
 }
 
+function allowPdfOnly(file: File): boolean {
+  return file.name.toLowerCase().endsWith(".pdf");
+}
+
 function readEntriesAsync(reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> {
   return new Promise((resolve, reject) => {
     const acc: FileSystemEntry[] = [];
@@ -151,6 +155,19 @@ export async function getPdfFilesFromEvent(event: unknown): Promise<File[]> {
   return [];
 }
 
+/** GNRE dropzone: aceita só `.pdf` (raiz e dentro de pastas). */
+export async function getPdfOnlyFilesFromEvent(event: unknown): Promise<File[]> {
+  const dt = dataTransferFrom(event);
+  if (dt) {
+    return extractFromDataTransfer(dt, allowPdfOnly, allowPdfOnly);
+  }
+  const t = (event as { target?: EventTarget | null }).target as HTMLInputElement | null;
+  if (t?.files?.length) {
+    return Array.from(t.files).filter(allowPdfOnly);
+  }
+  return [];
+}
+
 /** NFS-e XML dropzone: aceita só `.xml` (diferente do NFe, que aceita .zip). */
 export async function getXmlOnlyFilesFromEvent(event: unknown): Promise<File[]> {
   const dt = dataTransferFrom(event);
@@ -201,9 +218,14 @@ async function collectFromHandle(dir: FsHandle, accept: (f: File) => boolean): P
  * antes de invocar.
  */
 export async function pickDirectoryAndReadFiles(
-  accept: "pdf-or-image" | "xml-only",
+  accept: "pdf-or-image" | "xml-only" | "pdf-only",
 ): Promise<File[] | null> {
-  const filter = accept === "pdf-or-image" ? allowPdfOrImage : isXml;
+  const filter =
+    accept === "pdf-or-image"
+      ? allowPdfOrImage
+      : accept === "pdf-only"
+        ? allowPdfOnly
+        : isXml;
   const showDirectoryPicker = (window as unknown as {
     showDirectoryPicker: (opts?: { mode?: "read" | "readwrite" }) => Promise<FsHandle>;
   }).showDirectoryPicker;

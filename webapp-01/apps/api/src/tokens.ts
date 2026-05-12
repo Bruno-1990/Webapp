@@ -7,7 +7,8 @@ export type DownloadTool =
   | "sped-merge"
   | "sci-consolidado"
   | "comparacao-planilhas"
-  | "comparacao-nfse";
+  | "comparacao-nfse"
+  | "gnre";
 
 export async function signDownloadToken(
   env: Env,
@@ -40,6 +41,7 @@ export async function verifyDownloadToken(
     else if (rawTool === "sci-consolidado") tool = "sci-consolidado";
     else if (rawTool === "comparacao-planilhas") tool = "comparacao-planilhas";
     else if (rawTool === "comparacao-nfse") tool = "comparacao-nfse";
+    else if (rawTool === "gnre") tool = "gnre";
     return { jobId, fileName, tool };
   } catch {
     return null;

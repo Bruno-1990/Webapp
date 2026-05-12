@@ -107,6 +107,24 @@ services:
     depends_on:
       - redis
 
+  worker-gnre:
+    profiles: ["gnre"]
+    build:
+      context: .
+      dockerfile: webapp-01/docker/Dockerfile.worker-gnre
+    env_file:
+      - ./.env
+    environment:
+      REDIS_URL: redis://redis:6379
+      TEMP_JOBS_ROOT: /data/jobs
+      GNRE_DB_PATH: /data/gnre/gnre.db
+    volumes:
+      - job-data:/data/jobs
+      - gnre-data:/data/gnre
+    depends_on:
+      - redis
+
 volumes:
   redis-data:
   job-data:
+  gnre-data:

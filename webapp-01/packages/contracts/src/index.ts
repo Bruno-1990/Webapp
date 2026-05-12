@@ -154,6 +154,17 @@ export type ComparacaoPlanilhasJobPayload = z.infer<typeof ComparacaoPlanilhasJo
 /** Comparacao NFS-e: PDF (OCR via Gemini) × XML (parser) → divergencias (webapp-06). */
 export const COMPARACAO_NFSE_QUEUE_NAME = "comparacao-nfse" as const;
 
+/** Extrator GNRE: PDFs → XLSX (Lançamentos + Falhas), com dedupe SQLite (webapp-07). */
+export const GNRE_QUEUE_NAME = "gnre-extract" as const;
+
+export const GnreJobPayloadSchema = z.object({
+  jobId: z.string(),
+  pdfsDir: z.string(),
+  outputXlsx: z.string(),
+});
+
+export type GnreJobPayload = z.infer<typeof GnreJobPayloadSchema>;
+
 export const ComparacaoNfseJobPayloadSchema = z.object({
   jobId: z.string(),
   pdfsDir: z.string(),

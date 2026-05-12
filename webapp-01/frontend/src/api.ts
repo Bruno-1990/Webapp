@@ -50,6 +50,8 @@ export type JobResponse = {
   fileName?: string;
 };
 
+export type ToolCategory = "fiscal" | "contabil";
+
 export type ToolManifestEntry = {
   id: string;
   title: string;
@@ -57,6 +59,7 @@ export type ToolManifestEntry = {
   description: string;
   route: string;
   available: boolean;
+  category?: ToolCategory;
 };
 
 /** API antiga ainda pode enviar sci-consolidado; o hub usa id webapp-04. Sem isso o merge gera dois cards SCI. */
@@ -119,6 +122,7 @@ function defaultToolsManifest(): ToolManifestEntry[] {
       description: "Junte os arquivos das notas e baixe tudo numa planilha só.",
       route: "/tools/nfe",
       available: true,
+      category: "fiscal",
     },
     {
       id: "sped",
@@ -127,6 +131,7 @@ function defaultToolsManifest(): ToolManifestEntry[] {
       description: "Envie o arquivo do contador e receba uma planilha fácil de conferir e ajustar.",
       route: "/tools/sped",
       available: true,
+      category: "fiscal",
     },
     {
       id: "webapp-03",
@@ -135,6 +140,7 @@ function defaultToolsManifest(): ToolManifestEntry[] {
       description: "Envie o arquivo original e a planilha que você editou; baixe o resultado pronto para reenviar.",
       route: "/tools/sped-merge",
       available: true,
+      category: "fiscal",
     },
     {
       id: "webapp-04",
@@ -144,6 +150,7 @@ function defaultToolsManifest(): ToolManifestEntry[] {
         "Envie a exportação SCI (CSV ou Excel). Receba ProdutosSCI.xlsx com Produtos, Base e Consolidado (SCI).",
       route: "/tools/sci-consolidado",
       available: true,
+      category: "fiscal",
     },
     {
       id: "webapp-05",
@@ -153,6 +160,7 @@ function defaultToolsManifest(): ToolManifestEntry[] {
         "Envie planilhas da SEFAZ e do SCI para identificar notas lançadas na SEFAZ que não constam no SCI.",
       route: "/tools/comparacao-planilhas",
       available: true,
+      category: "fiscal",
     },
     {
       id: "webapp-06",
@@ -162,6 +170,17 @@ function defaultToolsManifest(): ToolManifestEntry[] {
         "Envie a pasta com PDFs ou imagens (JPG/PNG) das notas de serviço tomadas e a pasta com XMLs; identificamos as que estão só em um lado.",
       route: "/tools/comparacao-nfse",
       available: true,
+      category: "fiscal",
+    },
+    {
+      id: "gnre",
+      title: "Extrator GNRE",
+      subtitle: "PDF → XLSX",
+      description:
+        "Envie os PDFs das guias GNRE e baixe uma planilha consolidada com Lançamentos e Falhas.",
+      route: "/tools/gnre",
+      available: true,
+      category: "contabil",
     },
   ];
 }
@@ -171,8 +190,8 @@ const UPLOAD_TIMEOUT_MS = 180_000;
 function apiOfflineMessage(): string {
   return (
     "Não foi possível falar com a API em http://127.0.0.1:8000 (o Vite encaminha /api para lá). " +
-    "Na pasta webapp-01: npm run redis:up (Docker) e npm run dev (API + workers + Vite), ou npm run dev:stack. " +
-    "Inclui worker Consolidado SCI (Python em webapp-04). Só Vite: npm run dev:fe + npm run dev:backend noutro terminal. " +
+    "Na raiz do projeto: npm run redis:up (Docker) e npm run dev (API + workers + Vite), ou npm run dev:stack. " +
+    "Inclui workers Python (webapp-04..07). Só Vite: cd webapp-01 && npm run dev:fe + npm run dev:backend noutro terminal. " +
     "Se a API já estiver no ar e forem muitos XMLs, o envio pode demorar — confira o terminal da API."
   );
 }
@@ -235,8 +254,8 @@ export async function createJob(files: File[]): Promise<{ id: string }> {
     ) {
       msg =
         "A API em http://127.0.0.1:8000 não está rodando (o Vite faz proxy para lá). " +
-        "Na pasta webapp-01: Redis (npm run redis:up) e npm run dev — " +
-        "ou npm run dev:backend num terminal e npm run dev:fe noutro.";
+        "Na raiz do projeto: npm run redis:up e npm run dev — " +
+        "ou (em webapp-01) npm run dev:backend num terminal e npm run dev:fe noutro.";
     }
     throw new Error(msg);
   }
@@ -390,7 +409,7 @@ export async function createSpedJob(
       (msg === "Internal Server Error" || msg.length < 3)
     ) {
       msg =
-        "A API em http://127.0.0.1:8000 não está rodando ou o worker SPED não está ativo. Na pasta webapp-01: npm run redis:up e npm run dev (inclui worker-sped).";
+        "A API em http://127.0.0.1:8000 não está rodando ou o worker SPED não está ativo. Na raiz do projeto: npm run redis:up e npm run dev (inclui worker-sped).";
     }
     throw new Error(msg);
   }
@@ -452,7 +471,7 @@ export async function createSpedMergeJob(spedTxt: File | null, xlsx: File): Prom
       (msg === "Internal Server Error" || msg.length < 3)
     ) {
       msg =
-        "API ou worker SPED merge inativo. Na pasta webapp-01: npm run redis:up e npm run dev (inclui worker-sped-merge-bridge e Python webapp-03).";
+        "API ou worker SPED merge inativo. Na raiz do projeto: npm run redis:up e npm run dev (inclui worker-sped-merge-bridge e Python webapp-03).";
     }
     throw new Error(msg);
   }
@@ -557,7 +576,7 @@ export async function createSciConsolidadoJob(
       (msg === "Internal Server Error" || msg.length < 3)
     ) {
       msg =
-        "API ou worker Consolidado SCI inativo. Na pasta webapp-01: npm run redis:up e npm run dev (worker-sci + Python em webapp-04).";
+        "API ou worker Consolidado SCI inativo. Na raiz do projeto: npm run redis:up e npm run dev (worker-sci + Python em webapp-04).";
     }
     throw new Error(msg);
   }
@@ -579,6 +598,80 @@ export async function getSciConsolidadoJob(id: string): Promise<JobResponse> {
 
 export function sciConsolidadoDownloadUrl(id: string, token: string): string {
   return `${baseUrl()}${API_PREFIX}/tools/sci-consolidado/jobs/${id}/download?token=${encodeURIComponent(token)}`;
+}
+
+export async function createGnreJob(files: File[]): Promise<{ id: string }> {
+  const fd = new FormData();
+  for (const f of files) fd.append("pdfs", f);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl()}${API_PREFIX}/tools/gnre/jobs`, {
+      method: "POST",
+      body: fd,
+      signal: controller.signal,
+    });
+  } catch (e) {
+    const aborted =
+      (e instanceof DOMException && e.name === "AbortError") ||
+      (e instanceof Error && e.name === "AbortError");
+    if (aborted) {
+      throw new Error(
+        `Envio excedeu ${Math.round(UPLOAD_TIMEOUT_MS / 60_000)} minutos. Verifique Redis, API e worker GNRE.`,
+      );
+    }
+    if (!baseUrl() && isFetchNetworkError(e)) {
+      throw new Error(apiOfflineMessage());
+    }
+    throw e;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    let msg = (err as { error?: string }).error ?? res.statusText;
+    const relative = !baseUrl();
+    if (
+      relative &&
+      (res.status === 500 || res.status === 502 || res.status === 503) &&
+      (msg === "Internal Server Error" || msg.length < 3)
+    ) {
+      msg =
+        "API ou worker GNRE inativo. Na raiz do projeto: npm run redis:up e npm run dev (worker-gnre + Python em webapp-07).";
+    }
+    throw new Error(msg);
+  }
+  return res.json() as Promise<{ id: string }>;
+}
+
+export type GnreResult = {
+  totais?: { ok?: number; dup?: number; fail?: number; total?: number };
+  valorTotal?: number;
+  lancamentos?: number;
+  falhas?: number;
+};
+
+export type GnreJobResponse = JobResponse & { result?: GnreResult };
+
+export async function getGnreJob(id: string): Promise<GnreJobResponse> {
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl()}${API_PREFIX}/tools/gnre/jobs/${id}`);
+  } catch (e) {
+    if (!baseUrl() && isFetchNetworkError(e)) {
+      throw new Error(apiOfflineMessage());
+    }
+    throw e;
+  }
+  return res.json() as Promise<GnreJobResponse>;
+}
+
+export function gnreDownloadUrl(id: string, token: string): string {
+  return `${baseUrl()}${API_PREFIX}/tools/gnre/jobs/${id}/download?token=${encodeURIComponent(token)}`;
 }
 
 export function downloadUrl(id: string, token: string): string {
@@ -638,7 +731,7 @@ export async function createComparacaoPlanilhasJob(
       (msg === "Internal Server Error" || msg.length < 3)
     ) {
       msg =
-        "API ou worker Comparação Planilhas inativo. Na pasta webapp-01: npm run redis:up e npm run dev (worker-comparacao + Python em webapp-05).";
+        "API ou worker Comparação Planilhas inativo. Na raiz do projeto: npm run redis:up e npm run dev (worker-comparacao + Python em webapp-05).";
     }
     throw new Error(msg);
   }

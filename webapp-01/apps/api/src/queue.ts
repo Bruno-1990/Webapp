@@ -7,11 +7,13 @@ import {
   SPED_QUEUE_NAME,
   COMPARACAO_PLANILHAS_QUEUE_NAME,
   COMPARACAO_NFSE_QUEUE_NAME,
+  GNRE_QUEUE_NAME,
   type SciConsolidadoJobPayload,
   type SpedJobPayload,
   type SpedMergeJobPayload,
   type ComparacaoPlanilhasJobPayload,
   type ComparacaoNfseJobPayload,
+  type GnreJobPayload,
 } from "@webapp/contracts";
 import type { Env } from "./env.js";
 
@@ -27,6 +29,7 @@ export type {
   SpedMergeJobPayload,
   ComparacaoPlanilhasJobPayload,
   ComparacaoNfseJobPayload,
+  GnreJobPayload,
 };
 
 let connection: Redis | null = null;
@@ -36,6 +39,7 @@ let spedMergeQueue: Queue<SpedMergeJobPayload> | null = null;
 let sciConsolidadoQueue: Queue<SciConsolidadoJobPayload> | null = null;
 let comparacaoPlanilhasQueue: Queue<ComparacaoPlanilhasJobPayload> | null = null;
 let comparacaoNfseQueue: Queue<ComparacaoNfseJobPayload> | null = null;
+let gnreQueue: Queue<GnreJobPayload> | null = null;
 
 export function getRedis(env: Env): Redis {
   if (!connection) {
@@ -130,4 +134,18 @@ export function getComparacaoNfseQueue(env: Env): Queue<ComparacaoNfseJobPayload
     });
   }
   return comparacaoNfseQueue;
+}
+
+export function getGnreQueue(env: Env): Queue<GnreJobPayload> {
+  if (!gnreQueue) {
+    gnreQueue = new Queue<GnreJobPayload>(GNRE_QUEUE_NAME, {
+      connection: getRedis(env),
+      defaultJobOptions: {
+        attempts: 1,
+        removeOnComplete: { count: 200 },
+        removeOnFail: { count: 100 },
+      },
+    });
+  }
+  return gnreQueue;
 }

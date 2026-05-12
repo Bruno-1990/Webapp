@@ -1,11 +1,12 @@
 {
   "name": "webapp-desktop-root",
   "private": true,
-  "description": "Atalho: monorepo em webapp-01; Python irmão em webapp-02, webapp-03, webapp-04. npm run dev na raiz delega para webapp-01.",
+  "description": "Monorepo: docker-compose.yml e Redis vivem aqui. App Node/TS em webapp-01; Python irmão em webapp-02..07. npm run dev na raiz delega para webapp-01.",
   "scripts": {
     "dev": "npm run dev --prefix webapp-01",
-    "dev:stack": "npm run dev:stack --prefix webapp-01",
-    "redis:up": "npm run redis:up --prefix webapp-01",
+    "dev:stack": "npm run redis:up && npm run dev --prefix webapp-01",
+    "redis:up": "docker compose up -d redis",
+    "redis:down": "docker compose stop redis",
     "install:app": "npm install --prefix webapp-01",
     "build": "npm run build --prefix webapp-01",
     "test:sci-py": "npm run test:sci-py --prefix webapp-01",

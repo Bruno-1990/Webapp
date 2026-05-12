@@ -25,6 +25,7 @@ import {
   getSciConsolidadoQueue,
   getComparacaoPlanilhasQueue,
   getComparacaoNfseQueue,
+  getGnreQueue,
   getSpedMergeQueue,
   getSpedQueue,
   type NfeJobPayload,
@@ -33,6 +34,7 @@ import {
   type SpedMergeJobPayload,
   type ComparacaoPlanilhasJobPayload,
   type ComparacaoNfseJobPayload,
+  type GnreJobPayload,
 } from "./queue.js";
 import { signDownloadToken, verifyDownloadToken } from "./tokens.js";
 import { buildSpedXlsxFileName, extractSpedRazaoFromBuffer } from "./sped-filename.js";
@@ -281,6 +283,7 @@ const spedMergeQueue = getSpedMergeQueue(env);
 const sciConsolidadoQueue = getSciConsolidadoQueue(env);
 const comparacaoPlanilhasQueue = getComparacaoPlanilhasQueue(env);
 const comparacaoNfseQueue = getComparacaoNfseQueue(env);
+const gnreQueue = getGnreQueue(env);
 
 function jobDir(id: string): string {
   /** Absoluto para o payload BullMQ: o worker/Python usa outro cwd e paths relativos quebram (ex.: SPED). */
@@ -306,6 +309,7 @@ app.get(`${API_PREFIX}/tools`, async () => ({
       description: "Junte os arquivos das notas e baixe tudo numa planilha só.",
       route: "/tools/nfe",
       available: true,
+      category: "fiscal",
     },
     {
       id: "sped",
@@ -314,6 +318,7 @@ app.get(`${API_PREFIX}/tools`, async () => ({
       description: "Envie o arquivo do contador e receba uma planilha fácil de conferir e ajustar.",
       route: "/tools/sped",
       available: true,
+      category: "fiscal",
     },
     {
       id: "webapp-03",
@@ -322,6 +327,7 @@ app.get(`${API_PREFIX}/tools`, async () => ({
       description: "Envie o arquivo original e a planilha que você editou; baixe o resultado pronto para reenviar.",
       route: "/tools/sped-merge",
       available: true,
+      category: "fiscal",
     },
     {
       id: "webapp-04",
@@ -331,6 +337,7 @@ app.get(`${API_PREFIX}/tools`, async () => ({
         "Envie a exportação SCI (CSV ou Excel). Receba ProdutosSCI.xlsx com abas Produtos, Base e Consolidado (SCI).",
       route: "/tools/sci-consolidado",
       available: true,
+      category: "fiscal",
     },
     {
       id: "webapp-05",
@@ -340,6 +347,7 @@ app.get(`${API_PREFIX}/tools`, async () => ({
         "Envie planilhas da SEFAZ e do SCI para identificar notas lançadas na SEFAZ que não constam no SCI.",
       route: "/tools/comparacao-planilhas",
       available: true,
+      category: "fiscal",
     },
     {
       id: "webapp-06",
@@ -349,6 +357,17 @@ app.get(`${API_PREFIX}/tools`, async () => ({
         "Envie a pasta com PDFs ou imagens (JPG/PNG) das notas de serviço tomadas e a pasta com XMLs; identificamos as que estão só em um lado.",
       route: "/tools/comparacao-nfse",
       available: true,
+      category: "fiscal",
+    },
+    {
+      id: "gnre",
+      title: "Extrator GNRE",
+      subtitle: "PDF → XLSX",
+      description:
+        "Envie os PDFs das guias GNRE e baixe uma planilha consolidada com Lançamentos e Falhas.",
+      route: "/tools/gnre",
+      available: true,
+      category: "contabil",
     },
   ],
 }));
@@ -1636,6 +1655,162 @@ app.get<{ Params: { id: string }; Querystring: { token?: string } }>(
     );
     return reply.send(stream);
   }
+);
+
+/** ============= Extrator GNRE (webapp-07) ============= */
+
+const ALLOWED_GNRE_EXT = new Set([".pdf"]);
+
+app.post(`${API_PREFIX}/tools/gnre/jobs`, async (req, reply) => {
+  const jobId = randomUUID();
+  const inDir = path.join(jobDir(jobId), "in");
+  const outDir = path.join(jobDir(jobId), "out");
+
+  try {
+    const pong = await getRedis(env).ping();
+    if (pong !== "PONG") throw new Error("Redis não respondeu");
+  } catch (e) {
+    req.log.warn({ err: e }, "redis indisponível ao criar job GNRE");
+    return reply.code(503).send({
+      error:
+        "Redis não está acessível. Inicie o Redis e o worker GNRE (worker-gnre-bridge + Python).",
+    });
+  }
+
+  await fs.promises.mkdir(inDir, { recursive: true });
+  await fs.promises.mkdir(outDir, { recursive: true });
+
+  let totalBytes = 0;
+  let fileCount = 0;
+  try {
+    const parts = req.parts();
+    for await (const part of parts) {
+      if (part.type !== "file") continue;
+      const original = (part.filename ?? "guia.pdf").replace(/[/\\]/g, "_");
+      const ext = path.extname(original).toLowerCase();
+      if (!ALLOWED_GNRE_EXT.has(ext)) {
+        await fs.promises.rm(jobDir(jobId), { recursive: true, force: true });
+        return reply.code(400).send({
+          error: `Formato não suportado: ${original}. Aceitamos apenas .pdf.`,
+        });
+      }
+      const buf = await part.toBuffer();
+      totalBytes += buf.length;
+      if (totalBytes > env.MAX_UPLOAD_NFSE_MB * 1024 * 1024) {
+        await fs.promises.rm(jobDir(jobId), { recursive: true, force: true });
+        return reply.code(413).send({
+          error: `Tamanho total excede ${env.MAX_UPLOAD_NFSE_MB} MB.`,
+        });
+      }
+      fileCount += 1;
+      const safe = original.replace(/[^\w.\-]+/g, "_").slice(0, 180) || `guia_${fileCount}.pdf`;
+      const dest = path.join(inDir, `${String(fileCount).padStart(4, "0")}_${safe}`);
+      await fs.promises.writeFile(dest, buf);
+    }
+  } catch (e) {
+    await fs.promises.rm(jobDir(jobId), { recursive: true, force: true });
+    req.log.error({ err: e }, "falha ao ler upload GNRE");
+    return reply.code(400).send({ error: "Falha ao ler upload" });
+  }
+
+  if (fileCount === 0) {
+    await fs.promises.rm(jobDir(jobId), { recursive: true, force: true });
+    return reply.code(400).send({ error: "Nenhum PDF enviado" });
+  }
+
+  const outputXlsx = path.join(outDir, "GNRE_Extracao.xlsx");
+
+  const payload: GnreJobPayload = {
+    jobId,
+    pdfsDir: inDir,
+    outputXlsx,
+  };
+
+  try {
+    await Promise.race([
+      gnreQueue.add("extract", payload, { jobId }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Fila timeout")), 15_000),
+      ),
+    ]);
+  } catch (e) {
+    await fs.promises.rm(jobDir(jobId), { recursive: true, force: true });
+    req.log.error({ err: e }, "falha ao enfileirar job GNRE");
+    return reply.code(503).send({
+      error:
+        "Não foi possível enfileirar o job. Verifique Redis e o worker-gnre-bridge.",
+    });
+  }
+
+  return reply.code(202).send({ id: jobId, status: "queued" as const });
+});
+
+app.get<{ Params: { id: string } }>(`${API_PREFIX}/tools/gnre/jobs/:id`, async (req, reply) => {
+  const { id } = req.params;
+  const job = await gnreQueue.getJob(id);
+  if (!job) {
+    return reply.code(404).send({ id, status: "not_found" as const });
+  }
+  const state = await job.getState();
+  const status = mapBullState(state);
+  const progress =
+    typeof job.progress === "number" ? Math.round(job.progress) : undefined;
+
+  let downloadToken: string | undefined;
+  let fileName: string | undefined;
+  let error: string | undefined;
+  let result: unknown;
+
+  if (status === "done") {
+    const rv = job.returnvalue as { fileName?: string; result?: unknown } | undefined;
+    fileName =
+      rv?.fileName ??
+      path.basename(String((job.data as GnreJobPayload).outputXlsx ?? "GNRE_Extracao.xlsx"));
+    downloadToken = await signDownloadToken(env, id, fileName, "gnre");
+    result = rv?.result;
+  }
+  if (status === "failed") {
+    error = job.failedReason?.slice(0, 500) ?? "Falha no processamento";
+  }
+
+  return { id, status, progress, error, downloadToken, fileName, result };
+});
+
+app.get<{ Params: { id: string }; Querystring: { token?: string } }>(
+  `${API_PREFIX}/tools/gnre/jobs/:id/download`,
+  async (req, reply) => {
+    const { id } = req.params;
+    const token = req.query.token;
+    if (!token) return reply.code(401).send({ error: "Token ausente" });
+
+    const claims = await verifyDownloadToken(env, token);
+    if (!claims || claims.jobId !== id || claims.tool !== "gnre") {
+      return reply.code(401).send({ error: "Token inválido" });
+    }
+
+    const job = await gnreQueue.getJob(id);
+    if (!job || (await job.getState()) !== "completed") {
+      return reply.code(404).send({ error: "Job não concluído" });
+    }
+
+    const outPath = (job.data as GnreJobPayload).outputXlsx;
+    if (!outPath || !fs.existsSync(outPath)) {
+      return reply.code(404).send({ error: "Arquivo não encontrado" });
+    }
+
+    const stream = fs.createReadStream(outPath);
+    reply.header(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    const fn = claims.fileName.replace(/[\r\n"]/g, "_");
+    const asciiFallback = fn.replace(/[^\x20-\x7e]/g, "_");
+    reply.header(
+      "Content-Disposition",
+      `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(fn)}`,
+    );
+    return reply.send(stream);
+  },
 );
 
 async function cleanupOldJobs(): Promise<void> {

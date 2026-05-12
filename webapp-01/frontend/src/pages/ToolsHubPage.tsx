@@ -1,26 +1,35 @@
 import {
   ArrowRight,
+  Calculator,
   CircleHelp,
   Combine,
   FileSearch,
   FileSpreadsheet,
   GitCompareArrows,
+  Landmark,
+  Receipt,
   ScrollText,
   Table2,
+  type LucideIcon,
 } from "lucide-react";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { fetchToolsManifest, type ToolManifestEntry } from "../api.js";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import {
+  fetchToolsManifest,
+  type ToolCategory,
+  type ToolManifestEntry,
+} from "../api.js";
 import { Modal } from "../components/Modal.js";
 
-const TOOL_ICONS: Record<string, typeof FileSpreadsheet> = {
+const TOOL_ICONS: Record<string, LucideIcon> = {
   nfe: FileSpreadsheet,
   sped: ScrollText,
   "webapp-03": Combine,
   "webapp-04": Table2,
   "webapp-05": GitCompareArrows,
   "webapp-06": FileSearch,
+  gnre: Receipt,
 };
 
 const TOOL_OWNER: Record<string, string> = {
@@ -30,6 +39,7 @@ const TOOL_OWNER: Record<string, string> = {
   "webapp-04": "Bruno",
   "webapp-05": "João",
   "webapp-06": "Bruno",
+  gnre: "Bruno",
 };
 
 const TOOL_ACCENT: Record<string, string> = {
@@ -39,11 +49,52 @@ const TOOL_ACCENT: Record<string, string> = {
   "webapp-04": "from-[#4a7f95] via-[#5a8fab] to-[#447f98]",
   "webapp-05": "from-[#3a6d85] via-[#4d8da6] to-[#5a9cb5]",
   "webapp-06": "from-[#2f6378] via-[#4583a0] to-[#6aa6be]",
+  gnre: "from-[#3f6f86] via-[#508aa1] to-[#73a8bd]",
 };
+
+type CategoryDef = {
+  id: ToolCategory;
+  label: string;
+  icon: LucideIcon;
+  title: string;
+  highlight: string;
+  subtitle: string;
+};
+
+const CATEGORIES: Record<ToolCategory, CategoryDef> = {
+  fiscal: {
+    id: "fiscal",
+    label: "Fiscais",
+    icon: Landmark,
+    title: "Ferramentas",
+    highlight: "fiscais",
+    subtitle:
+      "Conversões fiscais em um só lugar: envie os arquivos, acompanhe na tela e baixe o resultado quando estiver pronto.",
+  },
+  contabil: {
+    id: "contabil",
+    label: "Contábeis",
+    icon: Calculator,
+    title: "Ferramentas",
+    highlight: "contábeis",
+    subtitle:
+      "Apoio à rotina do contábil: extração de guias, conciliações e relatórios prontos para conferência.",
+  },
+};
+
+function categoryOf(tool: ToolManifestEntry): ToolCategory {
+  return tool.category ?? "fiscal";
+}
+
+function parseCategory(value: string | null): ToolCategory {
+  return value === "contabil" ? "contabil" : "fiscal";
+}
 
 export default function ToolsHubPage() {
   const [tools, setTools] = useState<ToolManifestEntry[] | null>(null);
   const [infoTool, setInfoTool] = useState<ToolManifestEntry | null>(null);
+  const [params] = useSearchParams();
+  const activeCategory = parseCategory(params.get("cat"));
 
   useEffect(() => {
     let cancelled = false;
@@ -56,9 +107,16 @@ export default function ToolsHubPage() {
   }, []);
 
   const list = tools ?? [];
-  /** Quatro ferramentas: 3 na primeira linha + 1 centralizada abaixo (grid 6 colunas). Com mais itens, fluxo em 3 colunas no md+. */
-  const hubThreePlusOne = list.length === 4;
 
+  const filtered = useMemo(
+    () => list.filter((t) => categoryOf(t) === activeCategory),
+    [list, activeCategory],
+  );
+
+  const activeDef = CATEGORIES[activeCategory];
+
+  /** Mesma lógica antiga: 4 ferramentas viram 3 + 1 centralizada. */
+  const hubThreePlusOne = filtered.length === 4;
   const hubGridClass = [
     "mx-auto grid w-full items-stretch gap-4 px-0.5 max-[480px]:grid-cols-1 sm:grid-cols-2 sm:gap-5",
     hubThreePlusOne
@@ -70,30 +128,33 @@ export default function ToolsHubPage() {
     <div className="space-y-8 sm:space-y-10">
       <div className="text-center">
         <h1 className="font-display text-2xl font-bold tracking-tight text-[#183844] sm:text-3xl md:text-4xl">
-          Ferramentas <span className="text-[#347891]">fiscais</span>
+          {activeDef.title} <span className="text-[#347891]">{activeDef.highlight}</span>
         </h1>
         <p className="mx-auto mt-3 max-w-lg font-sans text-sm leading-relaxed text-[#1e3d4d] sm:mt-3.5 sm:max-w-xl sm:text-[15px]">
-          Conversões fiscais em um só lugar: envie os arquivos, acompanhe na tela e baixe o resultado quando estiver
-          pronto.
+          {activeDef.subtitle}
         </p>
       </div>
 
-      <ul className={hubGridClass}>
-        {list.map((tool, index) => (
-          <li
-            key={tool.id}
-            className={
-              hubThreePlusOne
-                ? index === 3
-                  ? "flex h-full min-h-0 md:col-span-2 md:col-start-3"
-                  : "flex h-full min-h-0 md:col-span-2"
-                : "flex h-full min-h-0"
-            }
-          >
-            <ToolCard tool={tool} onInfo={() => setInfoTool(tool)} />
-          </li>
-        ))}
-      </ul>
+      {filtered.length === 0 ? (
+        <EmptyCategoryState category={activeDef} />
+      ) : (
+        <ul className={hubGridClass}>
+          {filtered.map((tool, index) => (
+            <li
+              key={tool.id}
+              className={
+                hubThreePlusOne
+                  ? index === 3
+                    ? "flex h-full min-h-0 md:col-span-2 md:col-start-3"
+                    : "flex h-full min-h-0 md:col-span-2"
+                  : "flex h-full min-h-0"
+              }
+            >
+              <ToolCard tool={tool} onInfo={() => setInfoTool(tool)} />
+            </li>
+          ))}
+        </ul>
+      )}
 
       <Modal
         open={!!infoTool}
@@ -118,6 +179,24 @@ export default function ToolsHubPage() {
           </div>
         )}
       </Modal>
+    </div>
+  );
+}
+
+function EmptyCategoryState({ category }: { category: CategoryDef }) {
+  const Icon = category.icon;
+  return (
+    <div className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-3xl border border-dashed border-[#cfe2ec] bg-[linear-gradient(180deg,#ffffff_0%,#f5fbfe_100%)] px-6 py-10 text-center">
+      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#447f98] via-[#4f8aa3] to-[#629bb5] text-white shadow-[0_12px_24px_-14px_rgb(34_78_97/0.9)] ring-2 ring-white/60">
+        <Icon className="h-5 w-5" strokeWidth={2.1} />
+      </span>
+      <p className="font-display text-base font-bold text-[#183844]">
+        Em breve por aqui
+      </p>
+      <p className="max-w-xs text-sm leading-relaxed text-[#1e3d4d]">
+        Ferramentas {category.label.toLowerCase()} aparecem assim que forem
+        publicadas — estamos preparando.
+      </p>
     </div>
   );
 }
