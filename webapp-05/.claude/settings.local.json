@@ -1,11 +1,15 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(py *)",
+      "Read(//d/aplicativos/webapp/**)",
+      "Bash(docker compose *)",
+      "PowerShell(Get-Process *)",
+      "Bash(docker version *)"
+    ]
+  },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "task-master-ai"
-  ],
-  "permissions": {
-    "allow": [
-      "Bash(py *)"
-    ]
-  }
+  ]
 }

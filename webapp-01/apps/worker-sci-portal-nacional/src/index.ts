@@ -3,7 +3,10 @@ import path from "node:path";
 import * as readline from "node:readline";
 import { Worker } from "bullmq";
 import { Redis } from "ioredis";
-import { COMPARACAO_PLANILHAS_QUEUE_NAME, type ComparacaoPlanilhasJobPayload } from "@webapp/contracts";
+import {
+  SCI_PORTAL_NACIONAL_QUEUE_NAME,
+  type SciPortalNacionalJobPayload,
+} from "@webapp/contracts";
 import { loadEnv } from "./env.js";
 
 const env = loadEnv();
@@ -15,46 +18,41 @@ const connection = new Redis(env.REDIS_URL, {
 });
 
 const logger = {
-  info: (...a: unknown[]) => console.log("[worker-comparacao]", ...a),
-  error: (...a: unknown[]) => console.error("[worker-comparacao]", ...a),
+  info: (...a: unknown[]) => console.log("[worker-sci-portal]", ...a),
+  error: (...a: unknown[]) => console.error("[worker-sci-portal]", ...a),
 };
 
 function absolutizeJobPath(filePath: string): string {
-  // A API pode rodar no Windows e enfileirar caminhos absolutos no estilo
-  // "D:\...\temp_jobs\<id>\..." enquanto este worker roda em Linux (no container,
-  // TEMP_JOBS_ROOT=/data/jobs). Unificamos os separadores e reancoramos qualquer
-  // caminho que contenha ".../temp_jobs/<resto>" sob o TEMP_JOBS_ROOT local —
-  // os arquivos são os mesmos via o bind mount ./temp_jobs:/data/jobs.
-  const unified = filePath.replace(/\\/g, "/");
-  const m = unified.match(/temp_jobs\/(.+)$/i);
+  const norm = path.normalize(filePath);
+  if (path.isAbsolute(norm)) return norm;
+  const rel = norm.replace(/^\.\//, "");
+  const m = rel.match(/^temp_jobs[/\\](.+)$/i);
   if (m) {
     return path.join(env.TEMP_JOBS_ROOT, m[1]);
   }
-  const norm = path.normalize(unified);
-  if (path.isAbsolute(norm)) return norm;
-  return path.resolve(process.cwd(), norm.replace(/^\.\//, ""));
+  return path.resolve(process.cwd(), rel);
 }
 
-function runComparacaoCli(
+/** Roda o engine standalone (webapp-08/cli.mjs) consumindo eventos JSON do stdout. */
+function runCli(
   job: { updateProgress: (n: number) => Promise<void> },
-  data: ComparacaoPlanilhasJobPayload
+  data: SciPortalNacionalJobPayload,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const sefazPaths = data.sefazPaths.map(absolutizeJobPath);
-    const sciPaths = data.sciPaths.map(absolutizeJobPath);
+    const sciPath = absolutizeJobPath(data.sciPath);
+    const portalPath = absolutizeJobPath(data.portalPath);
     const outputPath = absolutizeJobPath(data.outputPath);
-    const cwd = env.COMPARACAO_PY_DIR;
-    const cliPath = path.join(cwd, "cli.py");
-    const cmd = env.PYTHON_CMD.trim();
-    const base = path.basename(cmd).replace(/\.exe$/i, "").toLowerCase();
-    const args: string[] =
-      base === "py"
-        ? ["-3", cliPath]
-        : [cliPath];
+    const cwd = env.SCI_PORTAL_DIR;
+    const cliPath = path.join(cwd, "cli.mjs");
 
-    args.push("--sefaz", ...sefazPaths, "--sci", ...sciPaths, "--output", outputPath);
+    const args = [
+      cliPath,
+      "--sci", sciPath,
+      "--portal", portalPath,
+      "--output", outputPath,
+    ];
 
-    const child = spawn(cmd, args, {
+    const child = spawn(process.execPath, args, {
       cwd,
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
@@ -82,7 +80,7 @@ function runComparacaoCli(
           jsonError = new Error(o.message);
         }
       } catch {
-        /* ignore */
+        /* ignore linhas mal-formadas */
       }
     });
 
@@ -101,31 +99,31 @@ function runComparacaoCli(
       reject(
         new Error(
           errText
-            ? `Python saiu com código ${code}: ${errText}`
-            : `Python saiu com código ${code}`
-        )
+            ? `Engine saiu com código ${code}: ${errText}`
+            : `Engine saiu com código ${code}`,
+        ),
       );
     });
   });
 }
 
-new Worker<ComparacaoPlanilhasJobPayload>(
-  COMPARACAO_PLANILHAS_QUEUE_NAME,
+new Worker<SciPortalNacionalJobPayload>(
+  SCI_PORTAL_NACIONAL_QUEUE_NAME,
   async (job) => {
     const outputPath = absolutizeJobPath(job.data.outputPath);
     await job.updateProgress(1);
-    await runComparacaoCli(job, job.data);
+    await runCli(job, job.data);
     await job.updateProgress(100);
     return { fileName: path.basename(outputPath) };
   },
   {
     connection,
     concurrency: 1,
-  }
+  },
 ).on("failed", (j, err) => {
   logger.error("job failed", j?.id, err?.message);
 });
 
 logger.info(
-  `Worker Comparação Planilhas ouvindo fila ${COMPARACAO_PLANILHAS_QUEUE_NAME} (Python: ${env.COMPARACAO_PY_DIR})`
+  `Worker Conciliador NFS-e SCI x SEFAZ ouvindo fila ${SCI_PORTAL_NACIONAL_QUEUE_NAME} (engine: ${env.SCI_PORTAL_DIR})`,
 );

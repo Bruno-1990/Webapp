@@ -2,6 +2,7 @@ import {
   ArrowRight,
   Calculator,
   CircleHelp,
+  ClipboardCheck,
   Combine,
   FileSearch,
   FileSpreadsheet,
@@ -19,6 +20,7 @@ import {
   fetchToolsManifest,
   type ToolCategory,
   type ToolManifestEntry,
+  type ToolTagTone,
 } from "../api.js";
 import { Modal } from "../components/Modal.js";
 
@@ -29,6 +31,7 @@ const TOOL_ICONS: Record<string, LucideIcon> = {
   "webapp-04": Table2,
   "webapp-05": GitCompareArrows,
   "webapp-06": FileSearch,
+  "webapp-08": ClipboardCheck,
   gnre: Receipt,
 };
 
@@ -39,7 +42,16 @@ const TOOL_OWNER: Record<string, string> = {
   "webapp-04": "Bruno",
   "webapp-05": "João",
   "webapp-06": "Bruno",
+  "webapp-08": "Bruno",
   gnre: "Bruno",
+};
+
+const TAG_TONE_CLASS: Record<ToolTagTone, string> = {
+  blue: "border-sky-300/80 bg-sky-50 text-sky-800",
+  violet: "border-violet-300/80 bg-violet-50 text-violet-800",
+  amber: "border-amber-300/80 bg-amber-50 text-amber-800",
+  emerald: "border-emerald-300/80 bg-emerald-50 text-emerald-800",
+  slate: "border-slate-300/80 bg-slate-50 text-slate-800",
 };
 
 const TOOL_ACCENT: Record<string, string> = {
@@ -49,6 +61,7 @@ const TOOL_ACCENT: Record<string, string> = {
   "webapp-04": "from-[#4a7f95] via-[#5a8fab] to-[#447f98]",
   "webapp-05": "from-[#3a6d85] via-[#4d8da6] to-[#5a9cb5]",
   "webapp-06": "from-[#2f6378] via-[#4583a0] to-[#6aa6be]",
+  "webapp-08": "from-[#356d85] via-[#4d8aa3] to-[#6fa3bb]",
   gnre: "from-[#3f6f86] via-[#508aa1] to-[#73a8bd]",
 };
 
@@ -234,6 +247,13 @@ function ToolCard({
           <Icon className="h-[18px] w-[18px] sm:h-5 sm:w-5" strokeWidth={2.1} />
         </div>
         <div className="min-w-0 flex-1 pt-px">
+          {tool.tag && (
+            <span
+              className={`mb-1 inline-flex items-center rounded-full border px-2 py-[1px] text-[9px] font-bold uppercase tracking-wide sm:text-[10px] ${TAG_TONE_CLASS[tool.tag.tone]}`}
+            >
+              {tool.tag.label}
+            </span>
+          )}
           <div className="flex items-start justify-between gap-1.5">
             <h2 className="font-display text-base font-bold leading-tight tracking-tight text-brand-inkStrong sm:text-lg">
               {tool.title}

@@ -52,6 +52,13 @@ export type JobResponse = {
 
 export type ToolCategory = "fiscal" | "contabil";
 
+export type ToolTagTone = "blue" | "violet" | "amber" | "emerald" | "slate";
+
+export type ToolTag = {
+  label: string;
+  tone: ToolTagTone;
+};
+
 export type ToolManifestEntry = {
   id: string;
   title: string;
@@ -60,6 +67,7 @@ export type ToolManifestEntry = {
   route: string;
   available: boolean;
   category?: ToolCategory;
+  tag?: ToolTag;
 };
 
 /** API antiga ainda pode enviar sci-consolidado; o hub usa id webapp-04. Sem isso o merge gera dois cards SCI. */
@@ -155,12 +163,13 @@ function defaultToolsManifest(): ToolManifestEntry[] {
     {
       id: "webapp-05",
       title: "Comparador",
-      subtitle: "SEFAZ vs SCI",
+      subtitle: "SEFAZ Estadual × SCI",
       description:
-        "Envie planilhas da SEFAZ e do SCI para identificar notas lançadas na SEFAZ que não constam no SCI.",
+        "Compare notas fiscais de produto/transporte (NF-e, CT-e, NFC-e) baixadas do SEFAZ estadual com os lançamentos no SCI. Receba uma planilha com as notas que estão na SEFAZ mas não foram lançadas.",
       route: "/tools/comparacao-planilhas",
       available: true,
       category: "fiscal",
+      tag: { label: "NF-e · Produtos", tone: "blue" },
     },
     {
       id: "webapp-06",
@@ -181,6 +190,17 @@ function defaultToolsManifest(): ToolManifestEntry[] {
       route: "/tools/gnre",
       available: true,
       category: "contabil",
+    },
+    {
+      id: "webapp-08",
+      title: "Conciliador NFS-e",
+      subtitle: "Portal Nacional × SCI",
+      description:
+        "Concilia notas fiscais de serviço tomadas (NFS-e) baixadas do Portal Nacional com os lançamentos no SCI — inclusive notas canceladas. Receba um XLSX com Resumo, Em ambas, Só no Portal Nacional, Só no SCI, Canceladas no SCI e Duplicados.",
+      route: "/tools/sci-portal-nacional",
+      available: true,
+      category: "fiscal",
+      tag: { label: "NFS-e · Serviços", tone: "violet" },
     },
   ];
 }
@@ -753,6 +773,77 @@ export async function getComparacaoPlanilhasJob(id: string): Promise<JobResponse
 
 export function comparacaoPlanilhasDownloadUrl(id: string, token: string): string {
   return `${baseUrl()}${API_PREFIX}/tools/comparacao-planilhas/jobs/${id}/download?token=${encodeURIComponent(token)}`;
+}
+
+// ── Conciliador NFS-e SCI × SEFAZ Portal Nacional (webapp-08) ────────────
+
+export async function createSciPortalNacionalJob(
+  sciFile: File,
+  portalFile: File,
+): Promise<{ id: string }> {
+  const fd = new FormData();
+  fd.append("sci", sciFile);
+  fd.append("portal", portalFile);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl()}${API_PREFIX}/tools/sci-portal-nacional/jobs`, {
+      method: "POST",
+      body: fd,
+      signal: controller.signal,
+    });
+  } catch (e) {
+    const aborted =
+      (e instanceof DOMException && e.name === "AbortError") ||
+      (e instanceof Error && e.name === "AbortError");
+    if (aborted) {
+      throw new Error(
+        `Envio excedeu ${Math.round(UPLOAD_TIMEOUT_MS / 60_000)} minutos. Verifique Redis, API e worker Conciliador NFS-e.`,
+      );
+    }
+    if (!baseUrl() && isFetchNetworkError(e)) {
+      throw new Error(apiOfflineMessage());
+    }
+    throw e;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    let msg = (err as { error?: string }).error ?? res.statusText;
+    const relative = !baseUrl();
+    if (
+      relative &&
+      (res.status === 500 || res.status === 502 || res.status === 503) &&
+      (msg === "Internal Server Error" || msg.length < 3)
+    ) {
+      msg =
+        "API ou worker Conciliador NFS-e inativo. Na raiz: docker compose --profile comparacao up -d (sobe Redis + worker-sci-portal-nacional).";
+    }
+    throw new Error(msg);
+  }
+  return res.json() as Promise<{ id: string }>;
+}
+
+export async function getSciPortalNacionalJob(id: string): Promise<JobResponse> {
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl()}${API_PREFIX}/tools/sci-portal-nacional/jobs/${id}`);
+  } catch (e) {
+    if (!baseUrl() && isFetchNetworkError(e)) {
+      throw new Error(apiOfflineMessage());
+    }
+    throw e;
+  }
+  return res.json() as Promise<JobResponse>;
+}
+
+export function sciPortalNacionalDownloadUrl(id: string, token: string): string {
+  return `${baseUrl()}${API_PREFIX}/tools/sci-portal-nacional/jobs/${id}/download?token=${encodeURIComponent(token)}`;
 }
 
 // ── Comparador NFS-e (PDF × XML) ─────────────────────────────────────────

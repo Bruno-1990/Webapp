@@ -12,11 +12,17 @@ export const SPED_QUEUE_NAME = "sped-convert" as const;
 /** XLSX (com _LINHA) + SPED .txt → SPED .txt mesclado (webapp-03). */
 export const SPED_MERGE_QUEUE_NAME = "sped-merge" as const;
 
+/** Inspeção rápida da planilha XLSX (síncrona pela API via waitUntilFinished). */
+export const SPED_MERGE_INSPECT_QUEUE_NAME = "sped-merge-inspect" as const;
+
 /** Planilha SCI (CSV/Excel) → ProdutosSCI.xlsx (Python). */
 export const SCI_CONSOLIDADO_QUEUE_NAME = "sci-consolidado" as const;
 
 /** Comparação SEFAZ vs SCI → Notas Faltantes.xlsx (Python webapp-05). */
 export const COMPARACAO_PLANILHAS_QUEUE_NAME = "comparacao-planilhas" as const;
+
+/** Conciliador NFS-e: SCI x SEFAZ (Portal Nacional) → Conciliação multi-aba (TS puro, webapp-08). */
+export const SCI_PORTAL_NACIONAL_QUEUE_NAME = "sci-portal-nacional-comparacao" as const;
 
 export const SciConsolidadoJobPayloadSchema = z.object({
   jobId: z.string(),
@@ -114,6 +120,13 @@ export const SpedMergeInspectXlsxResponseSchema = z.object({
 
 export type SpedMergeInspectXlsxResponse = z.infer<typeof SpedMergeInspectXlsxResponseSchema>;
 
+export const SpedMergeInspectJobPayloadSchema = z.object({
+  jobId: z.string(),
+  xlsxPath: z.string(),
+});
+
+export type SpedMergeInspectJobPayload = z.infer<typeof SpedMergeInspectJobPayloadSchema>;
+
 export const JobStatusSchema = z.enum([
   "queued",
   "running",
@@ -150,6 +163,15 @@ export const ComparacaoPlanilhasJobPayloadSchema = z.object({
 });
 
 export type ComparacaoPlanilhasJobPayload = z.infer<typeof ComparacaoPlanilhasJobPayloadSchema>;
+
+export const SciPortalNacionalJobPayloadSchema = z.object({
+  jobId: z.string(),
+  sciPath: z.string(),
+  portalPath: z.string(),
+  outputPath: z.string(),
+});
+
+export type SciPortalNacionalJobPayload = z.infer<typeof SciPortalNacionalJobPayloadSchema>;
 
 /** Comparacao NFS-e: PDF (OCR via Gemini) × XML (parser) → divergencias (webapp-06). */
 export const COMPARACAO_NFSE_QUEUE_NAME = "comparacao-nfse" as const;

@@ -22,6 +22,7 @@ import {
   fadeUp,
   springSnappy,
   springSoft,
+  transitionFast,
   transitionSmooth,
 } from "../motion-variants.js";
 
@@ -186,15 +187,32 @@ export default function SpedMergeHomePage() {
         <section {...xlsxDrop.getRootProps()} className={toolDropzoneClass(xlsxDrop.isDragActive)}>
           <motion.div
             className="flex min-h-0 w-full flex-col"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...transitionSmooth, delay: 0.14 }}
+            initial={{ opacity: 0, y: 20, scale: 0.98, filter: "blur(6px)" }}
+            animate={{
+              opacity: 1,
+              y: 0,
+              scale: xlsxDrop.isDragActive ? 1.02 : 1,
+              filter: "blur(0px)",
+            }}
+            transition={
+              xlsxDrop.isDragActive
+                ? springSnappy
+                : { ...transitionSmooth, delay: 0.12 }
+            }
+            whileHover={{ scale: xlsxDrop.isDragActive ? 1.02 : 1.01 }}
+            whileTap={{ scale: 0.995 }}
           >
             <input {...xlsxDrop.getInputProps({ accept: ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })} />
             <p className="font-display text-sm font-semibold text-brand-ink">2. Planilha editada</p>
-            <p className="mt-1 text-xs text-[#347891]">
-              {xlsxDrop.isDragActive ? "Solte…" : "A que você baixou nesta conversão, já com suas alterações"}
-            </p>
+            <motion.p
+              className="mt-1 text-xs text-[#347891]"
+              key={xlsxDrop.isDragActive ? "drag" : "idle"}
+              initial={{ opacity: 0.85, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={transitionFast}
+            >
+              {xlsxDrop.isDragActive ? "Solte o arquivo…" : "A que você baixou nesta conversão, já com suas alterações"}
+            </motion.p>
             {xlsxFile && (
               <p className="mt-2 truncate text-xs text-accent" title={fileLabel(xlsxFile)}>
                 {fileLabel(xlsxFile)}
@@ -207,15 +225,32 @@ export default function SpedMergeHomePage() {
           <section {...spedDrop.getRootProps()} className={toolDropzoneClass(spedDrop.isDragActive)}>
             <motion.div
               className="flex min-h-0 w-full flex-col"
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ ...transitionSmooth, delay: 0.14 }}
+              initial={{ opacity: 0, y: 20, scale: 0.98, filter: "blur(6px)" }}
+              animate={{
+                opacity: 1,
+                y: 0,
+                scale: spedDrop.isDragActive ? 1.02 : 1,
+                filter: "blur(0px)",
+              }}
+              transition={
+                spedDrop.isDragActive
+                  ? springSnappy
+                  : { ...transitionSmooth, delay: 0.18 }
+              }
+              whileHover={{ scale: spedDrop.isDragActive ? 1.02 : 1.01 }}
+              whileTap={{ scale: 0.995 }}
             >
               <input {...spedDrop.getInputProps({ accept: ".txt,text/plain" })} />
               <p className="font-display text-sm font-semibold text-brand-ink">SPED original (obrigatório neste caso)</p>
-              <p className="mt-1 text-xs text-[#347891]">
-                {spedDrop.isDragActive ? "Solte…" : "Clique ou arraste o arquivo original .txt"}
-              </p>
+              <motion.p
+                className="mt-1 text-xs text-[#347891]"
+                key={spedDrop.isDragActive ? "drag" : "idle"}
+                initial={{ opacity: 0.85, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={transitionFast}
+              >
+                {spedDrop.isDragActive ? "Solte o arquivo…" : "Clique ou arraste o arquivo original .txt"}
+              </motion.p>
               {spedFile && (
                 <p className="mt-2 truncate text-xs text-accent" title={fileLabel(spedFile)}>
                   {fileLabel(spedFile)}
@@ -265,12 +300,21 @@ export default function SpedMergeHomePage() {
           <motion.div
             key="progress"
             className={`space-y-2 p-4 ${toolPanelClass}`}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={transitionSmooth}
+            initial={{ opacity: 0, y: 10, filter: "blur(4px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            exit={{ opacity: 0, y: -6, filter: "blur(3px)" }}
+            transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
           >
-            <p className="text-center text-xs font-semibold text-accent">{progressLabel}</p>
+            <motion.p
+              className="text-center text-xs font-semibold text-accent"
+              key={progressLabel}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={transitionFast}
+            >
+              {progressLabel}
+            </motion.p>
             <div
               className="relative h-3 w-full overflow-hidden rounded-full bg-brand-soft ring-1 ring-brand-line/70"
               role="progressbar"

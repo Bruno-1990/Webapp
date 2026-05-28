@@ -5,10 +5,6 @@ import { loadDotenvFromUpwards } from "@webapp/contracts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-function defaultWebapp03Dir(): string {
-  return path.resolve(process.cwd(), "../webapp-03");
-}
-
 const _loadedEnv = loadDotenvFromUpwards(__dirname);
 if (_loadedEnv) {
   console.log(`[api] .env carregado de ${_loadedEnv}`);
@@ -30,9 +26,6 @@ const EnvSchema = z.object({
   MAX_XML_FILES: z.coerce.number().default(5000),
   /** Limite por request do Comparador NFS-e (upload em chunks). */
   MAX_UPLOAD_NFSE_MB: z.coerce.number().default(300),
-  /** Diretório do motor Python de merge SPED (webapp-03). */
-  SPED_MERGE_DIR: z.string().default(defaultWebapp03Dir()),
-  PYTHON_CMD: z.string().default(process.platform === "win32" ? "py" : "python3"),
   /** Chave Google Generative AI — repassada ao worker de NFS-e (OCR). */
   GEMINI_API_KEY: z.string().optional().default(""),
 });

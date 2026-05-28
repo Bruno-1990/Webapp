@@ -2,7 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useDropzone } from "react-dropzone";
-import { createComparacaoPlanilhasJob, getComparacaoPlanilhasJob, type JobResponse } from "../api.js";
+import {
+  createSciPortalNacionalJob,
+  getSciPortalNacionalJob,
+  type JobResponse,
+} from "../api.js";
 import { fileLabel } from "../dropFiles.js";
 import { ToolPageTitle } from "../components/ToolPageTitle.js";
 import { Modal } from "../components/Modal.js";
@@ -22,7 +26,7 @@ import {
 } from "../motion-variants.js";
 
 function allowedFile(file: File): null | { code: string; message: string } {
-  const n = typeof file?.name === "string" ? file.name.toLowerCase() : "";
+  const n = (file?.name ?? "").toLowerCase();
   if (n.endsWith(".csv") || n.endsWith(".xlsx") || n.endsWith(".xls")) return null;
   return { code: "file-invalid-type", message: "Use CSV, XLS ou XLSX" };
 }
@@ -30,9 +34,9 @@ function allowedFile(file: File): null | { code: string; message: string } {
 type DropzoneSlotProps = {
   label: string;
   hint: string;
-  files: File[];
+  file: File | null;
   onDrop: (files: File[]) => void;
-  onRemoveAt: (idx: number) => void;
+  onClear: () => void;
   disabled: boolean;
   /** Para sequenciar a entrada animada dos 2 dropzones. */
   delay?: number;
@@ -41,14 +45,16 @@ type DropzoneSlotProps = {
 function DropzoneSlot({
   label,
   hint,
-  files,
+  file,
   onDrop,
-  onRemoveAt,
+  onClear,
   disabled,
   delay = 0,
 }: DropzoneSlotProps) {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
+    multiple: false,
+    maxFiles: 1,
     validator: allowedFile,
     disabled,
   });
@@ -82,17 +88,16 @@ function DropzoneSlot({
             initial={{ opacity: 0.85, y: 4 }}
             transition={transitionFast}
           >
-            {isDragActive ? "Solte os arquivos…" : "Arraste ou clique"}
+            {isDragActive ? "Solte o arquivo…" : "Arraste ou clique"}
           </motion.p>
           <p className="mt-1 text-xs text-[#2a4f60]">{hint}</p>
         </motion.div>
       </section>
 
-      {/* Chips externos (um por arquivo) — mesmo padrão visual do webapp-08. */}
       <AnimatePresence mode="popLayout">
-        {files.map((f, i) => (
+        {file && (
           <motion.div
-            key={`${fileLabel(f)}-${i}`}
+            key="file-row"
             layout
             initial={{ opacity: 0, x: -16, scale: 0.97, filter: "blur(4px)" }}
             animate={{ opacity: 1, x: 0, scale: 1, filter: "blur(0px)" }}
@@ -100,13 +105,13 @@ function DropzoneSlot({
             transition={transitionSmooth}
             className="flex items-center justify-between gap-2 rounded-xl bg-gradient-to-b from-brand-soft/90 to-brand-soft/70 px-3 py-2 text-sm text-brand-ink ring-1 ring-brand-line/60"
           >
-            <span className="min-w-0 truncate" title={fileLabel(f)}>
-              {fileLabel(f)}
+            <span className="min-w-0 truncate" title={fileLabel(file)}>
+              {fileLabel(file)}
             </span>
             <motion.button
               type="button"
               className="shrink-0 rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm"
-              onClick={() => onRemoveAt(i)}
+              onClick={onClear}
               whileHover={{ scale: 1.06, filter: "brightness(1.08)" }}
               whileTap={{ scale: 0.92 }}
               transition={springSnappy}
@@ -115,37 +120,41 @@ function DropzoneSlot({
               remover
             </motion.button>
           </motion.div>
-        ))}
+        )}
       </AnimatePresence>
     </div>
   );
 }
 
-export default function ComparacaoPlanilhasHomePage() {
+export default function SciPortalNacionalHomePage() {
   const navigate = useNavigate();
-  const [sefazFiles, setSefazFiles] = useState<File[]>([]);
-  const [sciFiles, setSciFiles] = useState<File[]>([]);
+  const [sciFile, setSciFile] = useState<File | null>(null);
+  const [portalFile, setPortalFile] = useState<File | null>(null);
   const [job, setJob] = useState<JobResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const onDropSefaz = useCallback((accepted: File[]) => {
-    setSefazFiles((prev) => [...prev, ...accepted]);
-    setErr(null);
+  const onDropSci = useCallback((accepted: File[]) => {
+    if (accepted.length > 0) {
+      setSciFile(accepted[0]!);
+      setErr(null);
+    }
   }, []);
 
-  const onDropSci = useCallback((accepted: File[]) => {
-    setSciFiles((prev) => [...prev, ...accepted]);
-    setErr(null);
+  const onDropPortal = useCallback((accepted: File[]) => {
+    if (accepted.length > 0) {
+      setPortalFile(accepted[0]!);
+      setErr(null);
+    }
   }, []);
 
   const submit = async () => {
-    if (sefazFiles.length === 0 || sciFiles.length === 0) return;
+    if (!sciFile || !portalFile) return;
     setBusy(true);
     setErr(null);
     setJob(null);
     try {
-      const { id } = await createComparacaoPlanilhasJob(sefazFiles, sciFiles);
+      const { id } = await createSciPortalNacionalJob(sciFile, portalFile);
       setJob({ id, status: "queued" });
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -158,7 +167,7 @@ export default function ComparacaoPlanilhasHomePage() {
     if (!job?.id || job.status === "done" || job.status === "failed") return;
     const t = setInterval(async () => {
       try {
-        const j = await getComparacaoPlanilhasJob(job.id);
+        const j = await getSciPortalNacionalJob(job.id);
         setJob(j);
       } catch {
         /* ignore */
@@ -169,7 +178,7 @@ export default function ComparacaoPlanilhasHomePage() {
 
   useEffect(() => {
     if (job?.status === "done" && job.downloadToken && job.id) {
-      navigate(`/tools/comparacao-planilhas/download/${encodeURIComponent(job.id)}`, { replace: true });
+      navigate(`/tools/sci-portal-nacional/download/${encodeURIComponent(job.id)}`, { replace: true });
     }
   }, [job?.status, job?.downloadToken, job?.id, navigate]);
 
@@ -190,12 +199,12 @@ export default function ComparacaoPlanilhasHomePage() {
   const progressLabel = busy
     ? "Enviando arquivos…"
     : job?.status === "running"
-      ? "Comparando planilhas…"
+      ? "Conciliando notas…"
       : job?.status === "queued"
         ? "Na fila…"
         : "Aguarde…";
 
-  const readyToSubmit = sefazFiles.length > 0 && sciFiles.length > 0 && !isProcessing;
+  const readyToSubmit = !!sciFile && !!portalFile && !isProcessing;
 
   return (
     <motion.div
@@ -215,7 +224,7 @@ export default function ComparacaoPlanilhasHomePage() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ ...springSoft, delay: 0.08 }}
         >
-          <ToolPageTitle left="SEFAZ" right="SCI" />
+          <ToolPageTitle left="SCI" right="Portal Nacional" />
         </motion.div>
         <motion.p
           className="mx-auto mt-3 max-w-2xl text-[15px] leading-relaxed text-[#1e3d4d]"
@@ -223,7 +232,8 @@ export default function ComparacaoPlanilhasHomePage() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.45, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
         >
-          Compare planilhas da SEFAZ com o SCI → <strong>Notas Faltantes.xlsx</strong>
+          Compare a planilha do SCI com o relatório de NFS-e do Portal Nacional —{" "}
+          <strong>inclusive a aba de canceladas</strong>. → <strong>Conciliacao SCI x Portal Nacional.xlsx</strong>
         </motion.p>
       </motion.header>
 
@@ -244,24 +254,20 @@ export default function ComparacaoPlanilhasHomePage() {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <DropzoneSlot
-            label="Arquivos SEFAZ"
+            label="Planilha SCI"
             hint=".csv · .xlsx · .xls"
-            files={sefazFiles}
-            onDrop={onDropSefaz}
-            onRemoveAt={(idx) =>
-              setSefazFiles((prev) => prev.filter((_, i) => i !== idx))
-            }
+            file={sciFile}
+            onDrop={onDropSci}
+            onClear={() => setSciFile(null)}
             disabled={isProcessing}
             delay={0}
           />
           <DropzoneSlot
-            label="Arquivos SCI"
+            label="Planilha Portal Nacional"
             hint=".csv · .xlsx · .xls"
-            files={sciFiles}
-            onDrop={onDropSci}
-            onRemoveAt={(idx) =>
-              setSciFiles((prev) => prev.filter((_, i) => i !== idx))
-            }
+            file={portalFile}
+            onDrop={onDropPortal}
+            onClear={() => setPortalFile(null)}
             disabled={isProcessing}
             delay={0.08}
           />
@@ -332,7 +338,7 @@ export default function ComparacaoPlanilhasHomePage() {
           whileTap={!readyToSubmit ? undefined : { scale: 0.985 }}
           transition={springSnappy}
         >
-          {busy ? "Enviando…" : "Comparar planilhas"}
+          {busy ? "Enviando…" : "Conciliar NFS-e"}
         </motion.button>
       </motion.div>
     </motion.div>

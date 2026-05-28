@@ -10,9 +10,11 @@ import {
   getComparacaoPlanilhasJob,
   getJob,
   getSciConsolidadoJob,
+  getSciPortalNacionalJob,
   getSpedJob,
   getSpedMergeJob,
   sciConsolidadoDownloadUrl,
+  sciPortalNacionalDownloadUrl,
   spedDownloadUrl,
   spedMergeDownloadUrl,
   type JobResponse,
@@ -32,6 +34,7 @@ export default function DownloadPage() {
   const isSpedMerge = pathname.includes("/tools/sped-merge/download");
   const isSci = pathname.includes("/tools/sci-consolidado/download");
   const isComparacao = pathname.includes("/tools/comparacao-planilhas/download");
+  const isSciPortal = pathname.includes("/tools/sci-portal-nacional/download");
   const isSped =
     pathname.includes("/tools/sped/download") && !isSpedMerge && !isSci && !isComparacao;
   const { jobId: rawId } = useParams<{ jobId: string }>();
@@ -53,9 +56,11 @@ export default function DownloadPage() {
             ? await getSciConsolidadoJob(jobId)
             : isComparacao
               ? await getComparacaoPlanilhasJob(jobId)
-              : isSped
-                ? await getSpedJob(jobId)
-                : await getJob(jobId);
+              : isSciPortal
+                ? await getSciPortalNacionalJob(jobId)
+                : isSped
+                  ? await getSpedJob(jobId)
+                  : await getJob(jobId);
         if (cancelled) return;
         setLoadErr(null);
         setJob(j);
@@ -84,7 +89,7 @@ export default function DownloadPage() {
         timerRef.current = null;
       }
     };
-  }, [jobId, isSped, isSpedMerge, isSci, isComparacao]);
+  }, [jobId, isSped, isSpedMerge, isSci, isComparacao, isSciPortal]);
 
   const showDeterminateBar =
     job?.status === "running" &&
@@ -99,7 +104,9 @@ export default function DownloadPage() {
           ? "Gerando planilha SCI…"
           : isComparacao
             ? "Comparando planilhas…"
-            : "Preparando planilha…"
+            : isSciPortal
+              ? "Conciliando notas…"
+              : "Preparando planilha…"
       : job?.status === "queued"
         ? "Na fila…"
         : "Carregando…";
@@ -156,6 +163,8 @@ export default function DownloadPage() {
             <ToolPageTitle left="SCI" right="Excel" size="download" />
           ) : isComparacao ? (
             <ToolPageTitle left="SEFAZ" right="SCI" size="download" />
+          ) : isSciPortal ? (
+            <ToolPageTitle left="SCI" right="Portal Nacional" size="download" />
           ) : isSped ? (
             <ToolPageTitle left="SPED" right="XLSX" size="download" />
           ) : (
@@ -174,7 +183,9 @@ export default function DownloadPage() {
               ? "Baixe o ProdutosSCI.xlsx"
               : isComparacao
                 ? "Baixe as notas faltantes"
-                : "Baixe a planilha"}
+                : isSciPortal
+                  ? "Baixe a conciliação SCI × Portal Nacional"
+                  : "Baixe a planilha"}
         </motion.p>
       </motion.header>
 
@@ -306,7 +317,9 @@ export default function DownloadPage() {
                   ? "Não foi possível atualizar o arquivo"
                   : isComparacao
                     ? "Não foi possível comparar as planilhas"
-                    : "Não foi possível gerar a planilha"}
+                    : isSciPortal
+                      ? "Não foi possível conciliar as planilhas"
+                      : "Não foi possível gerar a planilha"}
               </motion.p>
               {job.error && (
                 <motion.p
@@ -355,9 +368,11 @@ export default function DownloadPage() {
                       ? "O arquivo inclui as abas Produtos, Base e Consolidado (SCI)."
                       : isComparacao
                         ? "A planilha contém as notas da SEFAZ que não foram encontradas no SCI."
-                        : isSped
-                          ? "Sua planilha está pronta para abrir no programa de planilhas."
-                          : "Sua planilha com os dados das notas está pronta para download."}
+                        : isSciPortal
+                          ? "A planilha tem 6 abas: Resumo, Em ambas, Só no Portal Nacional, Só no SCI, ⚠ Canceladas no SCI e Duplicados."
+                          : isSped
+                            ? "Sua planilha está pronta para abrir no programa de planilhas."
+                            : "Sua planilha com os dados das notas está pronta para download."}
                 </p>
               </motion.div>
               <motion.a
@@ -369,9 +384,11 @@ export default function DownloadPage() {
                       ? sciConsolidadoDownloadUrl(job.id, job.downloadToken)
                       : isComparacao
                         ? comparacaoPlanilhasDownloadUrl(job.id, job.downloadToken)
-                        : isSped
-                          ? spedDownloadUrl(job.id, job.downloadToken)
-                          : downloadUrl(job.id, job.downloadToken)
+                        : isSciPortal
+                          ? sciPortalNacionalDownloadUrl(job.id, job.downloadToken)
+                          : isSped
+                            ? spedDownloadUrl(job.id, job.downloadToken)
+                            : downloadUrl(job.id, job.downloadToken)
                 }
                 download={
                   job.fileName ??
@@ -381,9 +398,11 @@ export default function DownloadPage() {
                       ? "ProdutosSCI.xlsx"
                       : isComparacao
                         ? "Notas Faltantes.xlsx"
-                        : isSped
-                          ? "SPED_Convertido.xlsx"
-                          : "NFE_Itens.xlsx")
+                        : isSciPortal
+                          ? "Conciliacao SCI x Portal Nacional.xlsx"
+                          : isSped
+                            ? "SPED_Convertido.xlsx"
+                            : "NFE_Itens.xlsx")
                 }
                 title={
                   job.fileName ??
@@ -393,9 +412,11 @@ export default function DownloadPage() {
                       ? "ProdutosSCI.xlsx"
                       : isComparacao
                         ? "Notas Faltantes.xlsx"
-                        : isSped
-                          ? "SPED_Convertido.xlsx"
-                          : "NFE_Itens.xlsx")
+                        : isSciPortal
+                          ? "Conciliacao SCI x Portal Nacional.xlsx"
+                          : isSped
+                            ? "SPED_Convertido.xlsx"
+                            : "NFE_Itens.xlsx")
                 }
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -412,9 +433,13 @@ export default function DownloadPage() {
                       ? "SPED_mesclado.txt"
                       : isSci
                         ? "ProdutosSCI.xlsx"
-                        : isSped
-                          ? "SPED_Convertido.xlsx"
-                          : "NFE_Itens.xlsx")}
+                        : isComparacao
+                          ? "Notas Faltantes.xlsx"
+                          : isSciPortal
+                            ? "Conciliacao SCI x Portal Nacional.xlsx"
+                            : isSped
+                              ? "SPED_Convertido.xlsx"
+                              : "NFE_Itens.xlsx")}
                 </span>
               </motion.a>
             </motion.div>
@@ -436,9 +461,11 @@ export default function DownloadPage() {
                     ? "/tools/sci-consolidado"
                     : isComparacao
                       ? "/tools/comparacao-planilhas"
-                      : isSped
-                        ? "/tools/sped"
-                        : "/tools/nfe"
+                      : isSciPortal
+                        ? "/tools/sci-portal-nacional"
+                        : isSped
+                          ? "/tools/sped"
+                          : "/tools/nfe"
               }
               className="font-display text-sm font-bold text-accent underline-offset-4 hover:text-accent2 hover:underline"
             >

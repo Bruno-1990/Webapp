@@ -150,8 +150,10 @@ def processar(sefaz_paths: list[str], sci_paths: list[str], output: str):
 
         for idx, col_name in enumerate(dados_faltantes.columns):
             ws.write(0, idx, col_name, header_fmt)
-            series = dados_faltantes[col_name].astype(str)
-            max_data = int(series.map(len).max()) if len(series) else 0
+            # str(v) por item: no pandas 3.x, astype(str) preserva NaN como float
+            # (nao vira "nan"), entao map(len) direto quebra com "float has no len()".
+            series = dados_faltantes[col_name]
+            max_data = int(series.map(lambda v: len(str(v))).max()) if len(series) else 0
             width = min(max(len(str(col_name)), max_data) + 2, 60)
             fmt = text_cell_fmt if col_name in text_cols else cell_fmt
             ws.set_column(idx, idx, width, fmt)

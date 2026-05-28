@@ -299,20 +299,26 @@ export default function NfseComparadorHomePage() {
       className={toolPageShellClass}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={transitionSmooth}
+      transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
     >
       <motion.header
         className="text-center"
         initial={fadeUp.initial}
         animate={fadeUp.animate}
-        transition={{ ...transitionSmooth, delay: 0.04 }}
+        transition={{ ...transitionSmooth, delay: 0.05 }}
       >
-        <ToolPageTitle left="PDFs / Imagens" right="XMLs" />
+        <motion.div
+          initial={{ opacity: 0, y: 12, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ ...springSoft, delay: 0.08 }}
+        >
+          <ToolPageTitle left="PDFs / Imagens" right="XMLs" />
+        </motion.div>
         <motion.p
           className="mt-3 text-[15px] leading-relaxed text-[#1e3d4d]"
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ ...transitionSmooth, delay: 0.1 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.45, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
         >
           Compare notas fiscais de serviço — PDFs ou imagens (OCR) × XMLs — e veja o que está só de um lado.
         </motion.p>
@@ -368,13 +374,33 @@ export default function NfseComparadorHomePage() {
                   {...pdfZone.getRootProps({ onClick: onZoneClick("pdf-or-image") })}
                   className={toolDropzoneClass(pdfZone.isDragActive)}
                 >
-                  <input {...pdfZone.getInputProps(FOLDER_INPUT_ATTRS)} />
-                  <div className="flex flex-col items-center gap-2">
-                    <p className="font-display text-base font-bold text-[#183844]">
+                  <motion.div
+                    className="flex flex-col items-center gap-2"
+                    initial={{ opacity: 0, y: 20, scale: 0.98, filter: "blur(6px)" }}
+                    animate={{
+                      opacity: 1,
+                      y: 0,
+                      scale: pdfZone.isDragActive ? 1.02 : 1,
+                      filter: "blur(0px)",
+                    }}
+                    transition={
+                      pdfZone.isDragActive ? springSnappy : { ...transitionSmooth, delay: 0.12 }
+                    }
+                    whileHover={{ scale: pdfZone.isDragActive ? 1.02 : 1.01 }}
+                    whileTap={{ scale: 0.995 }}
+                  >
+                    <input {...pdfZone.getInputProps(FOLDER_INPUT_ATTRS)} />
+                    <motion.p
+                      className="font-display text-base font-bold text-[#183844]"
+                      key={pdfZone.isDragActive ? "drag" : "idle"}
+                      initial={{ opacity: 0.85, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={transitionFast}
+                    >
                       {pdfZone.isDragActive ? "Solte a pasta…" : "Arraste ou clique para escolher a pasta"}
-                    </p>
+                    </motion.p>
                     {pdfFiles.length > 0 && <FileSummary files={pdfFiles} />}
-                  </div>
+                  </motion.div>
                 </section>
               </div>
 
@@ -386,13 +412,33 @@ export default function NfseComparadorHomePage() {
                   {...xmlZone.getRootProps({ onClick: onZoneClick("xml-only") })}
                   className={toolDropzoneClass(xmlZone.isDragActive)}
                 >
-                  <input {...xmlZone.getInputProps(FOLDER_INPUT_ATTRS)} />
-                  <div className="flex flex-col items-center gap-2">
-                    <p className="font-display text-base font-bold text-[#183844]">
+                  <motion.div
+                    className="flex flex-col items-center gap-2"
+                    initial={{ opacity: 0, y: 20, scale: 0.98, filter: "blur(6px)" }}
+                    animate={{
+                      opacity: 1,
+                      y: 0,
+                      scale: xmlZone.isDragActive ? 1.02 : 1,
+                      filter: "blur(0px)",
+                    }}
+                    transition={
+                      xmlZone.isDragActive ? springSnappy : { ...transitionSmooth, delay: 0.2 }
+                    }
+                    whileHover={{ scale: xmlZone.isDragActive ? 1.02 : 1.01 }}
+                    whileTap={{ scale: 0.995 }}
+                  >
+                    <input {...xmlZone.getInputProps(FOLDER_INPUT_ATTRS)} />
+                    <motion.p
+                      className="font-display text-base font-bold text-[#183844]"
+                      key={xmlZone.isDragActive ? "drag" : "idle"}
+                      initial={{ opacity: 0.85, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={transitionFast}
+                    >
                       {xmlZone.isDragActive ? "Solte a pasta…" : "Arraste ou clique para escolher a pasta"}
-                    </p>
+                    </motion.p>
                     {xmlFiles.length > 0 && <FileSummary files={xmlFiles} />}
-                  </div>
+                  </motion.div>
                 </section>
               </div>
             </div>
@@ -423,7 +469,16 @@ export default function NfseComparadorHomePage() {
               exit={{ opacity: 0, height: 0 }}
               className="space-y-2"
             >
-              <p className="text-center text-sm font-semibold text-accent">{barLabel}</p>
+              <motion.p
+                className="text-center text-sm font-semibold text-accent"
+                key={barLabel}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={transitionFast}
+              >
+                {barLabel}
+              </motion.p>
               <div className="relative h-3 w-full overflow-hidden rounded-full bg-brand-soft ring-1 ring-brand-line/70">
                 {uploadPct != null ? (
                   <motion.div
@@ -455,7 +510,12 @@ export default function NfseComparadorHomePage() {
             className={toolPrimaryButtonClass}
             onClick={submit}
             disabled={!readyToSubmit}
-            whileTap={{ scale: 0.98 }}
+            whileHover={
+              !readyToSubmit
+                ? undefined
+                : { scale: 1.015, boxShadow: "0 12px 40px -8px rgb(42 79 96 / 0.2)" }
+            }
+            whileTap={!readyToSubmit ? undefined : { scale: 0.985 }}
             transition={springSnappy}
           >
             Comparar NFS-e

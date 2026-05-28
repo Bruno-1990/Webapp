@@ -1,0 +1,18 @@
+{
+  "name": "webapp-08-conciliador-nfse",
+  "version": "0.1.0",
+  "description": "Conciliador NFS-e SCI x Portal Nacional — engine standalone Node.js.",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "conciliador-nfse": "./cli.mjs"
+  },
+  "scripts": {
+    "start": "node cli.mjs",
+    "smoke": "node cli.mjs --sci \"./exemplo/02/RELATORIO SCI.xls\" --portal \"./exemplo/02/RELATORIO PORTAL NACIONAL.xlsx\" --output \"./exemplo/02/Conciliacao SCI x Portal Nacional.xlsx\""
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  }
+}

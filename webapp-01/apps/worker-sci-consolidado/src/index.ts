@@ -21,6 +21,10 @@ const logger = {
 
 function absolutizeJobPath(filePath: string): string {
   const norm = path.normalize(filePath);
+  const containerJobs = norm.match(/^[/\\]data[/\\]jobs[/\\](.+)$/i);
+  if (containerJobs) {
+    return path.join(env.TEMP_JOBS_ROOT, containerJobs[1]);
+  }
   if (path.isAbsolute(norm)) return norm;
   const rel = norm.replace(/^\.\//, "");
   const m = rel.match(/^temp_jobs[/\\](.+)$/i);

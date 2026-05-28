@@ -77,13 +77,13 @@ API em `http://0.0.0.0:8000`. O frontend em dev continua apontando `VITE_API_URL
 
 ### Profiles opcionais (workers Python)
 
-A stack base (`redis`, `api`, `worker` NFe) sobe sem profile. Workers Python entram via profile:
+A stack **core** (`redis`, `api`, `worker` NFe, `worker-sci-consolidado`) sobe sem profile — `docker compose up -d --build` na raiz já entrega: NFe XML→XLSX e Consolidado SCI (webapp-04) prontos. Workers Python adicionais entram via profile:
 
 ```bash
 # SPED export + merge (webapp-02 + webapp-03)
 docker compose --profile sped up -d --build worker-sped worker-sped-merge
 
-# Consolidado SCI / Comparador SEFAZ × SCI (webapp-04 + webapp-05)
+# Comparador SEFAZ × SCI (webapp-05)
 docker compose --profile comparacao up -d --build
 
 # Comparador NFS-e PDF × XML (webapp-06, exige GEMINI_API_KEY)
@@ -91,6 +91,9 @@ docker compose --profile nfse up -d --build
 
 # Extrator GNRE (webapp-07, volume persistente para SQLite em gnre-data:/data/gnre)
 docker compose --profile gnre up -d --build
+
+# Tudo de uma vez:
+docker compose --profile sped --profile comparacao --profile nfse --profile gnre up -d --build
 ```
 
 Os Dockerfiles dos workers copiam o código Python da respectiva pasta irmã (`webapp-02..07`), então o build precisa rodar a partir da pasta-pai (que já é o cwd da raiz do monorepo).

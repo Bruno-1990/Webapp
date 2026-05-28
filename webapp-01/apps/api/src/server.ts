@@ -7,7 +7,6 @@ import rateLimit from "@fastify/rate-limit";
 import fs from "node:fs";
 import readline from "node:readline";
 import path from "node:path";
-import { spawn } from "node:child_process";
 import {
   API_PREFIX,
   SPED_EXPORT_SHEET_KEYS,
@@ -15,6 +14,7 @@ import {
   SPED_MAX_SHEETS_CSV_BYTES,
   SPED_MAX_SHEETS_PER_JOB,
   SPED_REG_CODE_RE,
+  type SpedMergeInspectXlsxResponse,
 } from "@webapp/contracts";
 import { getOutName } from "@webapp/nfe-core";
 import { loadEnv } from "./env.js";
@@ -26,15 +26,20 @@ import {
   getComparacaoPlanilhasQueue,
   getComparacaoNfseQueue,
   getGnreQueue,
+  getSciPortalNacionalQueue,
   getSpedMergeQueue,
+  getSpedMergeInspectQueue,
+  getSpedMergeInspectEvents,
   getSpedQueue,
   type NfeJobPayload,
   type SciConsolidadoJobPayload,
   type SpedJobPayload,
   type SpedMergeJobPayload,
+  type SpedMergeInspectJobPayload,
   type ComparacaoPlanilhasJobPayload,
   type ComparacaoNfseJobPayload,
   type GnreJobPayload,
+  type SciPortalNacionalJobPayload,
 } from "./queue.js";
 import { signDownloadToken, verifyDownloadToken } from "./tokens.js";
 import { buildSpedXlsxFileName, extractSpedRazaoFromBuffer } from "./sped-filename.js";
@@ -56,71 +61,28 @@ function extractRegFromSpedLine(line: string): string | null {
   return SPED_REG_CODE_RE.test(reg) ? reg : null;
 }
 
-type SpedMergeXlsxInspect = {
-  complete: boolean;
-  requiresOriginal: boolean;
-  reasons: string[];
-  regSheets: string[];
-};
+type SpedMergeXlsxInspect = SpedMergeInspectXlsxResponse;
+
+const SPED_MERGE_INSPECT_TIMEOUT_MS = 30_000;
 
 async function inspectSpedMergeXlsx(env: ReturnType<typeof loadEnv>, xlsxPath: string): Promise<SpedMergeXlsxInspect> {
-  const cwd = env.SPED_MERGE_DIR;
-  const cliPath = path.join(cwd, "inspect_xlsx.py");
-  const cmd = env.PYTHON_CMD.trim();
-  const base = path.basename(cmd).replace(/\.exe$/i, "").toLowerCase();
-  const args =
-    base === "py" ? ["-3", cliPath, "--xlsx", xlsxPath] : [cliPath, "--xlsx", xlsxPath];
-  return await new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, {
-      cwd,
-      stdio: ["ignore", "pipe", "pipe"],
-      windowsHide: true,
-    });
-    const stderrChunks: Buffer[] = [];
-    child.stderr?.on("data", (c: Buffer) => stderrChunks.push(c));
-    let out: SpedMergeXlsxInspect | null = null;
-    let jsonErr: string | null = null;
-    const rl = readline.createInterface({ input: child.stdout! });
-    rl.on("line", (line) => {
-      const s = line.trim();
-      if (!s.startsWith("{")) return;
-      try {
-        const obj = JSON.parse(s) as {
-          kind?: string;
-          message?: string;
-          complete?: boolean;
-          requiresOriginal?: boolean;
-          reasons?: string[];
-          regSheets?: string[];
-        };
-        if (obj.kind === "error") {
-          jsonErr = obj.message ?? "Falha ao inspecionar XLSX";
-          return;
-        }
-        if (obj.kind === "ok") {
-          out = {
-            complete: Boolean(obj.complete),
-            requiresOriginal: Boolean(obj.requiresOriginal),
-            reasons: Array.isArray(obj.reasons) ? obj.reasons.map(String) : [],
-            regSheets: Array.isArray(obj.regSheets) ? obj.regSheets.map(String) : [],
-          };
-        }
-      } catch {
-        /* ignore */
-      }
-    });
-    child.on("error", (err) => reject(err));
-    child.on("close", (code) => {
-      rl.close();
-      if (jsonErr) return reject(new Error(jsonErr));
-      if (code !== 0) {
-        const errText = Buffer.concat(stderrChunks).toString("utf-8").trim().slice(0, 800);
-        return reject(new Error(errText || `inspect_xlsx falhou (${code})`));
-      }
-      if (!out) return reject(new Error("inspect_xlsx não retornou JSON válido"));
-      resolve(out);
-    });
-  });
+  const inspectQueue = getSpedMergeInspectQueue(env);
+  const inspectEvents = getSpedMergeInspectEvents(env);
+  const jobId = randomUUID();
+  const job = await inspectQueue.add(
+    "inspect",
+    { jobId, xlsxPath } satisfies SpedMergeInspectJobPayload,
+    { jobId }
+  );
+  try {
+    const result = (await job.waitUntilFinished(
+      inspectEvents,
+      SPED_MERGE_INSPECT_TIMEOUT_MS
+    )) as SpedMergeXlsxInspect;
+    return result;
+  } finally {
+    await job.remove().catch(() => undefined);
+  }
 }
 
 function parseJsonRegArray(
@@ -280,10 +242,13 @@ app.setErrorHandler((err, req, reply) => {
 const queue = getQueue(env);
 const spedQueue = getSpedQueue(env);
 const spedMergeQueue = getSpedMergeQueue(env);
+getSpedMergeInspectQueue(env);
+getSpedMergeInspectEvents(env);
 const sciConsolidadoQueue = getSciConsolidadoQueue(env);
 const comparacaoPlanilhasQueue = getComparacaoPlanilhasQueue(env);
 const comparacaoNfseQueue = getComparacaoNfseQueue(env);
 const gnreQueue = getGnreQueue(env);
+const sciPortalNacionalQueue = getSciPortalNacionalQueue(env);
 
 function jobDir(id: string): string {
   /** Absoluto para o payload BullMQ: o worker/Python usa outro cwd e paths relativos quebram (ex.: SPED). */
@@ -342,12 +307,13 @@ app.get(`${API_PREFIX}/tools`, async () => ({
     {
       id: "webapp-05",
       title: "Comparador",
-      subtitle: "SEFAZ vs SCI",
+      subtitle: "SEFAZ Estadual × SCI",
       description:
-        "Envie planilhas da SEFAZ e do SCI para identificar notas lançadas na SEFAZ que não constam no SCI.",
+        "Compare notas fiscais de produto/transporte (NF-e, CT-e, NFC-e) baixadas do SEFAZ estadual com os lançamentos no SCI. Receba uma planilha com as notas que estão na SEFAZ mas não foram lançadas.",
       route: "/tools/comparacao-planilhas",
       available: true,
       category: "fiscal",
+      tag: { label: "NF-e · Produtos", tone: "blue" },
     },
     {
       id: "webapp-06",
@@ -368,6 +334,17 @@ app.get(`${API_PREFIX}/tools`, async () => ({
       route: "/tools/gnre",
       available: true,
       category: "contabil",
+    },
+    {
+      id: "webapp-08",
+      title: "Conciliador NFS-e",
+      subtitle: "Portal Nacional × SCI",
+      description:
+        "Concilia notas fiscais de serviço tomadas (NFS-e) baixadas do Portal Nacional com os lançamentos no SCI — inclusive notas canceladas. Receba um XLSX com Resumo, Em ambas, Só no Portal Nacional, Só no SCI, Canceladas no SCI e Duplicados.",
+      route: "/tools/sci-portal-nacional",
+      available: true,
+      category: "fiscal",
+      tag: { label: "NFS-e · Serviços", tone: "violet" },
     },
   ],
 }));
@@ -1326,6 +1303,173 @@ app.get<{ Params: { id: string }; Querystring: { token?: string } }>(
     }
 
     const outPath = (job.data as ComparacaoPlanilhasJobPayload).outputPath;
+    if (!outPath || !fs.existsSync(outPath)) {
+      return reply.code(404).send({ error: "Arquivo não encontrado" });
+    }
+
+    const stream = fs.createReadStream(outPath);
+    reply.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    const fn = claims.fileName.replace(/[\r\n"]/g, "_");
+    const asciiFallback = fn.replace(/[^\x20-\x7e]/g, "_");
+    reply.header(
+      "Content-Disposition",
+      `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(fn)}`
+    );
+    return reply.send(stream);
+  }
+);
+
+// ── Conciliador NFS-e SCI × Portal Nacional (webapp-08) ─────────────────
+
+const ALLOWED_SCI_PORTAL_EXT = new Set([".csv", ".xlsx", ".xls"]);
+
+app.post(
+  `${API_PREFIX}/tools/sci-portal-nacional/jobs`,
+  async (req, reply) => {
+    const jobId = randomUUID();
+    const inDir = path.join(jobDir(jobId), "in");
+    const outDir = path.join(jobDir(jobId), "out");
+
+    try {
+      const pong = await getRedis(env).ping();
+      if (pong !== "PONG") throw new Error("Redis não respondeu");
+    } catch (e) {
+      req.log.warn({ err: e }, "redis indisponível ao criar job sci-portal");
+      return reply.code(503).send({
+        error:
+          "Redis não está acessível. Inicie o Redis e o worker Conciliador NFS-e (worker-sci-portal-nacional).",
+      });
+    }
+
+    await fs.promises.mkdir(inDir, { recursive: true });
+    await fs.promises.mkdir(outDir, { recursive: true });
+
+    let totalBytes = 0;
+    let sciPath: string | null = null;
+    let portalPath: string | null = null;
+
+    const parts = req.parts();
+    for await (const part of parts) {
+      if (part.type !== "file") continue;
+      const name = (part.filename ?? "arquivo").replace(/[/\\]/g, "_");
+      const ext = path.extname(name).toLowerCase();
+      if (!ALLOWED_SCI_PORTAL_EXT.has(ext)) {
+        await fs.promises.rm(jobDir(jobId), { recursive: true, force: true });
+        return reply.code(400).send({
+          error: `Formato não suportado: ${name}. Use .csv, .xlsx ou .xls.`,
+        });
+      }
+      const buf = await part.toBuffer();
+      totalBytes += buf.length;
+      if (totalBytes > env.MAX_UPLOAD_MB * 1024 * 1024) {
+        await fs.promises.rm(jobDir(jobId), { recursive: true, force: true });
+        return reply.code(413).send({ error: "Arquivos muito grandes" });
+      }
+      const fieldName = part.fieldname;
+      if (fieldName === "sci" && !sciPath) {
+        const dest = path.join(inDir, `sci${ext}`);
+        await fs.promises.writeFile(dest, buf);
+        sciPath = dest;
+      } else if (fieldName === "portal" && !portalPath) {
+        const dest = path.join(inDir, `portal${ext}`);
+        await fs.promises.writeFile(dest, buf);
+        portalPath = dest;
+      }
+    }
+
+    if (!sciPath || !portalPath) {
+      await fs.promises.rm(jobDir(jobId), { recursive: true, force: true });
+      return reply.code(400).send({
+        error: "Envie 1 arquivo no campo 'sci' (planilha SCI) e 1 no campo 'portal' (planilha Portal Nacional).",
+      });
+    }
+
+    const outputPath = path.join(outDir, "Conciliacao SCI x Portal Nacional.xlsx");
+
+    const payload: SciPortalNacionalJobPayload = {
+      jobId,
+      sciPath,
+      portalPath,
+      outputPath,
+    };
+
+    try {
+      await Promise.race([
+        sciPortalNacionalQueue.add("conciliacao", payload, { jobId }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Fila timeout")), 15_000)
+        ),
+      ]);
+    } catch (e) {
+      await fs.promises.rm(jobDir(jobId), { recursive: true, force: true });
+      req.log.error({ err: e }, "falha ao enfileirar job sci-portal");
+      return reply.code(503).send({
+        error:
+          "Não foi possível enfileirar o job. Verifique Redis e se o worker-sci-portal-nacional está rodando.",
+      });
+    }
+
+    return reply.code(202).send({ id: jobId, status: "queued" as const });
+  }
+);
+
+app.get<{ Params: { id: string } }>(`${API_PREFIX}/tools/sci-portal-nacional/jobs/:id`, async (req, reply) => {
+  const { id } = req.params;
+  const job = await sciPortalNacionalQueue.getJob(id);
+  if (!job) {
+    return reply.code(404).send({
+      id,
+      status: "not_found" as const,
+    });
+  }
+  const state = await job.getState();
+  const status = mapBullState(state);
+  const progress =
+    typeof job.progress === "number" ? Math.round(job.progress) : undefined;
+
+  let downloadToken: string | undefined;
+  let fileName: string | undefined;
+  let error: string | undefined;
+
+  if (status === "done") {
+    const rv = job.returnvalue as { fileName?: string } | undefined;
+    fileName =
+      rv?.fileName ??
+      path.basename(String((job.data as SciPortalNacionalJobPayload).outputPath ?? "Conciliacao SCI x Portal Nacional.xlsx"));
+    downloadToken = await signDownloadToken(env, id, fileName, "sci-portal-nacional");
+  }
+  if (status === "failed") {
+    error = job.failedReason?.slice(0, 500) ?? "Falha no processamento";
+  }
+
+  return {
+    id,
+    status,
+    progress,
+    error,
+    downloadToken,
+    fileName,
+  };
+});
+
+app.get<{ Params: { id: string }; Querystring: { token?: string } }>(
+  `${API_PREFIX}/tools/sci-portal-nacional/jobs/:id/download`,
+  async (req, reply) => {
+    const { id } = req.params;
+    const token = req.query.token;
+    if (!token) return reply.code(401).send({ error: "Token ausente" });
+
+    const claims = await verifyDownloadToken(env, token);
+    if (!claims || claims.jobId !== id || claims.tool !== "sci-portal-nacional") {
+      return reply.code(401).send({ error: "Token inválido" });
+    }
+
+    const job = await sciPortalNacionalQueue.getJob(id);
+    if (!job || (await job.getState()) !== "completed") {
+      return reply.code(404).send({ error: "Job não concluído" });
+    }
+
+    const outPath = (job.data as SciPortalNacionalJobPayload).outputPath;
     if (!outPath || !fs.existsSync(outPath)) {
       return reply.code(404).send({ error: "Arquivo não encontrado" });
     }

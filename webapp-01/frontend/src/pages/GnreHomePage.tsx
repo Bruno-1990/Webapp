@@ -33,6 +33,7 @@ import {
   fadeUp,
   springSnappy,
   springSoft,
+  transitionFast,
   transitionSmooth,
 } from "../motion-variants.js";
 
@@ -179,20 +180,26 @@ export default function GnreHomePage() {
       className={toolPageShellClass}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={transitionSmooth}
+      transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
     >
       <motion.header
         className="text-center"
         initial={fadeUp.initial}
         animate={fadeUp.animate}
-        transition={{ ...transitionSmooth, delay: 0.04 }}
+        transition={{ ...transitionSmooth, delay: 0.05 }}
       >
-        <ToolPageTitle left="GNRE" right="Excel" />
+        <motion.div
+          initial={{ opacity: 0, y: 12, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ ...springSoft, delay: 0.08 }}
+        >
+          <ToolPageTitle left="GNRE" right="Excel" />
+        </motion.div>
         <motion.p
           className="mt-3 text-[15px] leading-relaxed text-[#1e3d4d]"
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ ...transitionSmooth, delay: 0.1 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.45, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
         >
           Selecione uma pasta com os PDFs das guias GNRE → planilha consolidada
           com <strong>Lançamentos</strong> e <strong>Falhas</strong>.
@@ -228,78 +235,128 @@ export default function GnreHomePage() {
           {...zone.getRootProps({ onClick: onZoneClick })}
           className={toolDropzoneClass(zone.isDragActive)}
         >
-          <input {...zone.getInputProps(FOLDER_INPUT_ATTRS)} />
-          <p className="font-display text-lg font-bold text-[#183844]">
-            {zone.isDragActive ? "Solte a pasta…" : "Arraste ou clique para escolher a pasta"}
-          </p>
-          <p className="mt-2 text-sm text-[#2a4f60]">
-            Todos os PDFs dentro da pasta serão lidos automaticamente.
-          </p>
-          {files.length > 0 && (
-            <p className="mt-3 text-xs text-accent">
-              {files.length} PDF{files.length > 1 ? "s" : ""} ·{" "}
-              {formatBytes(totalSize)}
+          <motion.div
+            className="flex min-h-0 w-full flex-col"
+            initial={{ opacity: 0, y: 20, scale: 0.98, filter: "blur(6px)" }}
+            animate={{
+              opacity: 1,
+              y: 0,
+              scale: zone.isDragActive ? 1.02 : 1,
+              filter: "blur(0px)",
+            }}
+            transition={
+              zone.isDragActive
+                ? springSnappy
+                : { ...transitionSmooth, delay: 0.12 }
+            }
+            whileHover={{ scale: zone.isDragActive ? 1.02 : 1.01 }}
+            whileTap={{ scale: 0.995 }}
+          >
+            <input {...zone.getInputProps(FOLDER_INPUT_ATTRS)} />
+            <motion.p
+              className="font-display text-lg font-bold text-[#183844]"
+              key={zone.isDragActive ? "drag" : "idle"}
+              initial={{ opacity: 0.85, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={transitionFast}
+            >
+              {zone.isDragActive ? "Solte os PDFs…" : "Arraste ou clique para escolher a pasta"}
+            </motion.p>
+            <p className="mt-2 text-sm text-[#2a4f60]">
+              Todos os PDFs dentro da pasta serão lidos automaticamente.
             </p>
-          )}
+            {files.length > 0 && (
+              <p className="mt-3 text-xs text-accent">
+                {files.length} PDF{files.length > 1 ? "s" : ""} ·{" "}
+                {formatBytes(totalSize)}
+              </p>
+            )}
+          </motion.div>
         </section>
 
-        {files.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#347891]">
-                PDFs selecionados
-              </p>
-              <button
-                type="button"
-                onClick={clearAll}
-                disabled={isProcessing}
-                className="text-xs font-medium text-[#7eaabb] hover:text-rose-600 disabled:opacity-50"
-              >
-                Limpar tudo
-              </button>
-            </div>
-            <ul className="max-h-44 space-y-1 overflow-y-auto rounded-xl border border-[#d4e4eb] bg-white/60 p-2">
-              {files.map((f, i) => {
-                const label = fileLabel(f);
-                return (
-                  <li
-                    key={`${label}-${i}`}
-                    className="flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-xs text-[#1e3d4d] hover:bg-[#eef7fb]"
-                  >
-                    <span className="truncate" title={label}>
-                      {label}
-                    </span>
-                    <span className="shrink-0 text-[10px] text-[#7eaabb]">
-                      {formatBytes(f.size)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeAt(i)}
-                      disabled={isProcessing}
-                      aria-label={`Remover ${label}`}
-                      className="shrink-0 rounded px-1 text-[#7eaabb] hover:text-rose-600 disabled:opacity-50"
-                    >
-                      ×
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
+        <AnimatePresence mode="popLayout">
+          {files.length > 0 && (
+            <motion.div
+              key="files-list"
+              className="space-y-2"
+              initial={{ opacity: 0, y: 16, scale: 0.98, filter: "blur(6px)" }}
+              animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+              exit={{ opacity: 0, y: -10, scale: 0.98, filter: "blur(4px)" }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              layout
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#347891]">
+                  PDFs selecionados
+                </p>
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  disabled={isProcessing}
+                  className="text-xs font-medium text-[#7eaabb] hover:text-rose-600 disabled:opacity-50"
+                >
+                  Limpar tudo
+                </button>
+              </div>
+              <ul className="max-h-44 space-y-1 overflow-y-auto rounded-xl border border-[#d4e4eb] bg-white/60 p-2">
+                <AnimatePresence mode="popLayout" initial={false}>
+                  {files.map((f, i) => {
+                    const label = fileLabel(f);
+                    return (
+                      <motion.li
+                        key={`${label}-${i}`}
+                        layout
+                        initial={{ opacity: 0, x: -12, scale: 0.97 }}
+                        animate={{ opacity: 1, x: 0, scale: 1 }}
+                        exit={{ opacity: 0, x: 12, scale: 0.97 }}
+                        transition={transitionFast}
+                        className="flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-xs text-[#1e3d4d] hover:bg-[#eef7fb]"
+                      >
+                        <span className="truncate" title={label}>
+                          {label}
+                        </span>
+                        <span className="shrink-0 text-[10px] text-[#7eaabb]">
+                          {formatBytes(f.size)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeAt(i)}
+                          disabled={isProcessing}
+                          aria-label={`Remover ${label}`}
+                          className="shrink-0 rounded px-1 text-[#7eaabb] hover:text-rose-600 disabled:opacity-50"
+                        >
+                          ×
+                        </button>
+                      </motion.li>
+                    );
+                  })}
+                </AnimatePresence>
+              </ul>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <AnimatePresence mode="wait">
           {isProcessing && job && (
             <motion.div
               key="prog"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
               className="space-y-2"
+              aria-live="polite"
+              initial={{ opacity: 0, y: 10, filter: "blur(4px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              exit={{ opacity: 0, y: -6, filter: "blur(3px)" }}
+              transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
             >
-              <p className="text-center text-sm font-semibold text-accent">
+              <motion.p
+                className="text-center text-sm font-semibold text-accent"
+                key={job.status === "queued" ? "queued" : "running"}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={transitionFast}
+              >
                 {job.status === "queued" ? "Na fila…" : "Extraindo guias…"}
-              </p>
+              </motion.p>
               <div className="relative h-3 w-full overflow-hidden rounded-full bg-brand-soft ring-1 ring-brand-line/70">
                 {showDeterminateBar ? (
                   <motion.div
@@ -329,18 +386,26 @@ export default function GnreHomePage() {
           </motion.a>
         )}
 
-        {!done && (
-          <motion.button
-            type="button"
-            className={toolPrimaryButtonClass}
-            onClick={submit}
-            disabled={files.length === 0 || isProcessing}
-            whileTap={{ scale: 0.98 }}
-            transition={springSnappy}
-          >
-            Gerar planilha
-          </motion.button>
-        )}
+        {!done && (() => {
+          const submitDisabled = files.length === 0 || isProcessing;
+          return (
+            <motion.button
+              type="button"
+              className={toolPrimaryButtonClass}
+              onClick={submit}
+              disabled={submitDisabled}
+              whileHover={
+                submitDisabled
+                  ? undefined
+                  : { scale: 1.015, boxShadow: "0 12px 40px -8px rgb(42 79 96 / 0.2)" }
+              }
+              whileTap={submitDisabled ? undefined : { scale: 0.985 }}
+              transition={springSnappy}
+            >
+              Gerar planilha
+            </motion.button>
+          );
+        })()}
       </motion.div>
     </motion.div>
   );
