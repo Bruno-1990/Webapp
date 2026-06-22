@@ -10,8 +10,16 @@
 import type { Cell } from "./parseExtrato.js";
 
 const ROYAL_BLUE_ARGB = "FF4169E1";
+const BORDER_ARGB = "FFCECECE";
 const HEADER_HEIGHT = 30;
 const ROW_HEIGHT = 22;
+
+const THIN_BORDER = {
+  top: { style: "thin", color: { argb: BORDER_ARGB } },
+  left: { style: "thin", color: { argb: BORDER_ARGB } },
+  bottom: { style: "thin", color: { argb: BORDER_ARGB } },
+  right: { style: "thin", color: { argb: BORDER_ARGB } },
+} as const;
 
 function columnWidth(header: string, rows: Cell[][], colIndex: number): number {
   let max = header.length;
@@ -44,6 +52,8 @@ export async function exportExtrato(
   const ExcelJS = (await import("exceljs")).default;
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("Extrato");
+  // Sem linhas de grade na visualização.
+  ws.views = [{ showGridLines: false }];
 
   ws.columns = headers.map((h, i) => ({ header: h, width: columnWidth(h, rows, i) }));
 
@@ -53,13 +63,15 @@ export async function exportExtrato(
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ROYAL_BLUE_ARGB } };
     cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
     cell.alignment = { horizontal: "center", vertical: "middle" };
+    cell.border = THIN_BORDER;
   });
 
   for (const r of rows) {
     const added = ws.addRow(r);
     added.height = ROW_HEIGHT;
     added.eachCell({ includeEmpty: true }, (cell) => {
-      cell.alignment = { horizontal: "left", vertical: "middle" };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+      cell.border = THIN_BORDER;
     });
   }
 
