@@ -16,6 +16,20 @@ def progress(value: int):
     emit("progress", value=max(0, min(100, value)))
 
 
+def norm_nota(v) -> str:
+    """Normaliza um numero de nota para texto comparavel.
+
+    SEFAZ "Num." chega como int (Excel); SCI pode chegar como str (CSV com
+    linha "Totais" ou valores ="..." forcam a coluna para texto) ou float
+    (ex.: "75.0"). Sem normalizar, int 59 != str "59" e TODAS as notas
+    aparecem como faltantes.
+    """
+    s = str(v).strip()
+    if s.endswith(".0"):
+        s = s[:-2]
+    return s
+
+
 def processar(sefaz_paths: list[str], sci_paths: list[str], output: str):
     progress(5)
 
@@ -83,12 +97,13 @@ def processar(sefaz_paths: list[str], sci_paths: list[str], output: str):
     progress(60)
 
     # --- Comparar ---
-    notas_sefaz = set(dados_sefaz[col_sefaz])
-    notas_sci = set(dados_sci[col_sci])
-    notas_faltantes = notas_sefaz - notas_sci
+    # Normaliza ambos os lados para texto antes de comparar: SEFAZ vem como int
+    # e SCI como str, entao a diferenca de conjuntos crua marca tudo como faltante.
+    sefaz_norm = dados_sefaz[col_sefaz].map(norm_nota)
+    notas_sci = {norm_nota(v) for v in dados_sci[col_sci]}
 
     dados_faltantes = dados_sefaz[
-        (dados_sefaz[col_sefaz].isin(notas_faltantes))
+        (~sefaz_norm.isin(notas_sci))
         & (dados_sefaz["Situação"] != "Cancelado")
     ].copy()
 
