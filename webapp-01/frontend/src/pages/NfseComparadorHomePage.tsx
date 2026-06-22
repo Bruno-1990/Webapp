@@ -14,7 +14,6 @@ import {
   type NfseJobResponse,
 } from "../api.js";
 import {
-  fileLabel,
   getPdfFilesFromEvent,
   getXmlOnlyFilesFromEvent,
   pickDirectoryAndReadFiles,

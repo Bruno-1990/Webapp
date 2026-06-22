@@ -192,6 +192,16 @@ function defaultToolsManifest(): ToolManifestEntry[] {
       category: "contabil",
     },
     {
+      id: "extrato-edit",
+      title: "Editor de Extrato",
+      subtitle: "XLSX → XLSX formatado",
+      description:
+        "Envie a planilha do extrato, ajuste as colunas (reordene e marque o que exportar) e baixe um .xlsx limpo e formatado. A data das linhas separadoras vira uma coluna ao lado de cada lançamento.",
+      route: "/tools/extrato-edit",
+      available: true,
+      category: "contabil",
+    },
+    {
       id: "webapp-08",
       title: "Conciliador NFS-e",
       subtitle: "Portal Nacional × SCI",

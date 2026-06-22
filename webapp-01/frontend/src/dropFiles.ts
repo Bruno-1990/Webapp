@@ -38,6 +38,10 @@ function allowPdfOnly(file: File): boolean {
   return file.name.toLowerCase().endsWith(".pdf");
 }
 
+function allowXlsxOnly(file: File): boolean {
+  return file.name.toLowerCase().endsWith(".xlsx");
+}
+
 function readEntriesAsync(reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> {
   return new Promise((resolve, reject) => {
     const acc: FileSystemEntry[] = [];
@@ -164,6 +168,19 @@ export async function getPdfOnlyFilesFromEvent(event: unknown): Promise<File[]> 
   const t = (event as { target?: EventTarget | null }).target as HTMLInputElement | null;
   if (t?.files?.length) {
     return Array.from(t.files).filter(allowPdfOnly);
+  }
+  return [];
+}
+
+/** Editor de Extrato: aceita só `.xlsx` (raiz e dentro de pastas). */
+export async function getXlsxOnlyFilesFromEvent(event: unknown): Promise<File[]> {
+  const dt = dataTransferFrom(event);
+  if (dt) {
+    return extractFromDataTransfer(dt, allowXlsxOnly, allowXlsxOnly);
+  }
+  const t = (event as { target?: EventTarget | null }).target as HTMLInputElement | null;
+  if (t?.files?.length) {
+    return Array.from(t.files).filter(allowXlsxOnly);
   }
   return [];
 }

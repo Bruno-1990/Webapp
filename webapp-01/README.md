@@ -14,6 +14,7 @@ Este repositório concentra a **plataforma** e as **ferramentas** atuais e futur
 - **Comparador SEFAZ × SCI (webapp-05):** `/tools/comparacao-planilhas`; identifica notas SEFAZ que faltam no SCI. Código Python em **[webapp-05](../webapp-05)**.
 - **Comparador NFS-e PDF × XML (webapp-06):** `/tools/comparacao-nfse`; OCR via Gemini para PDFs vs parser XML. Código Python em **[webapp-06](../webapp-06)**.
 - **Extrator GNRE (webapp-07):** `/tools/gnre`; seleciona pasta com PDFs de guias GNRE → planilha (`Lançamentos` + `Falhas`) com dedupe SQLite persistente. Código Python em **[webapp-07](../webapp-07)**.
+- **Editor de Extrato:** `/tools/extrato-edit`; **100% no navegador** (sem worker/Python, sem porta nova). Recebe um `.xlsx` de relatório (ex.: "Contas Pagas" do SIST): colapsa células mescladas, **explode a data das linhas separadoras (`DT. PAGAMENTO:`) numa coluna à esquerda** de cada lançamento, descarta preâmbulo/cabeçalhos repetidos/totais/linhas em branco, deixa **reordenar colunas por arrasto** e marcar/desmarcar o que exportar, e baixa um `.xlsx` formatado (cabeçalho Azul Royal/altura 30, linhas altura 22, dados à esquerda). Leitura/escrita com **exceljs** no front (chunk lazy). Tem **fallback genérico** para outros formatos de planilha. Categoria **Contábil**. Página: `frontend/src/pages/ExtratoEditHomePage.tsx` + lógica em `frontend/src/extratoEdit/`.
 
 **Pastas irmãs no disco:** `webapp-01` até `webapp-07` no mesmo diretório pai (caminhos padrão dos workers). **O `docker-compose.yml` e o serviço Redis ficam na raiz** (`../`).
 

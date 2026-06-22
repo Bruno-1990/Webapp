@@ -11,6 +11,7 @@ import {
   Receipt,
   ScrollText,
   Table2,
+  TableProperties,
   type LucideIcon,
 } from "lucide-react";
 import type { MouseEvent as ReactMouseEvent } from "react";
@@ -33,6 +34,7 @@ const TOOL_ICONS: Record<string, LucideIcon> = {
   "webapp-06": FileSearch,
   "webapp-08": ClipboardCheck,
   gnre: Receipt,
+  "extrato-edit": TableProperties,
 };
 
 const TOOL_OWNER: Record<string, string> = {
@@ -44,6 +46,7 @@ const TOOL_OWNER: Record<string, string> = {
   "webapp-06": "Bruno",
   "webapp-08": "Bruno",
   gnre: "Bruno",
+  "extrato-edit": "Bruno",
 };
 
 const TAG_TONE_CLASS: Record<ToolTagTone, string> = {
@@ -63,6 +66,7 @@ const TOOL_ACCENT: Record<string, string> = {
   "webapp-06": "from-[#2f6378] via-[#4583a0] to-[#6aa6be]",
   "webapp-08": "from-[#356d85] via-[#4d8aa3] to-[#6fa3bb]",
   gnre: "from-[#3f6f86] via-[#508aa1] to-[#73a8bd]",
+  "extrato-edit": "from-[#3a6d85] via-[#4f8aa3] to-[#6fa3bb]",
 };
 
 type CategoryDef = {
