@@ -1,4 +1,4 @@
-# Build a partir da pasta pai (webapp-01 e webapp-07 lado a lado):
+# Build a partir da pasta pai (webapp-01 e engines/gnre lado a lado):
 # docker compose --profile gnre build worker-gnre
 FROM node:22-bookworm-slim AS build-js
 WORKDIR /workspace/webapp-01
@@ -19,11 +19,11 @@ COPY --from=build-js /workspace/webapp-01/package.json ./
 COPY --from=build-js /workspace/webapp-01/node_modules ./node_modules
 COPY --from=build-js /workspace/webapp-01/packages ./packages
 COPY --from=build-js /workspace/webapp-01/apps/worker-gnre-bridge ./apps/worker-gnre-bridge
-COPY webapp-07 /app/webapp-07
+COPY engines/gnre /app/engines/gnre
 RUN python3 -m venv /opt/gnre \
-  && /opt/gnre/bin/pip install --no-cache-dir -r /app/webapp-07/requirements.txt
+  && /opt/gnre/bin/pip install --no-cache-dir -r /app/engines/gnre/requirements.txt
 ENV NODE_ENV=production
-ENV GNRE_PY_DIR=/app/webapp-07
+ENV GNRE_PY_DIR=/app/engines/gnre
 ENV PYTHON_CMD=/opt/gnre/bin/python
 ENV GNRE_DB_PATH=/data/gnre/gnre.db
 CMD ["node", "apps/worker-gnre-bridge/dist/index.js"]

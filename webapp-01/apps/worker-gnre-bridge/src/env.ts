@@ -5,9 +5,9 @@ import { loadDotenvFromUpwards } from "@webapp/contracts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** Código Python do Extrator GNRE: pasta irmã webapp-07. */
+/** Código Python do Extrator GNRE: engines/gnre. */
 function defaultPythonDir(): string {
-  return path.resolve(__dirname, "../../../../webapp-07");
+  return path.resolve(__dirname, "../../../../engines/gnre");
 }
 
 const _loadedEnv = loadDotenvFromUpwards(__dirname);
