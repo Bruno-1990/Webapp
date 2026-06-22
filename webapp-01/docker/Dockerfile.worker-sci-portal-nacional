@@ -10,10 +10,10 @@ COPY webapp-01/frontend ./frontend
 RUN npm ci --workspaces --include-workspace-root 2>/dev/null || npm install --workspaces --include-workspace-root
 RUN npm run build -w @webapp/contracts && npm run build -w @webapp/worker-sci-portal-nacional
 
-# Instala deps do engine standalone (webapp-08).
+# Instala deps do engine standalone (engines/sci-portal-nacional).
 FROM node:22-bookworm-slim AS build-engine
 WORKDIR /engine
-COPY webapp-08/package.json ./
+COPY engines/sci-portal-nacional/package.json ./
 RUN npm install --omit=dev
 
 FROM node:22-bookworm-slim
@@ -23,7 +23,7 @@ COPY --from=build-js /workspace/webapp-01/package.json ./
 COPY --from=build-js /workspace/webapp-01/node_modules ./node_modules
 COPY --from=build-js /workspace/webapp-01/packages ./packages
 COPY --from=build-js /workspace/webapp-01/apps/worker-sci-portal-nacional ./apps/worker-sci-portal-nacional
-COPY webapp-08 /app/webapp-08
-COPY --from=build-engine /engine/node_modules /app/webapp-08/node_modules
-ENV SCI_PORTAL_DIR=/app/webapp-08
+COPY engines/sci-portal-nacional /app/engines/sci-portal-nacional
+COPY --from=build-engine /engine/node_modules /app/engines/sci-portal-nacional/node_modules
+ENV SCI_PORTAL_DIR=/app/engines/sci-portal-nacional
 CMD ["node", "apps/worker-sci-portal-nacional/dist/index.js"]

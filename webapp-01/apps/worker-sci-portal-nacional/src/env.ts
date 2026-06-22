@@ -10,16 +10,17 @@ if (_loadedEnv) {
   console.log(`[worker-sci-portal] .env carregado de ${_loadedEnv}`);
 }
 
-function defaultWebapp08Dir(): string {
-  return path.resolve(process.cwd(), "../webapp-08");
+function defaultEngineDir(): string {
+  // cwd do worker = webapp-01 (npm run), entao ../engines/... aponta para a engine.
+  return path.resolve(process.cwd(), "../engines/sci-portal-nacional");
 }
 
 const EnvSchema = z.object({
   NODE_ENV: z.string().optional(),
   REDIS_URL: z.string().default("redis://127.0.0.1:6379"),
   TEMP_JOBS_ROOT: z.string().default("./temp_jobs"),
-  /** Diretório do engine standalone (webapp-08). */
-  SCI_PORTAL_DIR: z.string().default(defaultWebapp08Dir()),
+  /** Diretório do engine standalone (engines/sci-portal-nacional). */
+  SCI_PORTAL_DIR: z.string().default(defaultEngineDir()),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

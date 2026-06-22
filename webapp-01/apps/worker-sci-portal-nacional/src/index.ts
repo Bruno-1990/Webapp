@@ -33,7 +33,7 @@ function absolutizeJobPath(filePath: string): string {
   return path.resolve(process.cwd(), rel);
 }
 
-/** Roda o engine standalone (webapp-08/cli.mjs) consumindo eventos JSON do stdout. */
+/** Roda o engine standalone (engines/sci-portal-nacional/cli.mjs) consumindo eventos JSON do stdout. */
 function runCli(
   job: { updateProgress: (n: number) => Promise<void> },
   data: SciPortalNacionalJobPayload,

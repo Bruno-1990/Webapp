@@ -133,7 +133,7 @@ services:
     environment:
       REDIS_URL: redis://redis:6379
       TEMP_JOBS_ROOT: /data/jobs
-      SCI_PORTAL_DIR: /app/webapp-08
+      SCI_PORTAL_DIR: /app/engines/sci-portal-nacional
     volumes:
       - ./temp_jobs:/data/jobs
     depends_on:
