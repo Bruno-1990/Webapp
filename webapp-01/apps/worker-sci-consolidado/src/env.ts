@@ -5,9 +5,9 @@ import { loadDotenvFromUpwards } from "@webapp/contracts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** Código Python do Consolidado SCI: pasta irmã webapp-04 (mesmo nível que webapp-01). */
+/** Código Python do Consolidado SCI: engines/sci-consolidado. */
 function defaultPythonDir(): string {
-  return path.resolve(__dirname, "../../../../webapp-04");
+  return path.resolve(__dirname, "../../../../engines/sci-consolidado");
 }
 
 const _loadedEnv = loadDotenvFromUpwards(__dirname);

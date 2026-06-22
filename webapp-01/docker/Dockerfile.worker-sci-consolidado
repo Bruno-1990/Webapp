@@ -1,4 +1,4 @@
-# Build a partir da pasta pai (webapp-01 e webapp-04 lado a lado):
+# Build a partir da pasta pai (webapp-01 e engines/sci-consolidado lado a lado):
 # docker compose build worker-sci-consolidado
 FROM node:22-bookworm-slim AS build-js
 WORKDIR /workspace/webapp-01
@@ -19,10 +19,10 @@ COPY --from=build-js /workspace/webapp-01/package.json ./
 COPY --from=build-js /workspace/webapp-01/node_modules ./node_modules
 COPY --from=build-js /workspace/webapp-01/packages ./packages
 COPY --from=build-js /workspace/webapp-01/apps/worker-sci-consolidado ./apps/worker-sci-consolidado
-COPY webapp-04 /app/webapp-04
+COPY engines/sci-consolidado /app/engines/sci-consolidado
 RUN python3 -m venv /opt/sci \
-  && /opt/sci/bin/pip install --no-cache-dir -r /app/webapp-04/requirements.txt
+  && /opt/sci/bin/pip install --no-cache-dir -r /app/engines/sci-consolidado/requirements.txt
 ENV NODE_ENV=production
-ENV SCI_CONSOLIDADO_PY_DIR=/app/webapp-04
+ENV SCI_CONSOLIDADO_PY_DIR=/app/engines/sci-consolidado
 ENV PYTHON_CMD=/opt/sci/bin/python
 CMD ["node", "apps/worker-sci-consolidado/dist/index.js"]
