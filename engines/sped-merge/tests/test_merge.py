@@ -11,8 +11,8 @@ import pytest
 
 _ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_ROOT))
-_FIXTURE_SPED = _ROOT.parent / "webapp-01" / "tests" / "fixtures" / "sped_minimo.txt"
-_ENGINE = _ROOT.parent / "webapp-02" / "sped_engine"
+_FIXTURE_SPED = _ROOT.parent.parent / "webapp-01" / "tests" / "fixtures" / "sped_minimo.txt"
+_ENGINE = _ROOT.parent / "sped" / "sped_engine"
 _CLI_EXPORT = _ENGINE / "cli.py"
 _CLI_MERGE = _ROOT / "cli_merge.py"
 from merger import merge_sped_from_xlsx
@@ -380,7 +380,7 @@ def test_merge_bloco_e_campos_inteiros_sem_decimal(tmp_path: Path) -> None:
     wb = Workbook()
     ws = wb.active
     ws.title = "E110"
-    # Simula o Excel montado pelo webapp-02 com VL_* formatados como "0,00"
+    # Simula o Excel montado pelo engines/sped com VL_* formatados como "0,00"
     ws.append(["_LINHA", "COL_01", "COL_02", "COL_03", "COL_04", "COL_05", "COL_06"])
     ws.append([2, "E110", "0,00", "0,00", "0,00", "0,00", "0,00"])
     wb.save(xlsx)
@@ -395,7 +395,7 @@ def test_merge_bloco_e_campos_inteiros_sem_decimal(tmp_path: Path) -> None:
 
 
 def test_inner_payload_c170_skips_injected() -> None:
-    sys.path.insert(0, str(_ROOT.parent / "webapp-02" / "sped_engine"))
+    sys.path.insert(0, str(_ROOT.parent / "sped" / "sped_engine"))
     from config import HEADERS  # noqa: WPS433
 
     from line_builders import build_sped_line, inner_payload_for_register

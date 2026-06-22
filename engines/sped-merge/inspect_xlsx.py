@@ -11,7 +11,7 @@ from pathlib import Path
 import openpyxl
 
 _ROOT = Path(__file__).resolve().parent
-_SPED_ENGINE = _ROOT.parent / "webapp-02" / "sped_engine"
+_SPED_ENGINE = _ROOT.parent / "sped" / "sped_engine"
 if _SPED_ENGINE.is_dir():
     sys.path.insert(0, str(_SPED_ENGINE))
 

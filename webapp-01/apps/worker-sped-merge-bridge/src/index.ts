@@ -210,5 +210,5 @@ new Worker<SpedMergeInspectJobPayload, SpedMergeInspectXlsxResponse>(
   logger.error("inspect job failed", job?.id, err?.message);
 });
 
-logger.info(`Worker SPED merge ouvindo fila ${SPED_MERGE_QUEUE_NAME} (webapp-03: ${env.SPED_MERGE_DIR})`);
+logger.info(`Worker SPED merge ouvindo fila ${SPED_MERGE_QUEUE_NAME} (engines/sped-merge: ${env.SPED_MERGE_DIR})`);
 logger.info(`Worker SPED inspect ouvindo fila ${SPED_MERGE_INSPECT_QUEUE_NAME}`);
