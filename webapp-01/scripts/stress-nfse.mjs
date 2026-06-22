@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Stress test do Comparador NFS-e: dispara N jobs paralelos com K arquivos
-// fixtures (XMLs e/ou PDFs do webapp-06/tests/fixtures, repetidos), mede tempo
+// fixtures (XMLs e/ou PDFs do engines/comparacao-nfse/tests/fixtures, repetidos), mede tempo
 // total, sucesso/falha por job, e checa estado do circuit breaker.
 //
 // Uso:
@@ -8,7 +8,7 @@
 //
 // Pre-requisitos:
 //   - Stack rodando (API + worker NFS-e + Redis)
-//   - Fixtures em ../webapp-06/tests/fixtures/*.xml
+//   - Fixtures em ../engines/comparacao-nfse/tests/fixtures/*.xml
 
 import fs from "node:fs";
 import path from "node:path";
@@ -34,7 +34,7 @@ function parseArgs(argv) {
 }
 
 const opts = parseArgs(process.argv);
-const FIX_DIR = path.resolve(__dirname, "../../webapp-06/tests/fixtures");
+const FIX_DIR = path.resolve(__dirname, "../../engines/comparacao-nfse/tests/fixtures");
 
 function loadXmlFixtures() {
   if (!fs.existsSync(FIX_DIR)) {

@@ -5,9 +5,9 @@ import { loadDotenvFromUpwards } from "@webapp/contracts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** Codigo Python do Comparador NFS-e: pasta irma webapp-06 (mesmo nivel que webapp-01). */
+/** Codigo Python do Comparador NFS-e: engines/comparacao-nfse. */
 function defaultPythonDir(): string {
-  return path.resolve(__dirname, "../../../../webapp-06");
+  return path.resolve(__dirname, "../../../../engines/comparacao-nfse");
 }
 
 const _loadedEnv = loadDotenvFromUpwards(__dirname);
