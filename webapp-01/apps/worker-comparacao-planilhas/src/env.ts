@@ -5,9 +5,9 @@ import { loadDotenvFromUpwards } from "@webapp/contracts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** Código Python do Comparador: pasta irmã webapp-05 (mesmo nível que webapp-01). */
+/** Código Python do Comparador: engines/comparacao-planilhas. */
 function defaultPythonDir(): string {
-  return path.resolve(__dirname, "../../../../webapp-05");
+  return path.resolve(__dirname, "../../../../engines/comparacao-planilhas");
 }
 
 const _loadedEnv = loadDotenvFromUpwards(__dirname);
