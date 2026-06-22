@@ -70,9 +70,21 @@ export type ToolManifestEntry = {
   tag?: ToolTag;
 };
 
-/** API antiga ainda pode enviar sci-consolidado; o hub usa id webapp-04. Sem isso o merge gera dois cards SCI. */
+/**
+ * IDs antigos numerados (webapp-0X) → IDs semânticos. Uma API ainda não
+ * atualizada pode enviar os ids velhos; mapeamos para os novos para não gerar
+ * cards duplicados no merge com o fallback local.
+ */
+const LEGACY_TOOL_ID_MAP: Record<string, string> = {
+  "webapp-03": "sped-merge",
+  "webapp-04": "sci-consolidado",
+  "webapp-05": "comparacao-planilhas",
+  "webapp-06": "comparacao-nfse",
+  "webapp-08": "sci-portal-nacional",
+};
 function normalizeToolId(t: ToolManifestEntry): ToolManifestEntry {
-  return t.id === "sci-consolidado" ? { ...t, id: "webapp-04" } : t;
+  const mapped = LEGACY_TOOL_ID_MAP[t.id];
+  return mapped ? { ...t, id: mapped } : t;
 }
 
 function normalizeToolsFromApi(list: ToolManifestEntry[] | undefined): ToolManifestEntry[] {
@@ -142,7 +154,7 @@ function defaultToolsManifest(): ToolManifestEntry[] {
       category: "fiscal",
     },
     {
-      id: "webapp-03",
+      id: "sped-merge",
       title: "XLSX → SPED",
       subtitle: "Mescla planilha no .txt",
       description: "Envie o arquivo original e a planilha que você editou; baixe o resultado pronto para reenviar.",
@@ -151,7 +163,7 @@ function defaultToolsManifest(): ToolManifestEntry[] {
       category: "fiscal",
     },
     {
-      id: "webapp-04",
+      id: "sci-consolidado",
       title: "Consolidado SCI",
       subtitle: "Planilha SCI → Excel",
       description:
@@ -161,7 +173,7 @@ function defaultToolsManifest(): ToolManifestEntry[] {
       category: "fiscal",
     },
     {
-      id: "webapp-05",
+      id: "comparacao-planilhas",
       title: "Comparador",
       subtitle: "SEFAZ Estadual × SCI",
       description:
@@ -172,7 +184,7 @@ function defaultToolsManifest(): ToolManifestEntry[] {
       tag: { label: "NF-e · Produtos", tone: "blue" },
     },
     {
-      id: "webapp-06",
+      id: "comparacao-nfse",
       title: "Comparador NFS-e",
       subtitle: "PDF/Imagem × XML",
       description:
@@ -202,7 +214,7 @@ function defaultToolsManifest(): ToolManifestEntry[] {
       category: "contabil",
     },
     {
-      id: "webapp-08",
+      id: "sci-portal-nacional",
       title: "Conciliador NFS-e",
       subtitle: "Portal Nacional × SCI",
       description:

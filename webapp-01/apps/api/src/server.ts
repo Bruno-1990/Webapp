@@ -286,7 +286,7 @@ app.get(`${API_PREFIX}/tools`, async () => ({
       category: "fiscal",
     },
     {
-      id: "webapp-03",
+      id: "sped-merge",
       title: "XLSX → SPED",
       subtitle: "Mescla planilha no .txt",
       description: "Envie o arquivo original e a planilha que você editou; baixe o resultado pronto para reenviar.",
@@ -295,7 +295,7 @@ app.get(`${API_PREFIX}/tools`, async () => ({
       category: "fiscal",
     },
     {
-      id: "webapp-04",
+      id: "sci-consolidado",
       title: "Consolidado SCI",
       subtitle: "Planilha SCI → Excel",
       description:
@@ -305,7 +305,7 @@ app.get(`${API_PREFIX}/tools`, async () => ({
       category: "fiscal",
     },
     {
-      id: "webapp-05",
+      id: "comparacao-planilhas",
       title: "Comparador",
       subtitle: "SEFAZ Estadual × SCI",
       description:
@@ -316,7 +316,7 @@ app.get(`${API_PREFIX}/tools`, async () => ({
       tag: { label: "NF-e · Produtos", tone: "blue" },
     },
     {
-      id: "webapp-06",
+      id: "comparacao-nfse",
       title: "Comparador NFS-e",
       subtitle: "PDF/Imagem × XML",
       description:
@@ -336,7 +336,7 @@ app.get(`${API_PREFIX}/tools`, async () => ({
       category: "contabil",
     },
     {
-      id: "webapp-08",
+      id: "sci-portal-nacional",
       title: "Conciliador NFS-e",
       subtitle: "Portal Nacional × SCI",
       description:
