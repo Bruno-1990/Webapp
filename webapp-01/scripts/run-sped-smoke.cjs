@@ -1,5 +1,5 @@
 /**
- * Smoke: gera XLSX a partir de tests/fixtures/sped_minimo.txt via webapp-02/sped_engine/cli.py
+ * Smoke: gera XLSX a partir de tests/fixtures/sped_minimo.txt via engines/sped/sped_engine/cli.py
  * Valida: export completo (11 abas), --sheets C100 e --sheets 0000 (cabeçalhos do guia).
  */
 const { spawnSync } = require("node:child_process");
@@ -8,7 +8,7 @@ const os = require("node:os");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
-const engine = path.resolve(root, "..", "webapp-02", "sped_engine");
+const engine = path.resolve(root, "..", "engines", "sped", "sped_engine");
 const fixture = path.join(root, "tests", "fixtures", "sped_minimo.txt");
 const outFull = path.join(os.tmpdir(), `sped-smoke-full-${Date.now()}.xlsx`);
 const outSub = path.join(os.tmpdir(), `sped-smoke-sub-${Date.now()}.xlsx`);

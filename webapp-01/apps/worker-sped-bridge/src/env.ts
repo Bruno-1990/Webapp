@@ -6,7 +6,7 @@ import { loadDotenvFromUpwards } from "@webapp/contracts";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function defaultSpedEngineDir(): string {
-  return path.resolve(__dirname, "../../../../webapp-02/sped_engine");
+  return path.resolve(__dirname, "../../../../engines/sped/sped_engine");
 }
 
 const _loadedEnv = loadDotenvFromUpwards(__dirname);

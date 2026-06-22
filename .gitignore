@@ -17,8 +17,8 @@ coverage/
 .venv/
 **/venv/
 
-# SPED / PyInstaller (webapp-02)
-webapp-02/sped_engine/build/
+# SPED / PyInstaller (engines/sped)
+engines/sped/sped_engine/build/
 
 # Logs e SO
 *.log
