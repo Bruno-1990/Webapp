@@ -71,14 +71,14 @@ if not defined PYEXE (
 if not defined PYEXE (
   echo.
   echo [Aviso] Python nao encontrado no PATH.
-  echo         SPED, XLSX-^>SPED, SCI e Comparador NFS-e precisam de py/python + pip ^(webapp-02..06^).
+  echo         SPED, XLSX-^>SPED, SCI e Comparador NFS-e precisam de py/python + pip ^(engines/^).
   echo.
   goto :after_python
 )
 
 echo.
 echo Instalando dependencias Python dos modulos ^(requirements.txt^)...
-for %%D in (webapp-02 webapp-03 webapp-04 webapp-05 webapp-06) do (
+for %%D in (engines\sped engines\sped-merge engines\sci-consolidado engines\comparacao-planilhas engines\comparacao-nfse) do (
   if exist "..\%%D\requirements.txt" (
     echo   %%D ...
     pushd "..\%%D"

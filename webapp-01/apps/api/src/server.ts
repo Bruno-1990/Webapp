@@ -810,7 +810,7 @@ app.post(`${API_PREFIX}/tools/sped-merge/jobs`, async (req, reply) => {
     req.log.warn({ err: e }, "redis indisponível ao criar job SPED merge");
     return reply.code(503).send({
       error:
-        "Redis não está acessível. Inicie o Redis e o worker SPED merge (worker-sped-merge-bridge + Python webapp-03).",
+        "Redis não está acessível. Inicie o Redis e o worker SPED merge (worker-sped-merge-bridge + engines/sped-merge).",
     });
   }
 
@@ -1149,7 +1149,7 @@ app.get<{ Params: { id: string }; Querystring: { token?: string } }>(
   }
 );
 
-// ── Comparação de Planilhas (webapp-05) ──────────────────────────────────
+// ── Comparação de Planilhas (engines/comparacao-planilhas) ──────────────────
 
 const ALLOWED_COMPARACAO_EXT = new Set([".csv", ".xlsx", ".xls"]);
 
@@ -1319,7 +1319,7 @@ app.get<{ Params: { id: string }; Querystring: { token?: string } }>(
   }
 );
 
-// ── Conciliador NFS-e SCI × Portal Nacional (webapp-08) ─────────────────
+// ── Conciliador NFS-e SCI × Portal Nacional (engines/sci-portal-nacional) ─────────────────
 
 const ALLOWED_SCI_PORTAL_EXT = new Set([".csv", ".xlsx", ".xls"]);
 
@@ -1486,7 +1486,7 @@ app.get<{ Params: { id: string }; Querystring: { token?: string } }>(
   }
 );
 
-// ── Comparação NFS-e (webapp-06) — PDF (OCR Gemini) × XML ────────────────
+// ── Comparação NFS-e (engines/comparacao-nfse) — PDF (OCR Gemini) × XML ────────────────
 
 const ALLOWED_NFSE_PDF_EXT = new Set([".pdf", ".jpg", ".jpeg", ".png"]);
 const ALLOWED_NFSE_XML_EXT = new Set([".xml"]);
@@ -1566,7 +1566,7 @@ app.post(`${API_PREFIX}/tools/comparacao-nfse/jobs`, async (req, reply) => {
     req.log.warn({ err: e }, "redis indisponível ao criar job nfse");
     return reply.code(503).send({
       error:
-        "Redis não está acessível. Inicie o Redis e o worker Comparador NFS-e (worker-comparacao-nfse + Python webapp-06).",
+        "Redis não está acessível. Inicie o Redis e o worker Comparador NFS-e (worker-comparacao-nfse + engines/comparacao-nfse).",
     });
   }
 
@@ -1801,7 +1801,7 @@ app.get<{ Params: { id: string }; Querystring: { token?: string } }>(
   }
 );
 
-/** ============= Extrator GNRE (webapp-07) ============= */
+/** ============= Extrator GNRE (engines/gnre) ============= */
 
 const ALLOWED_GNRE_EXT = new Set([".pdf"]);
 

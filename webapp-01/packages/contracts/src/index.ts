@@ -9,7 +9,7 @@ export const QUEUE_NAME = "nfe-convert" as const;
 /** Fila BullMQ dedicada ao SPED (worker bridge + Python). */
 export const SPED_QUEUE_NAME = "sped-convert" as const;
 
-/** XLSX (com _LINHA) + SPED .txt → SPED .txt mesclado (webapp-03). */
+/** XLSX (com _LINHA) + SPED .txt → SPED .txt mesclado (engines/sped-merge). */
 export const SPED_MERGE_QUEUE_NAME = "sped-merge" as const;
 
 /** Inspeção rápida da planilha XLSX (síncrona pela API via waitUntilFinished). */
@@ -18,10 +18,10 @@ export const SPED_MERGE_INSPECT_QUEUE_NAME = "sped-merge-inspect" as const;
 /** Planilha SCI (CSV/Excel) → ProdutosSCI.xlsx (Python). */
 export const SCI_CONSOLIDADO_QUEUE_NAME = "sci-consolidado" as const;
 
-/** Comparação SEFAZ vs SCI → Notas Faltantes.xlsx (Python webapp-05). */
+/** Comparação SEFAZ vs SCI → Notas Faltantes.xlsx (engines/comparacao-planilhas). */
 export const COMPARACAO_PLANILHAS_QUEUE_NAME = "comparacao-planilhas" as const;
 
-/** Conciliador NFS-e: SCI x SEFAZ (Portal Nacional) → Conciliação multi-aba (TS puro, webapp-08). */
+/** Conciliador NFS-e: SCI x SEFAZ (Portal Nacional) → Conciliação multi-aba (TS puro, engines/sci-portal-nacional). */
 export const SCI_PORTAL_NACIONAL_QUEUE_NAME = "sci-portal-nacional-comparacao" as const;
 
 export const SciConsolidadoJobPayloadSchema = z.object({
@@ -34,8 +34,8 @@ export const SciConsolidadoJobPayloadSchema = z.object({
 export type SciConsolidadoJobPayload = z.infer<typeof SciConsolidadoJobPayloadSchema>;
 
 /**
- * Abas exportadas pelo motor SPED (webapp-02). Manter igual a `SHEET_ORDER` em
- * `webapp-02/sped_engine/config.py`.
+ * Abas exportadas pelo motor SPED (engines/sped). Manter igual a `SHEET_ORDER` em
+ * `engines/sped/sped_engine/config.py`.
  */
 export const SPED_EXPORT_SHEET_KEYS = [
   "0150",
@@ -173,10 +173,10 @@ export const SciPortalNacionalJobPayloadSchema = z.object({
 
 export type SciPortalNacionalJobPayload = z.infer<typeof SciPortalNacionalJobPayloadSchema>;
 
-/** Comparacao NFS-e: PDF (OCR via Gemini) × XML (parser) → divergencias (webapp-06). */
+/** Comparacao NFS-e: PDF (OCR via Gemini) × XML (parser) → divergencias (engines/comparacao-nfse). */
 export const COMPARACAO_NFSE_QUEUE_NAME = "comparacao-nfse" as const;
 
-/** Extrator GNRE: PDFs → XLSX (Lançamentos + Falhas), com dedupe SQLite (webapp-07). */
+/** Extrator GNRE: PDFs → XLSX (Lançamentos + Falhas), com dedupe SQLite (engines/gnre). */
 export const GNRE_QUEUE_NAME = "gnre-extract" as const;
 
 export const GnreJobPayloadSchema = z.object({

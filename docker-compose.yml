@@ -1,4 +1,4 @@
-# Stack única do monorepo (webapp-01 + workers que embutem webapp-02..07).
+# Stack única do monorepo (webapp-01 + workers que embutem as engines/).
 # Da raiz webapp:  docker compose up -d --build
 #
 # Services CORE (sobem por padrao):  redis, api, worker (NFE), worker-sci-consolidado
@@ -6,14 +6,14 @@
 # Para subir tudo:
 #   docker compose --profile sped --profile comparacao --profile nfse --profile gnre up -d
 #
-# Mapa worker -> engine Python:
-#   worker-sci-consolidado    -> webapp-04            (SCI -> Excel)
-#   worker-sped               -> webapp-02/sped_engine (SPED -> XLSX)
-#   worker-sped-merge         -> webapp-03            (XLSX -> SPED)
-#   worker-comparacao-planilhas -> webapp-05          (Comparador Planilhas)
-#   worker-comparacao-nfse    -> webapp-06            (Comparador NFS-e, Gemini OCR)
-#   worker-gnre               -> webapp-07            (Extrator GNRE)
-#   worker-sci-portal-nacional -> webapp-08           (Conciliador NFS-e SCI x SEFAZ, Node engine)
+# Mapa worker -> engine (ver docs/ARCHITECTURE.md):
+#   worker-sci-consolidado     -> engines/sci-consolidado       (SCI -> Excel)
+#   worker-sped                -> engines/sped/sped_engine       (SPED -> XLSX)
+#   worker-sped-merge          -> engines/sped-merge             (XLSX -> SPED)
+#   worker-comparacao-planilhas -> engines/comparacao-planilhas  (Comparador Planilhas)
+#   worker-comparacao-nfse     -> engines/comparacao-nfse        (Comparador NFS-e, Gemini OCR)
+#   worker-gnre                -> engines/gnre                   (Extrator GNRE)
+#   worker-sci-portal-nacional -> engines/sci-portal-nacional    (Conciliador NFS-e, Node engine)
 #
 # Bind mount ./temp_jobs:/data/jobs e' compartilhado por todos: a API grava em
 # /data/jobs/<id>/... (caminho do container), que aparece no host Windows em

@@ -233,7 +233,7 @@ function apiOfflineMessage(): string {
   return (
     "Não foi possível falar com a API em http://127.0.0.1:8000 (o Vite encaminha /api para lá). " +
     "Na raiz do projeto: npm run redis:up (Docker) e npm run dev (API + workers + Vite), ou npm run dev:stack. " +
-    "Inclui workers Python (webapp-04..07). Só Vite: cd webapp-01 && npm run dev:fe + npm run dev:backend noutro terminal. " +
+    "Inclui workers das engines/. Só Vite: cd webapp-01 && npm run dev:fe + npm run dev:backend noutro terminal. " +
     "Se a API já estiver no ar e forem muitos XMLs, o envio pode demorar — confira o terminal da API."
   );
 }
@@ -492,7 +492,7 @@ export async function createSpedMergeJob(spedTxt: File | null, xlsx: File): Prom
       (e instanceof Error && e.name === "AbortError");
     if (aborted) {
       throw new Error(
-        `Envio excedeu ${Math.round(UPLOAD_TIMEOUT_MS / 60_000)} minutos. Verifique Redis, API e worker SPED merge (webapp-03).`
+        `Envio excedeu ${Math.round(UPLOAD_TIMEOUT_MS / 60_000)} minutos. Verifique Redis, API e worker SPED merge (engines/sped-merge).`
       );
     }
     if (!baseUrl() && isFetchNetworkError(e)) {
@@ -513,7 +513,7 @@ export async function createSpedMergeJob(spedTxt: File | null, xlsx: File): Prom
       (msg === "Internal Server Error" || msg.length < 3)
     ) {
       msg =
-        "API ou worker SPED merge inativo. Na raiz do projeto: npm run redis:up e npm run dev (inclui worker-sped-merge-bridge e Python webapp-03).";
+        "API ou worker SPED merge inativo. Na raiz do projeto: npm run redis:up e npm run dev (inclui worker-sped-merge-bridge e engines/sped-merge).";
     }
     throw new Error(msg);
   }
@@ -618,7 +618,7 @@ export async function createSciConsolidadoJob(
       (msg === "Internal Server Error" || msg.length < 3)
     ) {
       msg =
-        "API ou worker Consolidado SCI inativo. Na raiz do projeto: npm run redis:up e npm run dev (worker-sci + Python em webapp-04).";
+        "API ou worker Consolidado SCI inativo. Na raiz do projeto: npm run redis:up e npm run dev (worker-sci + engines/sci-consolidado).";
     }
     throw new Error(msg);
   }
@@ -683,7 +683,7 @@ export async function createGnreJob(files: File[]): Promise<{ id: string }> {
       (msg === "Internal Server Error" || msg.length < 3)
     ) {
       msg =
-        "API ou worker GNRE inativo. Na raiz do projeto: npm run redis:up e npm run dev (worker-gnre + Python em webapp-07).";
+        "API ou worker GNRE inativo. Na raiz do projeto: npm run redis:up e npm run dev (worker-gnre + engines/gnre).";
     }
     throw new Error(msg);
   }
@@ -773,7 +773,7 @@ export async function createComparacaoPlanilhasJob(
       (msg === "Internal Server Error" || msg.length < 3)
     ) {
       msg =
-        "API ou worker Comparação Planilhas inativo. Na raiz do projeto: npm run redis:up e npm run dev (worker-comparacao + Python em webapp-05).";
+        "API ou worker Comparação Planilhas inativo. Na raiz do projeto: npm run redis:up e npm run dev (worker-comparacao + engines/comparacao-planilhas).";
     }
     throw new Error(msg);
   }
@@ -797,7 +797,7 @@ export function comparacaoPlanilhasDownloadUrl(id: string, token: string): strin
   return `${baseUrl()}${API_PREFIX}/tools/comparacao-planilhas/jobs/${id}/download?token=${encodeURIComponent(token)}`;
 }
 
-// ── Conciliador NFS-e SCI × SEFAZ Portal Nacional (webapp-08) ────────────
+// ── Conciliador NFS-e SCI × SEFAZ Portal Nacional (engines/sci-portal-nacional) ────────────
 
 export async function createSciPortalNacionalJob(
   sciFile: File,

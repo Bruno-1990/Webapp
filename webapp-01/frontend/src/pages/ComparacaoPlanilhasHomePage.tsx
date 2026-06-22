@@ -88,7 +88,7 @@ function DropzoneSlot({
         </motion.div>
       </section>
 
-      {/* Chips externos (um por arquivo) — mesmo padrão visual do webapp-08. */}
+      {/* Chips externos (um por arquivo) — mesmo padrão visual do sci-portal-nacional. */}
       <AnimatePresence mode="popLayout">
         {files.map((f, i) => (
           <motion.div

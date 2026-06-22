@@ -1,5 +1,5 @@
 {
-  "name": "webapp-08-conciliador-nfse",
+  "name": "sci-portal-nacional-conciliador-nfse",
   "version": "0.1.0",
   "description": "Conciliador NFS-e SCI x Portal Nacional — engine standalone Node.js.",
   "type": "module",

@@ -4,19 +4,19 @@ Monorepo **Node.js + TypeScript**: API **Fastify**, fila **BullMQ** + **Redis**,
 
 ### Repositório GitHub (uma repo, várias ferramentas)
 
-Este repositório concentra a **plataforma** e as **ferramentas** atuais e futuras (NFe, SPED, etc.). Novas ferramentas entram como pastas/workers adicionais (ex.: [webapp-02](../webapp-02) para SPED) sem obrigar outro repositório.
+Este repositório concentra a **plataforma** (webapp-01) e as **engines** das ferramentas (`../engines/<nome>`). Novas ferramentas entram como `engines/<nome>` + worker bridge, sem obrigar outro repositório. Mapa completo em [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md).
 
 - **Hub:** `/` lista ferramentas (`GET /api/v1/tools` alimenta os cards). Categorias **Fiscais** e **Contábeis** no header (`?cat=contabil`).
 - **NFe XML → XLSX:** `/tools/nfe` (rotas legadas de API: `POST /api/v1/jobs` inalteradas).
-- **SPED → XLSX:** `/tools/sped`; motor Python em **[webapp-02](../webapp-02)/sped_engine** (worker `worker-sped-bridge`). A planilha exportada inclui a coluna **`_LINHA`** (número da linha no `.txt` original).
-- **XLSX → SPED (webapp-03):** `/tools/sped-merge`; mescla o XLSX editado de volta no `.txt` preservando linhas que não estão na planilha. Requer o XLSX gerado pela exportação atual (**com `_LINHA`**). Código Python em **[webapp-03](../webapp-03)**; worker Node `worker-sped-merge-bridge`.
-- **Consolidado SCI (webapp-04):** `/tools/sci-consolidado`; exportação SCI → **ProdutosSCI.xlsx**. Código Python em **[webapp-04](../webapp-04)**; worker Node `worker-sci-consolidado`.
-- **Comparador SEFAZ × SCI (webapp-05):** `/tools/comparacao-planilhas`; identifica notas SEFAZ que faltam no SCI. Código Python em **[webapp-05](../webapp-05)**.
-- **Comparador NFS-e PDF × XML (webapp-06):** `/tools/comparacao-nfse`; OCR via Gemini para PDFs vs parser XML. Código Python em **[webapp-06](../webapp-06)**.
-- **Extrator GNRE (webapp-07):** `/tools/gnre`; seleciona pasta com PDFs de guias GNRE → planilha (`Lançamentos` + `Falhas`) com dedupe SQLite persistente. Código Python em **[webapp-07](../webapp-07)**.
+- **SPED → XLSX:** `/tools/sped`; motor Python em **[engines/sped](../engines/sped)/sped_engine** (worker `worker-sped-bridge`). A planilha exportada inclui a coluna **`_LINHA`** (número da linha no `.txt` original).
+- **XLSX → SPED:** `/tools/sped-merge`; mescla o XLSX editado de volta no `.txt` preservando linhas que não estão na planilha. Requer o XLSX gerado pela exportação atual (**com `_LINHA`**). Código Python em **[engines/sped-merge](../engines/sped-merge)**; worker Node `worker-sped-merge-bridge`.
+- **Consolidado SCI:** `/tools/sci-consolidado`; exportação SCI → **ProdutosSCI.xlsx**. Código Python em **[engines/sci-consolidado](../engines/sci-consolidado)**; worker Node `worker-sci-consolidado`.
+- **Comparador SEFAZ × SCI:** `/tools/comparacao-planilhas`; identifica notas SEFAZ que faltam no SCI. Código Python em **[engines/comparacao-planilhas](../engines/comparacao-planilhas)**.
+- **Comparador NFS-e PDF × XML:** `/tools/comparacao-nfse`; OCR via Gemini para PDFs vs parser XML. Código Python em **[engines/comparacao-nfse](../engines/comparacao-nfse)**.
+- **Extrator GNRE:** `/tools/gnre`; seleciona pasta com PDFs de guias GNRE → planilha (`Lançamentos` + `Falhas`) com dedupe SQLite persistente. Código Python em **[engines/gnre](../engines/gnre)**.
 - **Editor de Extrato:** `/tools/extrato-edit`; **100% no navegador** (sem worker/Python, sem porta nova). Recebe um `.xlsx` de relatório (ex.: "Contas Pagas" do SIST): colapsa células mescladas, **explode a data das linhas separadoras (`DT. PAGAMENTO:`) numa coluna à esquerda** de cada lançamento, descarta preâmbulo/cabeçalhos repetidos/totais/linhas em branco, deixa **reordenar colunas por arrasto** e marcar/desmarcar o que exportar, e baixa um `.xlsx` formatado (cabeçalho Azul Royal/altura 30, linhas altura 22, dados à esquerda). Leitura/escrita com **exceljs** no front (chunk lazy). Tem **fallback genérico** para outros formatos de planilha. Categoria **Contábil**. Página: `frontend/src/pages/ExtratoEditHomePage.tsx` + lógica em `frontend/src/extratoEdit/`.
 
-**Pastas irmãs no disco:** `webapp-01` até `webapp-07` no mesmo diretório pai (caminhos padrão dos workers). **O `docker-compose.yml` e o serviço Redis ficam na raiz** (`../`).
+**Layout no disco:** `webapp-01` (plataforma) e `engines/<nome>` (engines das ferramentas) sob a raiz do monorepo (caminhos padrão dos workers). **O `docker-compose.yml` e o serviço Redis ficam na raiz** (`../`).
 
 ---
 
@@ -78,26 +78,26 @@ API em `http://0.0.0.0:8000`. O frontend em dev continua apontando `VITE_API_URL
 
 ### Profiles opcionais (workers Python)
 
-A stack **core** (`redis`, `api`, `worker` NFe, `worker-sci-consolidado`) sobe sem profile — `docker compose up -d --build` na raiz já entrega: NFe XML→XLSX e Consolidado SCI (webapp-04) prontos. Workers Python adicionais entram via profile:
+A stack **core** (`redis`, `api`, `worker` NFe, `worker-sci-consolidado`) sobe sem profile — `docker compose up -d --build` na raiz já entrega: NFe XML→XLSX e Consolidado SCI prontos. Workers adicionais entram via profile:
 
 ```bash
-# SPED export + merge (webapp-02 + webapp-03)
+# SPED export + merge (engines/sped + engines/sped-merge)
 docker compose --profile sped up -d --build worker-sped worker-sped-merge
 
-# Comparador SEFAZ × SCI (webapp-05)
+# Comparador SEFAZ × SCI + Conciliador NFS-e (engines/comparacao-planilhas, engines/sci-portal-nacional)
 docker compose --profile comparacao up -d --build
 
-# Comparador NFS-e PDF × XML (webapp-06, exige GEMINI_API_KEY)
+# Comparador NFS-e PDF × XML (engines/comparacao-nfse, exige GEMINI_API_KEY)
 docker compose --profile nfse up -d --build
 
-# Extrator GNRE (webapp-07, volume persistente para SQLite em gnre-data:/data/gnre)
+# Extrator GNRE (engines/gnre, volume persistente para SQLite em gnre-data:/data/gnre)
 docker compose --profile gnre up -d --build
 
 # Tudo de uma vez:
 docker compose --profile sped --profile comparacao --profile nfse --profile gnre up -d --build
 ```
 
-Os Dockerfiles dos workers copiam o código Python da respectiva pasta irmã (`webapp-02..07`), então o build precisa rodar a partir da pasta-pai (que já é o cwd da raiz do monorepo).
+Os Dockerfiles dos workers copiam o código da respectiva engine (`engines/<nome>`), então o build precisa rodar a partir da raiz do monorepo (já é o cwd). Ver [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md).
 
 ## GitHub
 

@@ -1,7 +1,7 @@
 {
   "name": "webapp-desktop-root",
   "private": true,
-  "description": "Monorepo: docker-compose.yml e Redis vivem aqui. App Node/TS em webapp-01; Python irmão em webapp-02..07. npm run dev na raiz delega para webapp-01.",
+  "description": "Monorepo: docker-compose.yml e Redis vivem aqui. Plataforma Node/TS em webapp-01; engines (Python/Node) em engines/. npm run dev na raiz delega para webapp-01. Mapa em docs/ARCHITECTURE.md.",
   "scripts": {
     "dev": "npm run dev --prefix webapp-01",
     "dev:stack": "npm run redis:up && npm run dev --prefix webapp-01",
