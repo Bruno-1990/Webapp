@@ -21,7 +21,7 @@ const EnvSchema = z.object({
     .string()
     .default("./temp_jobs")
     .transform((s) => path.resolve(process.cwd(), s)),
-  SPED_MERGE_DIR: z.string().default(defaultWebapp03Dir()),
+  SPED_MERGE_DIR: z.string().default(defaultEngineDir()),
   PYTHON_CMD: z.string().default(process.platform === "win32" ? "py" : "python3"),
 });
 
