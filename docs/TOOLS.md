@@ -52,6 +52,15 @@ só "onde clicar" para cada ferramenta. Caminhos relativos à raiz `webapp/`.
 - Página: [`ExtratoEditHomePage.tsx`](../webapp-01/frontend/src/pages/ExtratoEditHomePage.tsx)
 - Lógica: [`frontend/src/extratoEdit/parseExtrato.ts`](../webapp-01/frontend/src/extratoEdit/parseExtrato.ts) · [`exportExtrato.ts`](../webapp-01/frontend/src/extratoEdit/exportExtrato.ts)
 
+### NFS-e → PDF (DANFSe) — `id: nfse-pdf`
+- **Sem backend** — roda 100% no navegador. Seleciona uma **pasta** de XMLs de NFS-e (padrão nacional), gera um PDF DANFSe por nota e baixa tudo num `.zip`. XMLs de evento (cancelamento) viram PDF de evento.
+- Entrada por **pasta**: picker nativo (Chrome/Edge) com fallback `webkitdirectory`; reaproveita `pickDirectoryAndReadFiles("xml-only")`/`getXmlOnlyFilesFromEvent` de `dropFiles.ts`.
+- Layout do DANFSe **fiel ao oficial** (NT-008) com logo embutida; discriminação de retenções conforme **NT-007** (`tpRetPisCofins`, `vRetCSLL` = soma PIS+COFINS+CSLL, `vPis`/`vCofins` = débito de apuração própria; ISSQN retido via `tpRetISSQN`).
+- Após gerar, mostra um **painel de retenções** (uma linha por nota com retenção) com download de **relatório `.xlsx`**; se não houver, avisa "nenhuma retenção".
+- Página: [`NfsePdfHomePage.tsx`](../webapp-01/frontend/src/pages/NfsePdfHomePage.tsx)
+- Lógica: [`frontend/src/nfsePdf/`](../webapp-01/frontend/src/nfsePdf) — `parseNfse.ts` (DOMParser) · `nfseEnums.ts`/`format.ts` (domínios NT-007 + formatação) · `danfseDoc.ts`/`eventoDoc.ts` (pdfmake) · `logoData.ts` (logo NFS-e base64) · `generateZip.ts` (JSZip + coleta de retenções) · `retencaoReport.ts` (relatório ExcelJS) · `qr.ts` (qrcode) · `municipios.ts` (+ `municipios.json`, tabela IBGE lazy)
+- Libs: `pdfmake`, `jszip`, `qrcode`, `exceljs` (todas carregadas sob demanda).
+
 ## Pontos comuns
 - Manifest da API: `GET /api/v1/tools` em [`server.ts`](../webapp-01/apps/api/src/server.ts) · fallback do front em [`api.ts`](../webapp-01/frontend/src/api.ts) (`defaultToolsManifest`)
 - Cards do hub (ícone/owner/cor por `id`): [`ToolsHubPage.tsx`](../webapp-01/frontend/src/pages/ToolsHubPage.tsx)

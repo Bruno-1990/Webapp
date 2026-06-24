@@ -252,6 +252,16 @@ export default function SciPortalNacionalHomePage() {
           message={err}
         />
 
+        <Modal
+          open={job?.status === "failed"}
+          onClose={() => setJob(null)}
+          tone="error"
+          title="Erro ao conciliar"
+          message={job?.status === "failed" ? job.error : undefined}
+          primaryLabel="Tentar de novo"
+          onPrimary={() => setJob(null)}
+        />
+
         <div className="grid gap-4 sm:grid-cols-2">
           <DropzoneSlot
             label="Planilha SCI"

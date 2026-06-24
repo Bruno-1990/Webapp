@@ -194,6 +194,17 @@ function defaultToolsManifest(): ToolManifestEntry[] {
       category: "fiscal",
     },
     {
+      id: "nfse-pdf",
+      title: "NFS-e → PDF",
+      subtitle: "XML → DANFSe (.zip)",
+      description:
+        "Envie os XMLs de NFS-e (padrão nacional). Cada nota vira um PDF no layout do DANFSe e você baixa tudo num .zip. Roda 100% no navegador — nada é enviado a servidores. Eventos de cancelamento também geram PDF.",
+      route: "/tools/nfse-pdf",
+      available: true,
+      category: "fiscal",
+      tag: { label: "NFS-e · Serviços", tone: "violet" },
+    },
+    {
       id: "gnre",
       title: "Extrator GNRE",
       subtitle: "PDF → XLSX",

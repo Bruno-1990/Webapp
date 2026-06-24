@@ -24,3 +24,7 @@ engines/sped/sped_engine/build/
 *.log
 .DS_Store
 Thumbs.db
+
+# Amostras locais / insumos (não versionar dados fiscais reais)
+/exemplo/
+NFS-e  Logo.png

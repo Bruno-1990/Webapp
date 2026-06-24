@@ -6,6 +6,7 @@ import {
   Combine,
   FileSearch,
   FileSpreadsheet,
+  FileText,
   GitCompareArrows,
   Landmark,
   Receipt,
@@ -33,6 +34,7 @@ const TOOL_ICONS: Record<string, LucideIcon> = {
   "comparacao-planilhas": GitCompareArrows,
   "comparacao-nfse": FileSearch,
   "sci-portal-nacional": ClipboardCheck,
+  "nfse-pdf": FileText,
   gnre: Receipt,
   "extrato-edit": TableProperties,
 };
@@ -45,6 +47,7 @@ const TOOL_OWNER: Record<string, string> = {
   "comparacao-planilhas": "João",
   "comparacao-nfse": "Bruno",
   "sci-portal-nacional": "Bruno",
+  "nfse-pdf": "Bruno",
   gnre: "Bruno",
   "extrato-edit": "Bruno",
 };
@@ -65,6 +68,7 @@ const TOOL_ACCENT: Record<string, string> = {
   "comparacao-planilhas": "from-[#3a6d85] via-[#4d8da6] to-[#5a9cb5]",
   "comparacao-nfse": "from-[#2f6378] via-[#4583a0] to-[#6aa6be]",
   "sci-portal-nacional": "from-[#356d85] via-[#4d8aa3] to-[#6fa3bb]",
+  "nfse-pdf": "from-[#2f6378] via-[#4583a0] to-[#6aa6be]",
   gnre: "from-[#3f6f86] via-[#508aa1] to-[#73a8bd]",
   "extrato-edit": "from-[#3a6d85] via-[#4f8aa3] to-[#6fa3bb]",
 };

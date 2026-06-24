@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import * as readline from "node:readline";
 import { Worker } from "bullmq";
@@ -44,6 +45,18 @@ function runCli(
     const outputPath = absolutizeJobPath(data.outputPath);
     const cwd = env.SCI_PORTAL_DIR;
     const cliPath = path.join(cwd, "cli.mjs");
+
+    // Erro claro se a engine não estiver no lugar (ex.: imagem Docker desatualizada
+    // após o refactor engines/). Sem isso, spawn falha com "spawn node ENOENT".
+    if (!fs.existsSync(cliPath)) {
+      reject(
+        new Error(
+          `Engine não encontrada em ${cliPath} (SCI_PORTAL_DIR=${cwd}). ` +
+            `Reconstrua a imagem: docker compose --profile comparacao build worker-sci-portal-nacional.`,
+        ),
+      );
+      return;
+    }
 
     const args = [
       cliPath,

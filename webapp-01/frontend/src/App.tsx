@@ -12,6 +12,7 @@ const ComparacaoPlanilhasHomePage = lazy(() => import("./pages/ComparacaoPlanilh
 const NfseComparadorHomePage = lazy(() => import("./pages/NfseComparadorHomePage.js"));
 const GnreHomePage = lazy(() => import("./pages/GnreHomePage.js"));
 const ExtratoEditHomePage = lazy(() => import("./pages/ExtratoEditHomePage.js"));
+const NfsePdfHomePage = lazy(() => import("./pages/NfsePdfHomePage.js"));
 const SciPortalNacionalHomePage = lazy(() => import("./pages/SciPortalNacionalHomePage.js"));
 const LegacyDownloadRedirect = lazy(() => import("./pages/LegacyDownloadRedirect.js"));
 
@@ -47,6 +48,7 @@ export default function App() {
           <Route path="/tools/comparacao-nfse" element={<NfseComparadorHomePage />} />
           <Route path="/tools/gnre" element={<GnreHomePage />} />
           <Route path="/tools/extrato-edit" element={<ExtratoEditHomePage />} />
+          <Route path="/tools/nfse-pdf" element={<NfsePdfHomePage />} />
           <Route path="/tools/sci-portal-nacional" element={<SciPortalNacionalHomePage />} />
           <Route path="/tools/sci-portal-nacional/download/:jobId" element={<DownloadPage />} />
         </Route>

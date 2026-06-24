@@ -1,34 +1,50 @@
 /**
  * Leitura e normalização de um extrato/relatório .xlsx no navegador (ExcelJS).
  *
- * O relatório de origem (ex.: "Contas Pagas" do SIST) traz a data em *linhas*
- * separadoras (`DT. PAGAMENTO: <data>`) que regem os lançamentos abaixo delas,
- * cabeçalhos repetidos por bloco, um preâmbulo de metadados e linhas de
- * `Total do Dia`. Aqui colapsamos células mescladas, "explodimos" a data numa
- * coluna à esquerda de cada lançamento e descartamos preâmbulo, cabeçalhos
- * repetidos, totais e linhas em branco.
+ * A ferramenta reconhece dois formatos do SIST e tem um fallback genérico:
  *
- * Há um fallback genérico: se nenhum cabeçalho `Lanc.` for encontrado, a 1ª
- * linha não-vazia vira cabeçalho e as demais não-vazias viram dados — assim a
- * ferramenta ainda funciona com qualquer planilha.
+ *  - "Contas Pagas" (DOC PAGOS): a data vem em *linhas* separadoras
+ *    (`DT. PAGAMENTO: <data>`) que regem os lançamentos abaixo; cabeçalho `Lanc.`,
+ *    cabeçalhos repetidos por bloco, preâmbulo de metadados e `Total do Dia`.
+ *    Colapsamos mescladas, "explodimos" a data numa coluna à esquerda e
+ *    descartamos preâmbulo, cabeçalhos repetidos, totais e linhas em branco.
+ *
+ *  - "Títulos Recebidos - Analítico por RCA" (CARTÕES / SANTANDER): o agrupador
+ *    é o RCA (vendedor) em linhas `RCA: <cód> <nome>`; o cabeçalho ocupa duas
+ *    linhas e fica *desalinhado* das colunas de dados, então mapeamos por índice
+ *    fixo de coluna. Explodimos o RCA numa coluna à esquerda e descartamos
+ *    preâmbulo, cabeçalhos repetidos, `TOTAL POR RCA`/`TOTAL GERAL` e branco.
+ *
+ *  - Fallback genérico: se nenhum formato é reconhecido, a 1ª linha não-vazia vira
+ *    cabeçalho e as demais não-vazias viram dados.
+ *
+ * A saída é sempre a mesma estrutura (cabeçalhos + linhas) e a mesma formatação
+ * final — só a *entrada* muda de formato.
  */
 import type { Cell as ExcelCell, Row, Worksheet } from "exceljs";
 
 export type Cell = string | number | boolean | Date | null;
 
+export type ParseProfile = "contas-pagas" | "titulos-recebidos" | "generic";
+
 export type ParseMeta = {
+  profile: ParseProfile;
   sheetName: string;
-  datesExploded: number;
+  /** Rótulo da coluna agrupadora explodida à esquerda ("Data" / "RCA") ou null. */
+  groupLabel: string | null;
+  /** Quantos lançamentos receberam um valor da coluna agrupadora. */
+  groupApplied: number;
   blankRemoved: number;
   totalsRemoved: number;
   headerRepeatsRemoved: number;
-  hasDateColumn: boolean;
   usedFallback: boolean;
 };
 
 export type ParsedExtrato = {
   headers: string[];
   rows: Cell[][];
+  /** Rótulos a marcar por padrão (ordem de planilha). Vazio = marcar todas. */
+  recommended: string[];
   meta: ParseMeta;
 };
 
@@ -37,6 +53,9 @@ const TOTAL_RE = /total\s+do\s+dia|t[íi]tulos\s+listados/i;
 const HEADER_FIRST_COL_RE = /^lan[cç]/i; // "Lanc." / "Lançamento"
 /** Início do rodapé de resumos ("Resumo por Banco/Usuário") — daqui pra baixo é só totalização. */
 const SUMMARY_SECTION_RE = /resumo\s+por/i;
+
+/** Assinatura do relatório "Títulos Recebidos - Analítico por RCA". */
+const TITULOS_RECEBIDOS_RE = /t[íi]tulos\s+recebidos|anal[íi]tico\s+por\s+rca/i;
 
 /** Valor que representa um nº de lançamento (número ou string só de dígitos). */
 function isLancamentoNumber(v: ExcelCell["value"]): boolean {
@@ -124,6 +143,14 @@ function isBlankRow(row: Row, cols: LogicalColumn[]): boolean {
   return cols.every(({ col }) => cellText(row.getCell(col).value).trim() === "");
 }
 
+/** Linha vazia em todas as colunas (1..colCount) — usada quando não há colunas lógicas. */
+function isBlankRowAll(row: Row, colCount: number): boolean {
+  for (let c = 1; c <= colCount; c++) {
+    if (cellText(row.getCell(c).value).trim() !== "") return false;
+  }
+  return true;
+}
+
 function rowMatches(row: Row, colCount: number, re: RegExp): boolean {
   for (let c = 1; c <= colCount; c++) {
     if (re.test(cellText(row.getCell(c).value))) return true;
@@ -170,8 +197,35 @@ export async function parseExtratoFile(file: File): Promise<ParsedExtrato> {
   if (!ws) throw new Error("A planilha não tem nenhuma aba com dados.");
 
   const colCount = Math.max(1, ws.actualColumnCount || ws.columnCount || 1);
-  const rowCount = ws.actualRowCount ? ws.rowCount : ws.rowCount;
+  const rowCount = ws.rowCount;
 
+  if (isTitulosRecebidos(ws, rowCount, colCount)) {
+    return parseTitulosRecebidos(ws, rowCount, colCount);
+  }
+  return parseContasPagas(ws, rowCount, colCount);
+}
+
+/** Detecta o relatório "Títulos Recebidos por RCA" pela assinatura nas 1ªs linhas. */
+function isTitulosRecebidos(ws: Worksheet, rowCount: number, colCount: number): boolean {
+  for (let r = 1; r <= Math.min(6, rowCount); r++) {
+    if (rowMatches(ws.getRow(r), colCount, TITULOS_RECEBIDOS_RE)) return true;
+  }
+  return false;
+}
+
+// ── Perfil: Contas Pagas (DOC PAGOS) + fallback genérico ─────────────────────
+
+const CONTAS_PAGAS_RECOMMENDED = [
+  "Data",
+  "Conta",
+  "Fornecedor",
+  "Histórico",
+  "Nº Nota",
+  "Vlr. Título",
+  "Bco.",
+];
+
+function parseContasPagas(ws: Worksheet, rowCount: number, colCount: number): ParsedExtrato {
   // 1) Acha a linha de cabeçalho real ("Lanc."). Senão, usa a 1ª linha não-vazia (fallback).
   let headerRowIndex = -1;
   for (let r = 1; r <= rowCount; r++) {
@@ -270,14 +324,123 @@ export async function parseExtratoFile(file: File): Promise<ParsedExtrato> {
   return {
     headers,
     rows,
+    recommended: usedFallback ? [] : CONTAS_PAGAS_RECOMMENDED,
     meta: {
+      profile: usedFallback ? "generic" : "contas-pagas",
       sheetName: ws.name,
-      datesExploded,
+      groupLabel: hasDateColumn ? "Data" : null,
+      groupApplied: datesExploded,
       blankRemoved,
       totalsRemoved,
       headerRepeatsRemoved,
-      hasDateColumn,
       usedFallback,
+    },
+  };
+}
+
+// ── Perfil: Títulos Recebidos - Analítico por RCA (CARTÕES / SANTANDER) ───────
+
+/** Linha agrupadora de vendedor: `RCA: <cód> <nome>` na 1ª coluna. */
+const RCA_LABEL_RE = /^rca:?$/i;
+/** Cabeçalho principal do bloco (R19): 1ª coluna "Cliente". */
+const TR_HEADER_C1_RE = /^cliente$/i;
+/** Linhas de totalização/resumo do relatório de recebidos. */
+const TR_TOTAL_RE = /total\s+(por\s+rca|geral)|presta[cç][õo]es\s+listadas/i;
+
+/**
+ * Esquema fixo por *índice de coluna de dados*. O cabeçalho ocupa duas linhas
+ * (R18 + R19) e fica desalinhado das colunas de dados — então não dá pra ler os
+ * rótulos das células de cabeçalho. O layout deste relatório SIST é estável,
+ * então mapeamos coluna→rótulo diretamente.
+ */
+const TR_SCHEMA: ReadonlyArray<{ col: number; label: string }> = [
+  { col: 1, label: "Cód. Cliente" },
+  { col: 3, label: "Cliente" },
+  { col: 7, label: "Fil." },
+  { col: 8, label: "Duplicata" },
+  { col: 10, label: "Parcela" },
+  { col: 11, label: "Vencto." },
+  { col: 12, label: "Vlr Dupl." },
+  { col: 13, label: "Juros/Despesas" },
+  { col: 14, label: "Desc." },
+  { col: 15, label: "Vlr Pago" },
+  { col: 17, label: "Cob." },
+  { col: 18, label: "Dt.Pagto." },
+  { col: 19, label: "Dt.Emissão" },
+  { col: 21, label: "Func. Baixa" },
+  { col: 22, label: "Dt. Baixa" },
+  { col: 23, label: "Banco" },
+  { col: 24, label: "Moeda" },
+];
+
+const TR_RECOMMENDED = ["RCA", "Cliente", "Duplicata", "Vencto.", "Vlr Pago", "Dt.Pagto.", "Banco"];
+
+function parseTitulosRecebidos(ws: Worksheet, rowCount: number, colCount: number): ParsedExtrato {
+  let currentRca: string | null = null;
+  let started = false; // só coleta depois do 1º bloco de RCA (ignora preâmbulo)
+  let groupApplied = 0;
+  let blankRemoved = 0;
+  let totalsRemoved = 0;
+  let headerRepeatsRemoved = 0;
+
+  type RawRow = { rca: string | null; values: Cell[] };
+  const collected: RawRow[] = [];
+  const DIGITS_RE = /^\d+$/;
+
+  for (let r = 1; r <= rowCount; r++) {
+    const row = ws.getRow(r);
+    const c1 = cellText(row.getCell(1).value).trim();
+
+    // Separador de vendedor — atualiza o RCA corrente e abre a coleta.
+    if (RCA_LABEL_RE.test(c1)) {
+      const code = cellText(row.getCell(2).value).trim();
+      const name = cellText(row.getCell(3).value).trim();
+      currentRca = [code, name].filter(Boolean).join(" - ") || null;
+      started = true;
+      continue;
+    }
+
+    if (!started) continue; // preâmbulo de metadados/filtros
+
+    // Cabeçalho principal repetido por bloco ("Cliente").
+    if (TR_HEADER_C1_RE.test(c1)) {
+      headerRepeatsRemoved++;
+      continue;
+    }
+    // Totais ("TOTAL POR RCA", "TOTAL GERAL", "Prestações Listadas").
+    if (rowMatches(row, colCount, TR_TOTAL_RE)) {
+      totalsRemoved++;
+      continue;
+    }
+    if (isBlankRowAll(row, colCount)) {
+      blankRemoved++;
+      continue;
+    }
+    // Linha de dados sempre tem o cód. do cliente (numérico) na 1ª coluna; o resto
+    // (sub-cabeçalho R18, nota de rodapé `* Título...`) é ignorado silenciosamente.
+    if (!DIGITS_RE.test(c1)) continue;
+
+    const values = TR_SCHEMA.map(({ col }) => cellOut(row.getCell(col).value));
+    if (currentRca) groupApplied++;
+    collected.push({ rca: currentRca, values });
+  }
+
+  const headers = ["RCA", ...TR_SCHEMA.map((s) => s.label)];
+  const rows: Cell[][] = collected.map((c) => [c.rca ?? "", ...c.values]);
+
+  return {
+    headers,
+    rows,
+    recommended: TR_RECOMMENDED,
+    meta: {
+      profile: "titulos-recebidos",
+      sheetName: ws.name,
+      groupLabel: "RCA",
+      groupApplied,
+      blankRemoved,
+      totalsRemoved,
+      headerRepeatsRemoved,
+      usedFallback: false,
     },
   };
 }

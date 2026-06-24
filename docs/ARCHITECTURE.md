@@ -69,14 +69,19 @@ ver tabela). No Docker, o Dockerfile copia a engine e fixa essa env var.
 | Extrator GNRE | `gnre` | `GnreHomePage.tsx` | `worker-gnre-bridge` | `gnre` | `GNRE_PY_DIR` | `gnre-extract` | `Dockerfile.worker-gnre` | `worker-gnre` | `gnre` |
 | Conciliador NFS-e | `sci-portal-nacional` | `SciPortalNacionalHomePage.tsx` | `worker-sci-portal-nacional` | `sci-portal-nacional` (Node) | `SCI_PORTAL_DIR` | `sci-portal-nacional-comparacao` | `Dockerfile.worker-sci-portal-nacional` | `worker-sci-portal-nacional` | `comparacao` |
 | **Editor de Extrato** | `extrato-edit` | `ExtratoEditHomePage.tsx` | — | — | — | — | — | — | — |
+| **NFS-e → PDF (DANFSe)** | `nfse-pdf` | `NfsePdfHomePage.tsx` | — | — | — | — | — | — | — |
 
-**Editor de Extrato** é a exceção: roda **100% no navegador** (ExcelJS), sem API,
-fila, worker, engine ou Docker. Sua lógica está em
-`webapp-01/frontend/src/extratoEdit/{parseExtrato.ts,exportExtrato.ts}`.
+**Editor de Extrato** e **NFS-e → PDF** são as exceções: rodam **100% no
+navegador**, sem API, fila, worker, engine ou Docker. Lógica em
+`webapp-01/frontend/src/extratoEdit/{parseExtrato.ts,exportExtrato.ts}` e
+`webapp-01/frontend/src/nfsePdf/` (parse com DOMParser, DANFSe via pdfmake fiel à
+NT-008, retenções conforme NT-007, .zip via JSZip, QR via qrcode, relatório de
+retenções `.xlsx` via ExcelJS, logo em `logoData.ts`; tabela IBGE `municipios.json`
+carregada sob demanda).
 
 Categorias do hub: **Fiscal** = nfe, sped, sped-merge, sci-consolidado,
-comparacao-planilhas, comparacao-nfse, sci-portal-nacional. **Contábil** = gnre,
-extrato-edit.
+comparacao-planilhas, comparacao-nfse, sci-portal-nacional, nfse-pdf. **Contábil**
+= gnre, extrato-edit.
 
 ## Como o frontend descobre as ferramentas
 
@@ -98,6 +103,11 @@ docker compose --profile sped --profile comparacao --profile nfse --profile gnre
 
 Frontend Vite roda **fora** do Docker (porta 5176). Build context dos workers
 Python é a raiz `webapp/` (por isso os Dockerfiles fazem `COPY engines/<nome> …`).
+
+> ⚠️ **Sempre use `--build`** ao subir. Imagens antigas anteriores ao refactor
+> `engines/` (2026-06-22) ainda têm a árvore `/app/webapp-0X`; com o compose novo
+> apontando `*_DIR=/app/engines/<nome>`, o worker falha ao achar a engine
+> (sintoma: `spawn node ENOENT` no log e job sem saída). Rebuild resolve.
 
 ## Volumes / paths de job
 

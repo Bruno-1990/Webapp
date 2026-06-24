@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useDropzone } from "react-dropzone";
 import { GripVertical } from "lucide-react";
@@ -19,20 +19,11 @@ import { exportExtrato } from "../extratoEdit/exportExtrato.js";
 const PREVIEW_ROWS = 20;
 
 /**
- * Colunas marcadas por padrão (as demais começam desmarcadas). Comparação por
- * rótulo normalizado (sem acento/pontuação). Se nenhuma bater (planilha de outro
- * formato), todas começam marcadas para a ferramenta seguir útil.
+ * Comparação de rótulos por forma normalizada (sem acento/pontuação). As colunas
+ * marcadas por padrão vêm do parser (`recommended`), conforme o formato detectado.
+ * Se nenhuma bater (planilha de outro formato), todas começam marcadas para a
+ * ferramenta seguir útil.
  */
-const DEFAULT_INCLUDE = new Set([
-  "data",
-  "conta",
-  "fornecedor",
-  "historico",
-  "n nota",
-  "vlr titulo",
-  "bco",
-]);
-
 function normalizeLabel(label: string): string {
   return label
     .toLowerCase()
@@ -75,13 +66,25 @@ export default function ExtratoEditHomePage() {
   const [parsed, setParsed] = useState<ParsedExtrato | null>(null);
   const [columns, setColumns] = useState<ColumnState[]>([]);
   const [busy, setBusy] = useState(false);
+  /** Barra de "preparando" (3s) que roda ao soltar a planilha antes de ler. */
+  const [preparing, setPreparing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
 
+  // Garante que a leitura automática dispare uma única vez por planilha solta.
+  const autoReadRef = useRef(false);
+
   const onDrop = useCallback((accepted: File[]) => {
-    if (accepted[0]) setFile(accepted[0]);
+    const f = accepted[0];
+    if (!f) return;
+    setFile(f);
+    setParsed(null);
+    setColumns([]);
     setErr(null);
+    autoReadRef.current = false;
+    // Inicia a barra de 3s; a leitura dispara sozinha quando ela completa.
+    setPreparing(true);
   }, []);
 
   const zone = useDropzone({
@@ -91,22 +94,24 @@ export default function ExtratoEditHomePage() {
     multiple: false,
   });
 
-  const readFile = async () => {
-    if (!file) return;
+  const readFile = async (target?: File) => {
+    const source = target ?? file;
+    if (!source) return;
     setBusy(true);
     setErr(null);
     try {
-      const result = await parseExtratoFile(file);
+      const result = await parseExtratoFile(source);
       if (result.rows.length === 0) {
         throw new Error("Nenhum lançamento foi encontrado na planilha. Verifique se o arquivo está correto.");
       }
       setParsed(result);
-      const anyDefault = result.headers.some((h) => DEFAULT_INCLUDE.has(normalizeLabel(h)));
+      const recommended = new Set(result.recommended.map(normalizeLabel));
+      const anyDefault = recommended.size > 0 && result.headers.some((h) => recommended.has(normalizeLabel(h)));
       const cols: ColumnState[] = result.headers.map((label, i) => ({
         source: i,
         label,
-        // Se a planilha tem as colunas conhecidas, marca só elas; senão marca todas.
-        include: anyDefault ? DEFAULT_INCLUDE.has(normalizeLabel(label)) : true,
+        // Se a planilha tem as colunas recomendadas, marca só elas; senão marca todas.
+        include: anyDefault ? recommended.has(normalizeLabel(label)) : true,
       }));
       // Marcadas primeiro (em sequência, na ordem da planilha), depois as desmarcadas.
       setColumns([...cols.filter((c) => c.include), ...cols.filter((c) => !c.include)]);
@@ -173,6 +178,7 @@ export default function ExtratoEditHomePage() {
     setColumns([]);
     setFile(null);
     setErr(null);
+    setPreparing(false);
   };
 
   return (
@@ -249,26 +255,65 @@ export default function ExtratoEditHomePage() {
               </motion.div>
             </section>
 
-            {busy && (
-              <div className="space-y-2" aria-live="polite">
-                <p className="text-center text-sm font-semibold text-accent">Lendo a planilha…</p>
-                <div className="relative h-3 w-full overflow-hidden rounded-full bg-brand-soft ring-1 ring-brand-line/70">
-                  <div className={`absolute top-0 h-full w-[38%] animate-loadingBar ${toolProgressFillClass}`} />
-                </div>
-              </div>
-            )}
-
-            <motion.button
-              type="button"
-              className={toolPrimaryButtonClass}
-              onClick={readFile}
-              disabled={!file || busy}
-              whileHover={!file || busy ? undefined : { scale: 1.015 }}
-              whileTap={!file || busy ? undefined : { scale: 0.985 }}
-              transition={springSnappy}
-            >
-              Ler planilha
-            </motion.button>
+            <AnimatePresence mode="wait">
+              {preparing ? (
+                <motion.div
+                  key="preparing"
+                  className="space-y-2"
+                  aria-live="polite"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={transitionFast}
+                >
+                  <p className="text-center text-sm font-semibold text-accent">Preparando a planilha…</p>
+                  <div className="relative h-3 w-full overflow-hidden rounded-full bg-brand-soft ring-1 ring-brand-line/70">
+                    <motion.div
+                      className={`absolute left-0 top-0 h-full rounded-full ${toolProgressFillClass}`}
+                      initial={{ width: "0%" }}
+                      animate={{ width: "100%" }}
+                      transition={{ duration: 3, ease: [0.22, 1, 0.36, 1] }}
+                      onAnimationComplete={() => {
+                        if (autoReadRef.current) return;
+                        autoReadRef.current = true;
+                        setPreparing(false);
+                        void readFile(file ?? undefined);
+                      }}
+                    />
+                  </div>
+                </motion.div>
+              ) : busy ? (
+                <motion.div
+                  key="busy"
+                  className="space-y-2"
+                  aria-live="polite"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={transitionFast}
+                >
+                  <p className="text-center text-sm font-semibold text-accent">Lendo a planilha…</p>
+                  <div className="relative h-3 w-full overflow-hidden rounded-full bg-brand-soft ring-1 ring-brand-line/70">
+                    <div className={`absolute top-0 h-full w-[38%] animate-loadingBar ${toolProgressFillClass}`} />
+                  </div>
+                </motion.div>
+              ) : (
+                file && (
+                  // Fallback manual: só aparece se algo impedir o início automático.
+                  <motion.button
+                    key="manual"
+                    type="button"
+                    className={toolPrimaryButtonClass}
+                    onClick={() => readFile(file)}
+                    whileHover={{ scale: 1.015 }}
+                    whileTap={{ scale: 0.985 }}
+                    transition={springSnappy}
+                  >
+                    Ler planilha
+                  </motion.button>
+                )
+              )}
+            </AnimatePresence>
           </>
         ) : (
           <div className="space-y-5">
@@ -358,7 +403,7 @@ function ParseSummary({ parsed }: { parsed: ParsedExtrato }) {
   const chips: Array<{ label: string; value: number | string }> = [
     { label: "Lançamentos", value: parsed.rows.length },
   ];
-  if (m.hasDateColumn) chips.push({ label: "Datas aplicadas", value: m.datesExploded });
+  if (m.groupLabel) chips.push({ label: `${m.groupLabel} aplicado`, value: m.groupApplied });
   if (m.blankRemoved) chips.push({ label: "Linhas em branco removidas", value: m.blankRemoved });
   if (m.totalsRemoved) chips.push({ label: "Linhas de resumo removidas", value: m.totalsRemoved });
   if (m.headerRepeatsRemoved) chips.push({ label: "Cabeçalhos repetidos removidos", value: m.headerRepeatsRemoved });
