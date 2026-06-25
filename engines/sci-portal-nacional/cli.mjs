@@ -311,7 +311,7 @@ function compare(sciIdx, portalAtivasIdx, portalCanceladasIdx) {
 
 // ── Escrita XLSX ─────────────────────────────────────────────────────────
 
-const HEADER_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3D4D" } };
+const HEADER_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4169E1" } };
 const HEADER_FONT = { bold: true, color: { argb: "FFFFFFFF" } };
 
 function styleHeader(ws) {

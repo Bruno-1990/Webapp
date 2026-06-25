@@ -15,7 +15,7 @@ HEADER_HEIGHT = 28
 ROW_HEIGHT    = 22
 
 # Cores (ARGB)
-HEADER_FILL = PatternFill(start_color="FF8DB4E2", end_color="FF8DB4E2", fill_type="solid")  # 8DB4E2 azul escuro
+HEADER_FILL = PatternFill(start_color="FF4169E1", end_color="FF4169E1", fill_type="solid")  # 4169E1 azul padrão
 ROW_FILL    = PatternFill(start_color="FFDCE6F1", end_color="FFDCE6F1", fill_type="solid")  # DCE6F1 azul claro
 
 # ==============================

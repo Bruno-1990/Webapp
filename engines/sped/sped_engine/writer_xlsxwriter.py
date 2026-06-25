@@ -148,7 +148,7 @@ class XlsxWriterExcelWriter:
             workbook = w.book
             header_fmt = workbook.add_format({
                 "bold": True,
-                "bg_color": "#4F81BD",
+                "bg_color": "#4169E1",
                 "font_color": "white",
                 "align": "center",
                 "valign": "vcenter",

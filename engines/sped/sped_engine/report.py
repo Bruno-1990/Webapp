@@ -4,7 +4,7 @@ from openpyxl.styles import PatternFill, Alignment, Font
 from datetime import datetime
 
 # Paleta de cores
-HEADER_FILL = PatternFill(start_color="FF4F81BD", end_color="FF4F81BD", fill_type="solid")  # azul cabeçalho
+HEADER_FILL = PatternFill(start_color="FF4169E1", end_color="FF4169E1", fill_type="solid")  # azul cabeçalho (padrão 4169E1)
 ALT_FILL    = PatternFill(start_color="FFDDEBF7", end_color="FFDDEBF7", fill_type="solid")  # zebra
 SECTION_FILL= PatternFill(start_color="FFEFEFEF", end_color="FFEFEFEF", fill_type="solid")  # cinza claro
 

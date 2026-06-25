@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useDropzone } from "react-dropzone";
 import { GripVertical } from "lucide-react";
@@ -15,8 +15,41 @@ import {
 import { fadeUp, springSnappy, springSoft, transitionFast, transitionSmooth } from "../motion-variants.js";
 import { parseExtratoFile, type Cell, type ParsedExtrato } from "../extratoEdit/parseExtrato.js";
 import { exportExtrato } from "../extratoEdit/exportExtrato.js";
+import { RegistryModal } from "../extratoEdit/RegistryModal.js";
+import { lookupCnpj, fetchCounts, type Counts, type EntidadeTipo } from "../extratoEdit/registryApi.js";
 
 const PREVIEW_ROWS = 20;
+
+/** Rótulo da coluna de CNPJ anexada (vinda do cadastro). */
+const CNPJ_COLUMN_LABEL = "CNPJ";
+
+/**
+ * Acha a coluna de código de cliente/fornecedor no extrato e o tipo associado.
+ * Prioriza rótulos explícitos ("Cód. Fornecedor"/"Cód. Cliente"); senão usa
+ * qualquer coluna de código e infere o tipo pelo formato detectado.
+ */
+function detectCodeColumn(
+  headers: string[],
+  profile: ParsedExtrato["meta"]["profile"],
+): { colIndex: number; tipo: EntidadeTipo; label: string } | null {
+  const norm = headers.map((h, i) => ({ i, n: normalizeLabel(h) }));
+  for (const { i, n } of norm) {
+    if (/\bcod/.test(n) && /fornecedor/.test(n)) return { colIndex: i, tipo: "fornecedor", label: headers[i] };
+  }
+  for (const { i, n } of norm) {
+    if (/\bcod/.test(n) && /cliente/.test(n)) return { colIndex: i, tipo: "cliente", label: headers[i] };
+  }
+  const anyCod = norm.find(({ n }) => /\bcod/.test(n));
+  if (anyCod) {
+    const tipo: EntidadeTipo = profile === "titulos-recebidos" ? "cliente" : "fornecedor";
+    return { colIndex: anyCod.i, tipo, label: headers[anyCod.i] };
+  }
+  return null;
+}
+
+function codeText(v: Cell): string {
+  return v == null ? "" : String(v).trim();
+}
 
 /**
  * Comparação de rótulos por forma normalizada (sem acento/pontuação). As colunas
@@ -34,11 +67,19 @@ function normalizeLabel(label: string): string {
 }
 
 type ColumnState = {
-  /** Índice da coluna na planilha parseada (headers/rows originais). */
+  /** Índice da coluna na planilha parseada (headers/rows originais). -1 se virtual. */
   source: number;
   label: string;
   include: boolean;
+  /** Coluna calculada (não vem da planilha): CNPJ vindo do cadastro. */
+  virtual?: "cnpj";
 };
+
+/** Valor de uma célula para preview/exportação, resolvendo a coluna virtual de CNPJ. */
+function cellForColumn(col: ColumnState, row: Cell[], rowIndex: number, cnpjByRow: string[]): Cell {
+  if (col.virtual === "cnpj") return cnpjByRow[rowIndex] ?? "";
+  return row[col.source];
+}
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -72,8 +113,20 @@ export default function ExtratoEditHomePage() {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
 
+  // Vínculo de CNPJ a partir do cadastro de clientes/fornecedores.
+  const [cnpjByRow, setCnpjByRow] = useState<string[]>([]);
+  const [codeInfo, setCodeInfo] = useState<{ colIndex: number; tipo: EntidadeTipo; label: string } | null>(null);
+  const [cnpjMatched, setCnpjMatched] = useState(0);
+  const [linking, setLinking] = useState(false);
+  const [registryOpen, setRegistryOpen] = useState(false);
+  const [counts, setCounts] = useState<Counts>({ cliente: 0, fornecedor: 0 });
+
   // Garante que a leitura automática dispare uma única vez por planilha solta.
   const autoReadRef = useRef(false);
+
+  useEffect(() => {
+    fetchCounts().then(setCounts).catch(() => undefined);
+  }, []);
 
   const onDrop = useCallback((accepted: File[]) => {
     const f = accepted[0];
@@ -114,13 +167,63 @@ export default function ExtratoEditHomePage() {
         include: anyDefault ? recommended.has(normalizeLabel(label)) : true,
       }));
       // Marcadas primeiro (em sequência, na ordem da planilha), depois as desmarcadas.
-      setColumns([...cols.filter((c) => c.include), ...cols.filter((c) => !c.include)]);
+      const ordered = [...cols.filter((c) => c.include), ...cols.filter((c) => !c.include)];
+      setColumns(ordered);
+      // Detecta a coluna de código e tenta vincular o CNPJ do cadastro.
+      await linkCnpj(result);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
   };
+
+  /**
+   * Busca o CNPJ no cadastro pelo código de cliente/fornecedor e insere/atualiza a
+   * coluna virtual "CNPJ" logo após a coluna de código. Tolerante a cadastro vazio
+   * (mantém a coluna, só sem preenchimento) e a API offline (não bloqueia a edição).
+   */
+  const linkCnpj = useCallback(async (result: ParsedExtrato, surfaceError = false) => {
+    const info = detectCodeColumn(result.headers, result.meta.profile);
+    setCodeInfo(info);
+    if (!info) {
+      setCnpjByRow([]);
+      setCnpjMatched(0);
+      return;
+    }
+    setLinking(true);
+    try {
+      const codes = result.rows.map((row) => codeText(row[info.colIndex]));
+      const distinct = [...new Set(codes.filter((c) => c !== ""))];
+      const matches = distinct.length > 0 ? await lookupCnpj(info.tipo, distinct) : {};
+      const byRow = codes.map((c) => (c && matches[c] ? matches[c].cnpj : ""));
+      setCnpjByRow(byRow);
+      setCnpjMatched(byRow.filter((v) => v !== "").length);
+      // Insere a coluna CNPJ logo após a coluna de código (se ainda não existir).
+      setColumns((prev) => {
+        if (prev.some((c) => c.virtual === "cnpj")) return prev;
+        const cnpjCol: ColumnState = { source: -1, label: CNPJ_COLUMN_LABEL, include: true, virtual: "cnpj" };
+        const pos = prev.findIndex((c) => c.source === info.colIndex);
+        const next = [...prev];
+        next.splice(pos >= 0 ? pos + 1 : next.length, 0, cnpjCol);
+        return next;
+      });
+    } catch (e) {
+      // Cadastro indisponível não impede a edição. No vínculo automático apenas
+      // avisa no console; na ação manual (Revincular) mostra o erro ao usuário.
+      if (surfaceError) setErr(e instanceof Error ? e.message : String(e));
+      else console.warn("Vínculo de CNPJ falhou (seguindo sem vincular):", e);
+    } finally {
+      setLinking(false);
+    }
+  }, []);
+
+  /** Reconsulta o cadastro (após o usuário gravar novos clientes/fornecedores). */
+  const revincular = useCallback(async () => {
+    if (!parsed) return;
+    // Atualiza os valores da coluna já existente sem duplicá-la.
+    await linkCnpj(parsed, true);
+  }, [parsed, linkCnpj]);
 
   const toggleColumn = (index: number) =>
     setColumns((prev) => prev.map((c, i) => (i === index ? { ...c, include: !c.include } : c)));
@@ -164,7 +267,7 @@ export default function ExtratoEditHomePage() {
     setErr(null);
     try {
       const headers = ordered.map((c) => c.label);
-      const rows = parsed.rows.map((row) => ordered.map((c) => row[c.source]));
+      const rows = parsed.rows.map((row, ri) => ordered.map((c) => cellForColumn(c, row, ri, cnpjByRow)));
       await exportExtrato(headers, rows, outputFileName(file.name));
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -179,6 +282,9 @@ export default function ExtratoEditHomePage() {
     setFile(null);
     setErr(null);
     setPreparing(false);
+    setCnpjByRow([]);
+    setCodeInfo(null);
+    setCnpjMatched(0);
   };
 
   return (
@@ -211,6 +317,34 @@ export default function ExtratoEditHomePage() {
           baixe um <strong>.xlsx</strong> limpo e formatado.
         </motion.p>
       </motion.header>
+
+      <motion.div
+        className="flex flex-col items-center gap-2"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4, delay: 0.25 }}
+      >
+        <button
+          type="button"
+          onClick={() => setRegistryOpen(true)}
+          className="inline-flex items-center gap-2 rounded-full border border-[#447f98] bg-white px-5 py-2.5 font-display text-[13px] font-bold uppercase tracking-wide text-[#2d6a82] shadow-sm transition-colors hover:bg-[#eef7fb]"
+        >
+          <span className="text-base leading-none">+</span> Add. Cliente / Fornecedor
+        </button>
+        <span className="text-[12px] text-[#2a4f60]">
+          Cadastrados: <strong className="text-[#183844]">{counts.cliente}</strong> clientes ·{" "}
+          <strong className="text-[#183844]">{counts.fornecedor}</strong> fornecedores
+        </span>
+      </motion.div>
+
+      <RegistryModal
+        open={registryOpen}
+        onClose={() => setRegistryOpen(false)}
+        onChanged={(c) => {
+          setCounts(c);
+          void revincular();
+        }}
+      />
 
       <motion.div
         className={`space-y-6 p-8 ${toolPanelClass}`}
@@ -319,6 +453,16 @@ export default function ExtratoEditHomePage() {
           <div className="space-y-5">
             <ParseSummary parsed={parsed} />
 
+            <CnpjStatus
+              codeInfo={codeInfo}
+              linking={linking}
+              matched={cnpjMatched}
+              total={parsed.rows.length}
+              counts={counts}
+              onOpenRegistry={() => setRegistryOpen(true)}
+              onRevincular={() => void revincular()}
+            />
+
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-[#347891]">
                 Colunas ({includedCount} de {columns.length} marcadas)
@@ -330,7 +474,7 @@ export default function ExtratoEditHomePage() {
                 <AnimatePresence initial={false}>
                   {columns.map((col, i) => (
                     <motion.li
-                      key={col.source}
+                      key={col.virtual ?? col.source}
                       layout
                       draggable
                       onDragStart={() => onDragStart(i)}
@@ -368,7 +512,12 @@ export default function ExtratoEditHomePage() {
               </ul>
             </div>
 
-            <PreviewTable columns={columns} rows={previewRows} totalRows={parsed.rows.length} />
+            <PreviewTable
+              columns={columns}
+              rows={previewRows}
+              totalRows={parsed.rows.length}
+              cnpjByRow={cnpjByRow}
+            />
 
             <div className="space-y-3">
               <motion.button
@@ -431,14 +580,92 @@ function ParseSummary({ parsed }: { parsed: ParsedExtrato }) {
   );
 }
 
+function CnpjStatus({
+  codeInfo,
+  linking,
+  matched,
+  total,
+  counts,
+  onOpenRegistry,
+  onRevincular,
+}: {
+  codeInfo: { colIndex: number; tipo: EntidadeTipo; label: string } | null;
+  linking: boolean;
+  matched: number;
+  total: number;
+  counts: Counts;
+  onOpenRegistry: () => void;
+  onRevincular: () => void;
+}) {
+  if (!codeInfo) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#dbe6ec] bg-[#f7fbfd] px-4 py-2.5 text-[12px] text-[#5b7c8a]">
+        <span>
+          Nenhuma coluna de <strong>código</strong> de cliente/fornecedor foi detectada — não há como
+          vincular o CNPJ automaticamente nesta planilha.
+        </span>
+        <button
+          type="button"
+          onClick={onOpenRegistry}
+          className="shrink-0 rounded-full border border-[#bddae5] bg-white px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-wide text-[#2d6a82] transition-colors hover:bg-[#eef7fb]"
+        >
+          Abrir cadastro
+        </button>
+      </div>
+    );
+  }
+
+  const tipoLabel = codeInfo.tipo === "cliente" ? "clientes" : "fornecedores";
+  const semCadastro = counts[codeInfo.tipo] === 0;
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#c5dfe8] bg-[#f2fafd] px-4 py-2.5 text-[12px] text-[#2d6a82]">
+      <span>
+        {linking ? (
+          <>Vinculando CNPJ por <strong>{codeInfo.label}</strong>…</>
+        ) : semCadastro ? (
+          <>
+            Coluna <strong>CNPJ</strong> criada por <strong>{codeInfo.label}</strong>, mas não há{" "}
+            {tipoLabel} cadastrados ainda. Envie a planilha de cadastro para preencher.
+          </>
+        ) : (
+          <>
+            <strong className="text-[#183844]">CNPJ vinculado:</strong> {matched} de {total} lançamentos
+            (por <strong>{codeInfo.label}</strong>).
+          </>
+        )}
+      </span>
+      <span className="flex shrink-0 gap-2">
+        <button
+          type="button"
+          onClick={onRevincular}
+          disabled={linking}
+          className="rounded-full border border-[#bddae5] bg-white px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-wide text-[#2d6a82] transition-colors hover:bg-[#eef7fb] disabled:opacity-50"
+        >
+          Revincular
+        </button>
+        <button
+          type="button"
+          onClick={onOpenRegistry}
+          className="rounded-full border border-[#447f98] bg-[#447f98] px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-wide text-white transition-colors hover:bg-[#3a6d83]"
+        >
+          {semCadastro ? "Cadastrar" : "Cadastro"}
+        </button>
+      </span>
+    </div>
+  );
+}
+
 function PreviewTable({
   columns,
   rows,
   totalRows,
+  cnpjByRow,
 }: {
   columns: ColumnState[];
   rows: Cell[][];
   totalRows: number;
+  cnpjByRow: string[];
 }) {
   /** Só colunas marcadas, na ordem atual (reflete o arrasto) — igual ao que será exportado. */
   const visible = columns.filter((c) => c.include);
@@ -465,7 +692,7 @@ function PreviewTable({
             <tr>
               {visible.map((c) => (
                 <th
-                  key={c.source}
+                  key={c.virtual ?? c.source}
                   className="whitespace-nowrap border-b border-[#d4e4eb] px-2.5 py-1.5 font-semibold text-[#183844]"
                 >
                   {c.label}
@@ -476,15 +703,18 @@ function PreviewTable({
           <tbody>
             {rows.map((row, ri) => (
               <tr key={ri} className="odd:bg-white even:bg-[#f7fbfd]">
-                {visible.map((c) => (
-                  <td
-                    key={c.source}
-                    className="max-w-[220px] truncate whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-[#1e3d4d]"
-                    title={displayCell(row[c.source])}
-                  >
-                    {displayCell(row[c.source])}
-                  </td>
-                ))}
+                {visible.map((c) => {
+                  const value = cellForColumn(c, row, ri, cnpjByRow);
+                  return (
+                    <td
+                      key={c.virtual ?? c.source}
+                      className="max-w-[220px] truncate whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-[#1e3d4d]"
+                      title={displayCell(value)}
+                    >
+                      {displayCell(value)}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>

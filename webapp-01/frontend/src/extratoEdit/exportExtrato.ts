@@ -1,11 +1,12 @@
 /**
  * Geração do .xlsx final, formatado, no navegador (ExcelJS) + download via Blob.
  *
- * Formatação pedida:
+ * Segue o padrão de exportação do sistema (docs/EXPORT-STANDARD.md):
  *  - altura do cabeçalho 30, altura das linhas 22;
- *  - cabeçalho: negrito, centralizado (horizontal + vertical), fundo Azul Royal,
- *    fonte branca;
- *  - células de dados alinhadas à esquerda.
+ *  - cabeçalho: negrito, centralizado (horizontal + vertical), fundo Azul Royal
+ *    (4169E1), fonte branca;
+ *  - células de dados centralizadas (horizontal + vertical);
+ *  - bordas thin cinza (CECECE) em todas as células; sem linhas de grade.
  */
 import type { Cell } from "./parseExtrato.js";
 

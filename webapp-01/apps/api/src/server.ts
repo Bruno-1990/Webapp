@@ -44,6 +44,17 @@ import {
 import { signDownloadToken, verifyDownloadToken } from "./tokens.js";
 import { buildSpedXlsxFileName, extractSpedRazaoFromBuffer } from "./sped-filename.js";
 import { loadSpedCabecalhosMeta } from "./sped-cabecalhos.js";
+import {
+  getExtratoDb,
+  importEntidades,
+  lookupByCodigos,
+  listEntidades,
+  countEntidades,
+  deleteEntidade,
+  clearTipo,
+  type EntidadeTipo,
+  type EntidadeInput,
+} from "./extrato-db.js";
 
 const SPED_CORE = new Set<string>(SPED_EXPORT_SHEET_KEYS);
 
@@ -1954,6 +1965,124 @@ app.get<{ Params: { id: string }; Querystring: { token?: string } }>(
       `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(fn)}`,
     );
     return reply.send(stream);
+  },
+);
+
+// ── Editor de Extrato: cadastro de clientes/fornecedores (SQLite) ────────────
+//
+// Banco compartilhado na intranet (EXTRATO_DB_PATH, volume persistente). O
+// usuário sobe a planilha de cadastro (Cód./Nome/CNPJ) parseada no navegador e
+// envia as linhas em JSON aqui; ao processar um extrato, /lookup devolve o CNPJ
+// pelo código do cliente/fornecedor. Sem fila/Redis — é só leitura/escrita local.
+
+const EXTRATO_TIPOS = new Set<EntidadeTipo>(["cliente", "fornecedor"]);
+const EXTRATO_MAX_IMPORT_ROWS = 100_000;
+const EXTRATO_MAX_LOOKUP_CODES = 50_000;
+
+function parseTipo(v: unknown): EntidadeTipo | null {
+  return typeof v === "string" && EXTRATO_TIPOS.has(v as EntidadeTipo)
+    ? (v as EntidadeTipo)
+    : null;
+}
+
+app.get<{ Querystring: { tipo?: string; q?: string; limit?: string; offset?: string } }>(
+  `${API_PREFIX}/tools/extrato-edit/entidades`,
+  async (req, reply) => {
+    const conn = getExtratoDb(env.EXTRATO_DB_PATH);
+    const tipo = req.query.tipo ? parseTipo(req.query.tipo) : undefined;
+    if (req.query.tipo && !tipo) {
+      return reply.code(400).send({ error: "tipo deve ser 'cliente' ou 'fornecedor'." });
+    }
+    const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 1000);
+    const offset = Math.max(Number(req.query.offset) || 0, 0);
+    const { items, total } = listEntidades(conn, {
+      ...(tipo ? { tipo } : {}),
+      ...(req.query.q ? { q: req.query.q } : {}),
+      limit,
+      offset,
+    });
+    return { items, total, counts: countEntidades(conn) };
+  },
+);
+
+app.get(`${API_PREFIX}/tools/extrato-edit/entidades/counts`, async () => {
+  const conn = getExtratoDb(env.EXTRATO_DB_PATH);
+  return { counts: countEntidades(conn) };
+});
+
+app.post<{ Body: { tipo?: string; rows?: EntidadeInput[]; replace?: boolean } }>(
+  `${API_PREFIX}/tools/extrato-edit/entidades/import`,
+  async (req, reply) => {
+    const body = req.body ?? {};
+    const tipo = parseTipo(body.tipo);
+    if (!tipo) {
+      return reply.code(400).send({ error: "Informe tipo 'cliente' ou 'fornecedor'." });
+    }
+    if (!Array.isArray(body.rows)) {
+      return reply.code(400).send({ error: "rows deve ser um array de { codigo, nome, cnpj }." });
+    }
+    if (body.rows.length > EXTRATO_MAX_IMPORT_ROWS) {
+      return reply
+        .code(413)
+        .send({ error: `Máximo de ${EXTRATO_MAX_IMPORT_ROWS} linhas por importação.` });
+    }
+    const conn = getExtratoDb(env.EXTRATO_DB_PATH);
+    if (body.replace === true) clearTipo(conn, tipo);
+    const result = importEntidades(conn, tipo, body.rows, new Date().toISOString());
+    return { ...result, counts: countEntidades(conn) };
+  },
+);
+
+app.post<{ Body: { tipo?: string; codigos?: unknown } }>(
+  `${API_PREFIX}/tools/extrato-edit/lookup`,
+  async (req, reply) => {
+    const body = req.body ?? {};
+    const tipo = parseTipo(body.tipo);
+    if (!tipo) {
+      return reply.code(400).send({ error: "Informe tipo 'cliente' ou 'fornecedor'." });
+    }
+    if (!Array.isArray(body.codigos)) {
+      return reply.code(400).send({ error: "codigos deve ser um array de strings." });
+    }
+    if (body.codigos.length > EXTRATO_MAX_LOOKUP_CODES) {
+      return reply
+        .code(413)
+        .send({ error: `Máximo de ${EXTRATO_MAX_LOOKUP_CODES} códigos por consulta.` });
+    }
+    const codigos = body.codigos.map((c) => String(c ?? ""));
+    const conn = getExtratoDb(env.EXTRATO_DB_PATH);
+    return { matches: lookupByCodigos(conn, tipo, codigos) };
+  },
+);
+
+app.delete<{ Querystring: { tipo?: string; codigo?: string } }>(
+  `${API_PREFIX}/tools/extrato-edit/entidades/item`,
+  async (req, reply) => {
+    const tipo = parseTipo(req.query.tipo);
+    if (!tipo) {
+      return reply.code(400).send({ error: "Informe tipo 'cliente' ou 'fornecedor'." });
+    }
+    const codigo = String(req.query.codigo ?? "").trim();
+    if (codigo === "") {
+      return reply.code(400).send({ error: "Informe o código a excluir." });
+    }
+    const conn = getExtratoDb(env.EXTRATO_DB_PATH);
+    const ok = deleteEntidade(conn, tipo, codigo);
+    if (!ok) return reply.code(404).send({ error: "Registro não encontrado." });
+    return { ok: true, counts: countEntidades(conn) };
+  },
+);
+
+app.delete<{ Querystring: { tipo?: string } }>(
+  `${API_PREFIX}/tools/extrato-edit/entidades`,
+  async (req, reply) => {
+    const tipo = parseTipo(req.query.tipo);
+    if (!tipo) {
+      return reply.code(400).send({ error: "Informe tipo 'cliente' ou 'fornecedor'." });
+    }
+    const conn = getExtratoDb(env.EXTRATO_DB_PATH);
+    const removed = clearTipo(conn, tipo);
+    return { removed, counts: countEntidades(conn) };
   },
 );
 

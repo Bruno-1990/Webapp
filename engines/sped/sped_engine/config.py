@@ -45,6 +45,6 @@ SHEET_ORDER = [
     "D590",
 ]
 
-HEADER_FILL  = PatternFill(start_color="FF4F81BD", end_color="FF4F81BD", fill_type="solid")
+HEADER_FILL  = PatternFill(start_color="FF4169E1", end_color="FF4169E1", fill_type="solid")
 ALT_FILL     = PatternFill(start_color="FFDDEBF7", end_color="FFDDEBF7", fill_type="solid")
 HEADER_FONT  = Font(color="FFFFFFFF", bold=True)

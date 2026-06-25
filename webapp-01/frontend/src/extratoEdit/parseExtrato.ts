@@ -360,8 +360,10 @@ const TR_SCHEMA: ReadonlyArray<{ col: number; label: string }> = [
   { col: 8, label: "Duplicata" },
   { col: 10, label: "Parcela" },
   { col: 11, label: "Vencto." },
-  { col: 12, label: "Vlr Dupl." },
-  { col: 13, label: "Juros/Despesas" },
+  // O cabeçalho mesclado "Vlr.Total Juros/Despesas" cobre DUAS colunas de dados:
+  // col 12 = Valor (valor cheio), col 13 = Juros. Mapeamos as duas separadas.
+  { col: 12, label: "Valor" },
+  { col: 13, label: "Juros" },
   { col: 14, label: "Desc." },
   { col: 15, label: "Vlr Pago" },
   { col: 17, label: "Cob." },
@@ -373,7 +375,7 @@ const TR_SCHEMA: ReadonlyArray<{ col: number; label: string }> = [
   { col: 24, label: "Moeda" },
 ];
 
-const TR_RECOMMENDED = ["RCA", "Cliente", "Duplicata", "Vencto.", "Vlr Pago", "Dt.Pagto.", "Banco"];
+const TR_RECOMMENDED = ["RCA", "Cliente", "Duplicata", "Vencto.", "Valor", "Juros", "Vlr Pago", "Dt.Pagto.", "Banco"];
 
 function parseTitulosRecebidos(ws: Worksheet, rowCount: number, colCount: number): ParsedExtrato {
   let currentRca: string | null = null;

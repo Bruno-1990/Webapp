@@ -1,6 +1,12 @@
 # Build monorepo
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
+# Toolchain para módulos nativos (better-sqlite3): usa binário pré-compilado quando
+# disponível, mas garante o fallback de compilação se o download falhar (ex.: VPS
+# sem acesso ao cache de prebuilds). Só no build stage — o runtime copia o .node pronto.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3 make g++ \
+  && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json* ./
 COPY tsconfig.base.json ./
 COPY packages ./packages

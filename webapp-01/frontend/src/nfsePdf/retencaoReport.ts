@@ -4,8 +4,8 @@
  */
 import type { RetencaoItem } from "./generateZip.js";
 
-const HEADER_ARGB = "FF1E3D4D";
-const BORDER_ARGB = "FFCED9DE";
+const HEADER_ARGB = "FF4169E1";
+const BORDER_ARGB = "FFCECECE";
 
 const THIN_BORDER = {
   top: { style: "thin", color: { argb: BORDER_ARGB } },

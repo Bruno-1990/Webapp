@@ -45,8 +45,12 @@ services:
       PORT: "8000"
       REDIS_URL: redis://redis:6379
       TEMP_JOBS_ROOT: /data/jobs
+      # SQLite do cadastro de clientes/fornecedores (Editor de Extrato), em volume
+      # persistente para sobreviver a rebuild/restart do container.
+      EXTRATO_DB_PATH: /data/extrato/extrato.db
     volumes:
       - ./temp_jobs:/data/jobs
+      - extrato-data:/data/extrato
     depends_on:
       - redis
 
@@ -174,3 +178,4 @@ services:
 volumes:
   redis-data:
   gnre-data:
+  extrato-data:

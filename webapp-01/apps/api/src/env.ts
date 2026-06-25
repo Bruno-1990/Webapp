@@ -19,6 +19,15 @@ const EnvSchema = z.object({
     .string()
     .default("./temp_jobs")
     .transform((s) => path.resolve(process.cwd(), s)),
+  /**
+   * SQLite do cadastro de clientes/fornecedores do Editor de Extrato. Em Docker
+   * aponta para um volume persistente (`/data/extrato/extrato.db`); em dev local
+   * cai em `./data/extrato/extrato.db` ao lado do processo. Sempre absoluto.
+   */
+  EXTRATO_DB_PATH: z
+    .string()
+    .default("./data/extrato/extrato.db")
+    .transform((s) => path.resolve(process.cwd(), s)),
   JWT_SECRET: z.string().min(16, "JWT_SECRET deve ter pelo menos 16 caracteres"),
   ALLOWED_ORIGINS: z.string().default("http://localhost:5176,http://192.168.0.47:5176"),
   MAX_UPLOAD_MB: z.coerce.number().default(50),

@@ -3,6 +3,10 @@
 Mapa autoritativo de onde está cada coisa. **Se a realidade do código divergir
 deste documento, o documento está desatualizado — corrija-o aqui.**
 
+> 📐 **Padrão de planilha de exportação:** todo `.xlsx` entregue ao usuário segue
+> [`EXPORT-STANDARD.md`](EXPORT-STANDARD.md) (cores, fontes, bordas, alturas,
+> receitas ExcelJS/openpyxl/xlsxwriter). Ao criar/editar um exportador, conforme-se a ele.
+
 ## Visão geral
 
 ```
@@ -68,12 +72,19 @@ ver tabela). No Docker, o Dockerfile copia a engine e fixa essa env var.
 | Comparador NFS-e (OCR) | `comparacao-nfse` | `NfseComparadorHomePage.tsx` | `worker-comparacao-nfse` | `comparacao-nfse` | `COMPARACAO_NFSE_PY_DIR` | `comparacao-nfse` | `Dockerfile.worker-comparacao-nfse` | `worker-comparacao-nfse` | `nfse` |
 | Extrator GNRE | `gnre` | `GnreHomePage.tsx` | `worker-gnre-bridge` | `gnre` | `GNRE_PY_DIR` | `gnre-extract` | `Dockerfile.worker-gnre` | `worker-gnre` | `gnre` |
 | Conciliador NFS-e | `sci-portal-nacional` | `SciPortalNacionalHomePage.tsx` | `worker-sci-portal-nacional` | `sci-portal-nacional` (Node) | `SCI_PORTAL_DIR` | `sci-portal-nacional-comparacao` | `Dockerfile.worker-sci-portal-nacional` | `worker-sci-portal-nacional` | `comparacao` |
-| **Editor de Extrato** | `extrato-edit` | `ExtratoEditHomePage.tsx` | — | — | — | — | — | — | — |
+| **Editor de Extrato** | `extrato-edit` | `ExtratoEditHomePage.tsx` | — (rotas na `api`) | — | — | — | — | `api` (DB SQLite) | core |
 | **NFS-e → PDF (DANFSe)** | `nfse-pdf` | `NfsePdfHomePage.tsx` | — | — | — | — | — | — | — |
 
-**Editor de Extrato** e **NFS-e → PDF** são as exceções: rodam **100% no
-navegador**, sem API, fila, worker, engine ou Docker. Lógica em
-`webapp-01/frontend/src/extratoEdit/{parseExtrato.ts,exportExtrato.ts}` e
+**NFS-e → PDF** roda **100% no navegador**, sem API, fila, worker, engine ou
+Docker. O **Editor de Extrato** parseia e exporta o `.xlsx` no navegador, mas tem
+um **cadastro de clientes/fornecedores server-side**: rotas REST simples
+(sem fila/Redis) em `apps/api/src/server.ts` + `apps/api/src/extrato-db.ts`
+(SQLite via `better-sqlite3`) sob `/api/v1/tools/extrato-edit/*`
+(`entidades` CRUD/import, `lookup`). O usuário sobe a planilha de cadastro
+(Cód./Nome/CNPJ, parseada no front por `extratoEdit/parseRegistry.ts`); ao
+processar um extrato, o CNPJ é vinculado pelo código do cliente/fornecedor e vira
+uma coluna na exportação. Lógica em
+`webapp-01/frontend/src/extratoEdit/{parseExtrato.ts,exportExtrato.ts,parseRegistry.ts,registryApi.ts,RegistryModal.tsx}` e
 `webapp-01/frontend/src/nfsePdf/` (parse com DOMParser, DANFSe via pdfmake fiel à
 NT-008, retenções conforme NT-007, .zip via JSZip, QR via qrcode, relatório de
 retenções `.xlsx` via ExcelJS, logo em `logoData.ts`; tabela IBGE `municipios.json`
@@ -115,7 +126,12 @@ Bind mount único `./temp_jobs:/data/jobs` em todos os services. A API grava em
 `/data/jobs/<id>/in|out/...` (path do container) e enfileira esse path; os workers
 leem o mesmo path. No host Windows aparece em `D:/aplicativos/webapp/temp_jobs/<id>/`.
 `worker-gnre` tem volume extra `gnre-data:/data/gnre` para o SQLite de dedupe
-(`GNRE_DB_PATH=/data/gnre/gnre.db`).
+(`GNRE_DB_PATH=/data/gnre/gnre.db`). A **`api`** tem volume extra
+`extrato-data:/data/extrato` para o SQLite do cadastro de clientes/fornecedores
+do Editor de Extrato (`EXTRATO_DB_PATH=/data/extrato/extrato.db`). Em dev local
+(sem Docker) o default cai em `webapp-01/data/extrato/extrato.db`. O `Dockerfile`
+(build stage) instala `python3 make g++` para compilar `better-sqlite3` quando o
+binário pré-compilado não está disponível; o runtime só copia o `.node` pronto.
 
 ## Pastas reservadas
 

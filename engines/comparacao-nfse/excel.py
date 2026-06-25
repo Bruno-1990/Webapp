@@ -1,7 +1,7 @@
 """Gera XLSX com 2 abas: 'So em PDFs' e 'So em XMLs'.
 
 Formatacao visual:
-  - Cabecalho: fundo azul (#1F4E79), texto branco, negrito, altura 25, centralizado
+  - Cabecalho: fundo azul (#4169E1, padrão do sistema), texto branco, negrito, altura 25, centralizado
   - Linhas de dados: altura 20, centralizadas
   - Bordas finas em todas as celulas, cor #CECECE
 """
@@ -29,7 +29,7 @@ _LARGURAS = (32, 20, 20, 14, 52, 40)
 #   - Header azul "bonito" (mesmo tom do branding interno)
 #   - Texto branco
 #   - Bordas finas cinza claro
-_HEADER_BG = "#1F4E79"
+_HEADER_BG = "#4169E1"
 _HEADER_FG = "#FFFFFF"
 _BORDER_COLOR = "#CECECE"
 _HEADER_HEIGHT = 25

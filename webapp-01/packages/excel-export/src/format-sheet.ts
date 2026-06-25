@@ -3,7 +3,7 @@ import type { Worksheet } from "exceljs";
 const HEADER_FILL = {
   type: "pattern" as const,
   pattern: "solid" as const,
-  fgColor: { argb: "FF4F81BD" },
+  fgColor: { argb: "FF4169E1" },
 };
 const HEADER_FONT = { color: { argb: "FFFFFFFF" }, bold: true };
 const ALIGN_CENTER = { vertical: "middle" as const, horizontal: "center" as const };

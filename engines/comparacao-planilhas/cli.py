@@ -139,10 +139,10 @@ def processar(sefaz_paths: list[str], sci_paths: list[str], output: str):
             "bold": True,
             "align": "center",
             "valign": "vcenter",
-            "bg_color": "#1e3d4d",
+            "bg_color": "#4169E1",
             "font_color": "#ffffff",
             "border": 1,
-            "border_color": "#0f2530",
+            "border_color": "#CECECE",
         })
         cell_fmt = wb.add_format({
             "align": "center",
