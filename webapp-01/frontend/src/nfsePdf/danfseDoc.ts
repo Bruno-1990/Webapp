@@ -194,7 +194,7 @@ export function buildDanfseDoc(data: NfseData, qrImage: string | null): unknown 
     gridRow([
       field("Tributação do ISSQN", fmtTribIssqn(data.tribISSQN)),
       field("País Resultado da Prestação do Serviço", orDash(data.paisResultado)),
-      field("Município de Incidência do ISSQN", orDash(data.localIncidencia)),
+      field("Município de Incidência do ISSQN", orDash(data.cLocIncid ? municipioLabel(data.cLocIncid) : data.localIncidencia)),
       field("Regime Especial de Tributação", fmtRegEspTrib(data.regEspTrib)),
     ]),
   );

@@ -363,7 +363,7 @@ export default function NfsePdfHomePage() {
                   <table className="min-w-full border-collapse text-left text-[11px]">
                     <thead className="sticky top-0 bg-[#eef6fb]">
                       <tr>
-                        {["Nº NFS-e", "Prestador", "Valor Bruto", "Valor Líquido", "ISSQN", "IRRF", "Prev. (INSS)", "Contrib. Sociais", "Total Federais"].map((h) => (
+                        {["Nº NFS-e", "Prestador", "Mun. Incid. ISSQN", "Valor Bruto", "Valor Líquido", "ISSQN", "IRRF", "Prev. (INSS)", "Contrib. Sociais", "Total Federais"].map((h) => (
                           <th key={h} className="whitespace-nowrap border-b border-[#d4e4eb] px-2.5 py-1.5 font-semibold text-[#183844]">
                             {h}
                           </th>
@@ -376,6 +376,9 @@ export default function NfsePdfHomePage() {
                           <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 font-semibold text-[#1e3d4d]">{r.numero || "—"}</td>
                           <td className="max-w-[220px] truncate border-b border-[#eef2f4] px-2.5 py-1 text-[#1e3d4d]" title={r.prestadorNome}>
                             {r.prestadorNome || "—"}
+                          </td>
+                          <td className="max-w-[160px] truncate border-b border-[#eef2f4] px-2.5 py-1 text-[#1e3d4d]" title={r.municipioIncidencia}>
+                            {r.municipioIncidencia || "—"}
                           </td>
                           <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-right font-semibold tabular-nums text-[#0b3a49]">{cell(r.vServ)}</td>
                           <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-right font-semibold tabular-nums text-[#0b3a49]">{cell(r.vLiq)}</td>

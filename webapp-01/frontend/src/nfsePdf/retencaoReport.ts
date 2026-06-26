@@ -33,6 +33,7 @@ const COLS: Col[] = [
   { header: "Prestador", key: "prestadorNome", width: 34 },
   { header: "CNPJ Tomador", key: "tomadorCnpj", width: 20, text: true },
   { header: "Tomador", key: "tomadorNome", width: 34 },
+  { header: "Município Incidência ISSQN", key: "municipioIncidencia", width: 26 },
   { header: "Valor do Serviço", key: "vServ", width: 16, money: true },
   { header: "ISSQN Retido", key: "issqnRetido", width: 14, money: true },
   { header: "IRRF Retido", key: "irrf", width: 14, money: true },
@@ -128,6 +129,7 @@ type PdfCol = { header: string; key: keyof RetencaoItem; money?: boolean; always
 const PDF_COLS: PdfCol[] = [
   { header: "Nº NFS-e", key: "numero", width: "auto" },
   { header: "Prestador", key: "prestadorNome", width: "*" },
+  { header: "Mun. Incid. ISSQN", key: "municipioIncidencia", width: "auto" },
   { header: "Valor Bruto", key: "vServ", money: true, always: true, width: "auto" },
   { header: "Valor Líquido", key: "vLiq", money: true, always: true, width: "auto" },
   { header: "ISSQN", key: "issqnRetido", money: true, width: "auto" },

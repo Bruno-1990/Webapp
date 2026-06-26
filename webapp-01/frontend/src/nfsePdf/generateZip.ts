@@ -11,6 +11,7 @@ import { loadMunicipios } from "./municipios.js";
 import { qrContentForChave, qrDataUrl } from "./qr.js";
 import { toNumber } from "./format.js";
 import { fmtRetPisCofins, issqnRetido } from "./nfseEnums.js";
+import { municipioLabel } from "./municipios.js";
 
 export type GenSkip = { arquivo: string; motivo: string };
 
@@ -22,6 +23,7 @@ export type RetencaoItem = {
   prestadorCnpj: string;
   tomadorNome: string;
   tomadorCnpj: string;
+  municipioIncidencia: string;
   vServ: number;
   issqnRetido: number;
   irrf: number;
@@ -54,13 +56,16 @@ export function extractRetencao(d: NfseData): RetencaoItem | null {
     prestadorCnpj: d.emit.cnpjCpf,
     tomadorNome: d.toma?.nome ?? "",
     tomadorCnpj: d.toma?.cnpjCpf ?? "",
+    municipioIncidencia: d.cLocIncid ? municipioLabel(d.cLocIncid) : d.localIncidencia,
     vServ: toNumber(d.vServ) ?? 0,
     issqnRetido: issqn,
     irrf,
     previdenciaria: prev,
     contribSociais: contrib,
     descContribSociais: contrib > 0 ? fmtRetPisCofins(d.tpRetPisCofins) : "",
-    totalFederais: toNumber(d.vTotalRet) ?? irrf + prev + contrib,
+    // Total de retenções FEDERAIS apenas (IRRF + Previdenciária + Contrib. Sociais).
+    // ISSQN é municipal e NÃO entra aqui — fica na coluna própria de ISSQN Retido.
+    totalFederais: irrf + prev + contrib,
     vLiq: toNumber(d.vLiq) ?? 0,
   };
 }

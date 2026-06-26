@@ -37,6 +37,7 @@ export type NfseData = {
   localEmissao: string;
   localPrestacao: string;
   localIncidencia: string;
+  cLocIncid: string;
   emit: Pessoa;
   opSimpNac: string;
   regEspTrib: string;
@@ -101,6 +102,20 @@ export type ParsedXml =
 function firstByLocal(scope: Element | Document, name: string): Element | null {
   const list = scope.getElementsByTagNameNS("*", name);
   return list.length ? list[0] : null;
+}
+
+/**
+ * Primeiro filho DIRETO com esse local name. Necessário para o bloco `valores`:
+ * o `infNFSe` tem o `valores` da apuração municipal (vBC, pAliqAplic, vISSQN, vLiq)
+ * E, aninhado em `DPS/infDPS`, um segundo `valores` (declarado). Usar filho direto
+ * garante que pegamos a apuração do `infNFSe`, não o `valores` do DPS.
+ */
+function directChild(parent: Element | null, name: string): Element | null {
+  if (!parent) return null;
+  for (const node of Array.from(parent.children)) {
+    if (node.localName === name) return node;
+  }
+  return null;
 }
 
 function txt(scope: Element | Document | null, name: string): string {
@@ -173,6 +188,8 @@ function parseNfse(doc: Document): NfseData {
   const prest = firstByLocal(doc, "prest");
   const toma = firstByLocal(doc, "toma");
   const interm = firstByLocal(doc, "interm") ?? firstByLocal(doc, "TSInterm");
+  /** Bloco da apuração municipal (filho direto de infNFSe): vBC, pAliqAplic, vISSQN, vLiq. */
+  const valNFSe = directChild(infNFSe, "valores") ?? infNFSe;
 
   return {
     kind: "nfse",
@@ -186,6 +203,7 @@ function parseNfse(doc: Document): NfseData {
     localEmissao: txt(infNFSe, "xLocEmi"),
     localPrestacao: txt(infNFSe, "xLocPrestacao"),
     localIncidencia: txt(infNFSe, "xLocIncid"),
+    cLocIncid: txt(infNFSe, "cLocIncid"),
     emit: pessoaEmit(emit),
     opSimpNac: txt(prest, "opSimpNac"),
     regEspTrib: txt(prest, "regEspTrib"),
@@ -203,9 +221,9 @@ function parseNfse(doc: Document): NfseData {
     nProcSusp: txtAny(dps, ["nProcesso", "nProcessoSusp", "nProcSusp"]),
     benefMun: txtAny(infNFSe, ["xBenef", "cBenefMun", "tpBM"]),
     calcBM: txtAny(infNFSe, ["vCalcBM", "vRedBCB", "vDedRed"]),
-    vBC: txtAny(dps, ["vBC", "vBCISSQN"]),
-    pAliq: txtAny(dps, ["pAliqAplic", "pAliq"]),
-    vISSQN: txt(dps, "vISSQN"),
+    vBC: txtAny(valNFSe, ["vBC", "vBCISSQN"]),
+    pAliq: txtAny(valNFSe, ["pAliqAplic", "pAliq"]),
+    vISSQN: txt(valNFSe, "vISSQN"),
     vDeducao: txtAny(dps, ["vDeducaoReducao", "vDeducao"]),
     vRetIRRF: txt(dps, "vRetIRRF"),
     vRetCP: txtAny(dps, ["vRetCP", "vRetPrev"]),
@@ -217,7 +235,7 @@ function parseNfse(doc: Document): NfseData {
     vDescCond: txt(dps, "vDescCondicionado"),
     vDescIncond: txt(dps, "vDescIncondicionado"),
     vTotalRet: txt(infNFSe, "vTotalRet"),
-    vLiq: txt(infNFSe, "vLiq"),
+    vLiq: txtAny(valNFSe, ["vLiq"]) || txt(infNFSe, "vLiq"),
     pTotTribFed: txt(infNFSe, "pTotTribFed"),
     pTotTribEst: txt(infNFSe, "pTotTribEst"),
     pTotTribMun: txt(infNFSe, "pTotTribMun"),
