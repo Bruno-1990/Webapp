@@ -18,7 +18,7 @@ import {
 } from "../toolLayout.js";
 import { fadeUp, springSnappy, springSoft, transitionFast, transitionSmooth } from "../motion-variants.js";
 import { generateDanfseZip, type GenResult } from "../nfsePdf/generateZip.js";
-import { downloadRetencaoReport } from "../nfsePdf/retencaoReport.js";
+import { downloadRetencaoPdf, downloadRetencaoReport } from "../nfsePdf/retencaoReport.js";
 import { fmtBRL } from "../nfsePdf/format.js";
 
 /** webkitdirectory faz o <input> abrir como picker de pasta (fallback p/ Firefox/Safari). */
@@ -46,18 +46,19 @@ export default function NfsePdfHomePage() {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [result, setResult] = useState<GenResult | null>(null);
-  const [reportBusy, setReportBusy] = useState(false);
+  const [reportBusy, setReportBusy] = useState<null | "xlsx" | "pdf">(null);
   const [err, setErr] = useState<string | null>(null);
 
-  const baixarRelatorio = async () => {
+  const baixarRelatorio = async (formato: "xlsx" | "pdf") => {
     if (!result || result.retencoes.length === 0) return;
-    setReportBusy(true);
+    setReportBusy(formato);
     try {
-      await downloadRetencaoReport(result.retencoes);
+      if (formato === "pdf") await downloadRetencaoPdf(result.retencoes);
+      else await downloadRetencaoReport(result.retencoes);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
-      setReportBusy(false);
+      setReportBusy(null);
     }
   };
 
@@ -335,22 +336,34 @@ export default function NfsePdfHomePage() {
                   <p className="text-xs font-semibold uppercase tracking-wide text-[#347891]">
                     Notas com retenção ({result.retencoes.length})
                   </p>
-                  <motion.button
-                    type="button"
-                    onClick={baixarRelatorio}
-                    disabled={reportBusy}
-                    className="rounded-full bg-gradient-to-br from-[#2f6378] to-[#4583a0] px-4 py-2 text-[12px] font-display font-bold uppercase tracking-wide text-white shadow-sm disabled:opacity-50"
-                    whileHover={reportBusy ? undefined : { scale: 1.03 }}
-                    whileTap={reportBusy ? undefined : { scale: 0.97 }}
-                  >
-                    {reportBusy ? "Gerando…" : "Baixar relatório (.xlsx)"}
-                  </motion.button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <motion.button
+                      type="button"
+                      onClick={() => baixarRelatorio("xlsx")}
+                      disabled={reportBusy !== null}
+                      className="rounded-full bg-gradient-to-br from-[#2f6378] to-[#4583a0] px-4 py-2 text-[12px] font-display font-bold uppercase tracking-wide text-white shadow-sm disabled:opacity-50"
+                      whileHover={reportBusy ? undefined : { scale: 1.03 }}
+                      whileTap={reportBusy ? undefined : { scale: 0.97 }}
+                    >
+                      {reportBusy === "xlsx" ? "Gerando…" : "Baixar relatório (.xlsx)"}
+                    </motion.button>
+                    <motion.button
+                      type="button"
+                      onClick={() => baixarRelatorio("pdf")}
+                      disabled={reportBusy !== null}
+                      className="rounded-full border border-[#4583a0]/40 bg-white px-4 py-2 text-[12px] font-display font-bold uppercase tracking-wide text-[#2f6378] shadow-sm disabled:opacity-50"
+                      whileHover={reportBusy ? undefined : { scale: 1.03 }}
+                      whileTap={reportBusy ? undefined : { scale: 0.97 }}
+                    >
+                      {reportBusy === "pdf" ? "Gerando…" : "Baixar relatório (.pdf)"}
+                    </motion.button>
+                  </div>
                 </div>
                 <div className="max-h-[min(48vh,26rem)] overflow-auto rounded-xl border border-[#d4e4eb] bg-white">
                   <table className="min-w-full border-collapse text-left text-[11px]">
                     <thead className="sticky top-0 bg-[#eef6fb]">
                       <tr>
-                        {["Nº NFS-e", "Prestador", "ISSQN", "IRRF", "Prev. (INSS)", "Contrib. Sociais", "Total Federais"].map((h) => (
+                        {["Nº NFS-e", "Prestador", "Valor Bruto", "Valor Líquido", "ISSQN", "IRRF", "Prev. (INSS)", "Contrib. Sociais", "Total Federais"].map((h) => (
                           <th key={h} className="whitespace-nowrap border-b border-[#d4e4eb] px-2.5 py-1.5 font-semibold text-[#183844]">
                             {h}
                           </th>
@@ -364,6 +377,8 @@ export default function NfsePdfHomePage() {
                           <td className="max-w-[220px] truncate border-b border-[#eef2f4] px-2.5 py-1 text-[#1e3d4d]" title={r.prestadorNome}>
                             {r.prestadorNome || "—"}
                           </td>
+                          <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-right font-semibold tabular-nums text-[#0b3a49]">{cell(r.vServ)}</td>
+                          <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-right font-semibold tabular-nums text-[#0b3a49]">{cell(r.vLiq)}</td>
                           <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-right tabular-nums">{cell(r.issqnRetido)}</td>
                           <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-right tabular-nums">{cell(r.irrf)}</td>
                           <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-right tabular-nums">{cell(r.previdenciaria)}</td>
