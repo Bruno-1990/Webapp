@@ -39,7 +39,13 @@ services:
       context: ./webapp-01
       dockerfile: docker/Dockerfile
       target: api
+    # Nome fixo para o OneClick V2 alcancar por DNS na rede `fiscal_net`
+    # (evita colisao com o servico `api` do proprio OneClick).
+    container_name: webapp-api
     ports:
+      # Acesso direto/dev. Em PRODUCAO o OneClick NAO usa esta porta — ele alcanca
+      # `webapp-api:8000` pela rede `fiscal_net`. No deploy, restrinja/bloqueie a
+      # 8000 externamente (o webapp nao tem auth propria; fica atras do OneClick).
       - "8000:8000"
     env_file:
       - ./.env
@@ -53,6 +59,9 @@ services:
     volumes:
       - ./temp_jobs:/data/jobs
       - extrato-data:/data/extrato
+    networks:
+      - default        # rede interna do webapp (fala com redis/workers)
+      - fiscal_net      # compartilhada com o OneClick V2 (criada automaticamente; ver bloco networks)
     depends_on:
       - redis
 
@@ -176,6 +185,15 @@ services:
       - gnre-data:/data/gnre
     depends_on:
       - redis
+
+networks:
+  # Rede compartilhada com o OneClick V2: o gateway das ferramentas fiscais/
+  # contabeis alcanca a API por http://webapp-api:8000. `name:` fixa o nome
+  # (sem prefixo do projeto) e o compose a CRIA automaticamente se faltar —
+  # nada muda no dev local. No deploy (VPS), o `oneclick-api` entra nela pelo
+  # docker-compose.override.yml do OneClick declarando-a como external.
+  fiscal_net:
+    name: fiscal_net
 
 volumes:
   redis-data:
