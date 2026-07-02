@@ -12,7 +12,7 @@ if (_loadedEnv) {
 
 const EnvSchema = z.object({
   NODE_ENV: z.string().optional(),
-  REDIS_URL: z.string().default("redis://127.0.0.1:6379"),
+  REDIS_URL: z.string().default("redis://127.0.0.1:6381"),
   TEMP_JOBS_ROOT: z.string().default("./temp_jobs"),
   /** XMLs lidos e parseados em lotes para reduzir pico de memória */
   WORKER_XML_CHUNK: z.coerce.number().min(1).default(100),

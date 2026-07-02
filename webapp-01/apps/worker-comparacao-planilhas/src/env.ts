@@ -17,7 +17,7 @@ if (_loadedEnv) {
 
 const EnvSchema = z.object({
   NODE_ENV: z.string().optional(),
-  REDIS_URL: z.string().default("redis://127.0.0.1:6379"),
+  REDIS_URL: z.string().default("redis://127.0.0.1:6381"),
   TEMP_JOBS_ROOT: z
     .string()
     .default("./temp_jobs")

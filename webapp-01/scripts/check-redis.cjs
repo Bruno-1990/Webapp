@@ -1,23 +1,23 @@
 /**
- * Guard de pré-flight: ping em 127.0.0.1:6379 antes do `dev:all`.
+ * Guard de pré-flight: ping em 127.0.0.1:6381 antes do `dev:all`.
  * Falha rápido (exit 1) com mensagem acionável em vez de deixar 8 workers
  * cuspirem ECONNREFUSED em loop.
  *
- * REDIS_URL é respeitado (formato redis://host:port[/db]); default 127.0.0.1:6379.
+ * REDIS_URL é respeitado (formato redis://host:port[/db]); default 127.0.0.1:6381.
  * Timeout curto (1.5s) — Redis local responde em milissegundos.
  */
 const net = require("node:net");
 
 function parseRedisUrl(url) {
-  if (!url) return { host: "127.0.0.1", port: 6379 };
+  if (!url) return { host: "127.0.0.1", port: 6381 };
   try {
     const u = new URL(url);
     return {
       host: u.hostname || "127.0.0.1",
-      port: Number(u.port) || 6379,
+      port: Number(u.port) || 6381,
     };
   } catch {
-    return { host: "127.0.0.1", port: 6379 };
+    return { host: "127.0.0.1", port: 6381 };
   }
 }
 

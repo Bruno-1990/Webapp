@@ -387,7 +387,7 @@ app.post(`${API_PREFIX}/jobs`, async (req, reply) => {
     req.log.warn({ err: e }, "redis indisponível ao criar job");
     return reply.code(503).send({
       error:
-        "Redis não está acessível (porta 6379). Inicie o Redis e reinicie API + worker — ex.: Docker Desktop + docker run -p 6379:6379 redis:7-alpine",
+        "Redis não está acessível (porta 6381). Inicie o Redis e reinicie API + worker — ex.: Docker Desktop + docker run -p 6381:6379 redis:7-alpine",
     });
   }
 

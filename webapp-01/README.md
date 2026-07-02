@@ -28,7 +28,7 @@ Monorepo **Node.js + TypeScript** para XML NFe → XLSX: API **Fastify**, fila *
 
 ### Início rápido (um comando)
 
-1. **Redis** em `127.0.0.1:6379` — **na raiz do monorepo** (`../`): `npm run redis:up` (Docker).
+1. **Redis** em `127.0.0.1:6381` — **na raiz do monorepo** (`../`): `npm run redis:up` (Docker).
 2. **`npm install`** na pasta `webapp-01` (ou `npm run install:app` na raiz).
 3. **`npm run dev`** (na raiz **ou** em `webapp-01`) — compila API/workers e sobe **API + workers + Vite** (`dev:all`).
    - Para SPED, XLSX→SPED, Consolidado SCI, Comparadores e GNRE: **Python** com `pip install -r requirements.txt` em cada `webapp-0X` (ou um venv único). Alternativa one-shot: `npm run dev:stack` na raiz (sobe Redis e em seguida o dev).
@@ -46,7 +46,7 @@ Monorepo **Node.js + TypeScript** para XML NFe → XLSX: API **Fastify**, fila *
 
 ## Desenvolvimento local (detalhe)
 
-1. **Redis** em `127.0.0.1:6379` — `npm run redis:up` **na raiz** (`docker compose up -d redis`). Avulso: `docker run -d -p 6379:6379 --name redis-nfe redis:7-alpine`.
+1. **Redis** em `127.0.0.1:6381` — `npm run redis:up` **na raiz** (`docker compose up -d redis`). Avulso: `docker run -d -p 6381:6379 --name redis-nfe redis:7-alpine`.
 2. `npm install` na pasta `webapp-01`.
 3. **`npm run dev`** (recomendado, raiz ou `webapp-01`) **ou** `npm run dev:stack` na raiz (sobe Redis e depois o app) **ou** dois terminais: `npm run dev:backend` e `npm run dev:fe`.
 

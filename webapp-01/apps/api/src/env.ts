@@ -13,7 +13,7 @@ if (_loadedEnv) {
 const EnvSchema = z.object({
   NODE_ENV: z.string().optional(),
   PORT: z.coerce.number().default(8000),
-  REDIS_URL: z.string().default("redis://127.0.0.1:6379"),
+  REDIS_URL: z.string().default("redis://127.0.0.1:6381"),
   /** Sempre absoluto (cwd na subida do processo) para coincidir com workers e Python. */
   TEMP_JOBS_ROOT: z
     .string()

@@ -97,7 +97,7 @@ echo.
 
 docker info >nul 2>&1
 if errorlevel 1 (
-  echo Docker indisponivel - usando npm run dev. Redis em 127.0.0.1:6379
+  echo Docker indisponivel - usando npm run dev. Redis em 127.0.0.1:6381
   echo Com Docker: instale Docker Desktop e rode este script de novo.
   echo.
   call npm run dev
@@ -109,7 +109,7 @@ if errorlevel 1 (
 if errorlevel 1 (
   echo.
   echo Encerrado com erro. Dicas:
-  echo   - Sem Docker: Redis na porta 6379 e na pasta webapp-01: npm run dev
+  echo   - Sem Docker: Redis na porta 6381 e na pasta webapp-01: npm run dev
   echo   - Erro de build: npm run build
   pause
 )

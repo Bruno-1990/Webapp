@@ -6,8 +6,12 @@
  *   node manage-ports.mjs                  Lista portas configuradas e verifica conflitos
  *   node manage-ports.mjs set api 9000     Altera a porta da API para 9000
  *   node manage-ports.mjs set frontend 3000
- *   node manage-ports.mjs set redis 6380
- *   node manage-ports.mjs reset            Restaura portas padrao (8000, 5176, 6379)
+ *   node manage-ports.mjs set redis 6381
+ *   node manage-ports.mjs reset            Restaura portas padrao (8000, 5176, 6381)
+ *
+ * Nota redis: a porta aqui e a do HOST. O container sempre escuta 6379 internamente
+ * (a rede Docker usa redis://redis:6379). O host saiu de 6379 -> 6381 porque a 6379
+ * passou a ser do OneClick V2 (saas-redis). Ver port-registry.json do server-manager.
  */
 
 import fs from "node:fs";
@@ -18,7 +22,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORTS_FILE = path.join(__dirname, "ports.json");
 
-const DEFAULTS = { api: 8000, frontend: 5176, redis: 6379 };
+const DEFAULTS = { api: 8000, frontend: 5176, redis: 6381 };
 const LABELS = { api: "API (Fastify)", frontend: "Frontend (Vite)", redis: "Redis" };
 
 // ── helpers ────────────────────────────────────────────────────────────
@@ -236,9 +240,9 @@ function propagate(ports, service, oldPort, newPort) {
       }
     }
 
-    // docker-compose
+    // docker-compose — so o lado HOST muda; o container fica fixo em 6379
     const dc = path.join(__dirname, "docker-compose.yml");
-    replaceInFile(dc, `"${oldPort}:${oldPort}"`, `"${newPort}:${newPort}"`);
+    replaceInFile(dc, `"${oldPort}:6379"`, `"${newPort}:6379"`);
   }
 }
 

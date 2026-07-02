@@ -1,5 +1,5 @@
 {
   "api": 8000,
   "frontend": 5176,
-  "redis": 6379
+  "redis": 6381
 }

@@ -28,7 +28,9 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      # Host 6381 -> container 6379. A porta 6379 do host fica para o OneClick V2.
+      # Dentro da rede Docker os servicos continuam falando com redis:6379.
+      - "6381:6379"
     volumes:
       - redis-data:/data
 
