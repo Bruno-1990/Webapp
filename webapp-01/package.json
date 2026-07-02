@@ -25,7 +25,7 @@
     "test": "npm run test -w @webapp/nfe-core --if-present",
     "test:sci-py": "cd ../engines/sci-consolidado && py -m pytest -q",
     "test:sped-smoke": "node scripts/run-sped-smoke.cjs",
-    "lint": "npm run lint -w @webapp/frontend"
+    "lint": "npm run build -w @webapp/contracts && npm run lint -w @webapp/frontend"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",
