@@ -17,9 +17,13 @@ import {
   toolProgressFillClass,
 } from "../toolLayout.js";
 import { fadeUp, springSnappy, springSoft, transitionFast, transitionSmooth } from "../motion-variants.js";
-import { generateDanfseZip, type GenResult } from "../nfsePdf/generateZip.js";
+import { generateDanfseZip, type GenResult, type RetencaoItem } from "../nfsePdf/generateZip.js";
 import { downloadRetencaoPdf, downloadRetencaoReport } from "../nfsePdf/retencaoReport.js";
 import { fmtBRL } from "../nfsePdf/format.js";
+
+type ReportKind = "retencao" | "todas";
+type ReportFmt = "xlsx" | "pdf";
+type ReportBusy = { kind: ReportKind; fmt: ReportFmt } | null;
 
 /** webkitdirectory faz o <input> abrir como picker de pasta (fallback p/ Firefox/Safari). */
 const FOLDER_INPUT_ATTRS = {
@@ -46,15 +50,28 @@ export default function NfsePdfHomePage() {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [result, setResult] = useState<GenResult | null>(null);
-  const [reportBusy, setReportBusy] = useState<null | "xlsx" | "pdf">(null);
+  const [reportBusy, setReportBusy] = useState<ReportBusy>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  const baixarRelatorio = async (formato: "xlsx" | "pdf") => {
-    if (!result || result.retencoes.length === 0) return;
-    setReportBusy(formato);
+  const baixarRelatorio = async (kind: ReportKind, fmt: ReportFmt) => {
+    if (!result) return;
+    const items = kind === "retencao" ? result.retencoes : result.todas;
+    if (items.length === 0) return;
+    setReportBusy({ kind, fmt });
     try {
-      if (formato === "pdf") await downloadRetencaoPdf(result.retencoes);
-      else await downloadRetencaoReport(result.retencoes);
+      if (kind === "retencao") {
+        if (fmt === "pdf") await downloadRetencaoPdf(items);
+        else await downloadRetencaoReport(items);
+      } else {
+        if (fmt === "pdf") {
+          await downloadRetencaoPdf(items, "NFS-e - Todas as notas.pdf", {
+            title: "Relatório de NFS-e — Todas as notas",
+            subtitle: `${items.length} nota(s)`,
+          });
+        } else {
+          await downloadRetencaoReport(items, "NFS-e - Todas as notas.xlsx", "Todas as notas");
+        }
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -331,68 +348,23 @@ export default function NfsePdfHomePage() {
                 Nenhuma retenção encontrada nos {result.geradosNfse} XML(s) de NFS-e analisados.
               </div>
             ) : (
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#347891]">
-                    Notas com retenção ({result.retencoes.length})
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <motion.button
-                      type="button"
-                      onClick={() => baixarRelatorio("xlsx")}
-                      disabled={reportBusy !== null}
-                      className="rounded-full bg-gradient-to-br from-[#2f6378] to-[#4583a0] px-4 py-2 text-[12px] font-display font-bold uppercase tracking-wide text-white shadow-sm disabled:opacity-50"
-                      whileHover={reportBusy ? undefined : { scale: 1.03 }}
-                      whileTap={reportBusy ? undefined : { scale: 0.97 }}
-                    >
-                      {reportBusy === "xlsx" ? "Gerando…" : "Baixar relatório (.xlsx)"}
-                    </motion.button>
-                    <motion.button
-                      type="button"
-                      onClick={() => baixarRelatorio("pdf")}
-                      disabled={reportBusy !== null}
-                      className="rounded-full border border-[#4583a0]/40 bg-white px-4 py-2 text-[12px] font-display font-bold uppercase tracking-wide text-[#2f6378] shadow-sm disabled:opacity-50"
-                      whileHover={reportBusy ? undefined : { scale: 1.03 }}
-                      whileTap={reportBusy ? undefined : { scale: 0.97 }}
-                    >
-                      {reportBusy === "pdf" ? "Gerando…" : "Baixar relatório (.pdf)"}
-                    </motion.button>
-                  </div>
-                </div>
-                <div className="max-h-[min(48vh,26rem)] overflow-auto rounded-xl border border-[#d4e4eb] bg-white">
-                  <table className="min-w-full border-collapse text-left text-[11px]">
-                    <thead className="sticky top-0 bg-[#eef6fb]">
-                      <tr>
-                        {["Nº NFS-e", "Prestador", "Mun. Incid. ISSQN", "Valor Bruto", "Valor Líquido", "ISSQN", "IRRF", "Prev. (INSS)", "Contrib. Sociais", "Total Federais"].map((h) => (
-                          <th key={h} className="whitespace-nowrap border-b border-[#d4e4eb] px-2.5 py-1.5 font-semibold text-[#183844]">
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {result.retencoes.map((r, i) => (
-                        <tr key={i} className="odd:bg-white even:bg-[#f7fbfd]">
-                          <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 font-semibold text-[#1e3d4d]">{r.numero || "—"}</td>
-                          <td className="max-w-[220px] truncate border-b border-[#eef2f4] px-2.5 py-1 text-[#1e3d4d]" title={r.prestadorNome}>
-                            {r.prestadorNome || "—"}
-                          </td>
-                          <td className="max-w-[160px] truncate border-b border-[#eef2f4] px-2.5 py-1 text-[#1e3d4d]" title={r.municipioIncidencia}>
-                            {r.municipioIncidencia || "—"}
-                          </td>
-                          <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-right font-semibold tabular-nums text-[#0b3a49]">{cell(r.vServ)}</td>
-                          <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-right font-semibold tabular-nums text-[#0b3a49]">{cell(r.vLiq)}</td>
-                          <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-right tabular-nums">{cell(r.issqnRetido)}</td>
-                          <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-right tabular-nums">{cell(r.irrf)}</td>
-                          <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-right tabular-nums">{cell(r.previdenciaria)}</td>
-                          <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-right tabular-nums" title={r.descContribSociais}>{cell(r.contribSociais)}</td>
-                          <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-right font-semibold tabular-nums text-[#0b3a49]">{cell(r.totalFederais)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <ReportBlock
+                title={`Notas com retenção (${result.retencoes.length})`}
+                items={result.retencoes}
+                reportBusy={reportBusy}
+                onDownload={(fmt) => baixarRelatorio("retencao", fmt)}
+                kind="retencao"
+              />
+            )}
+
+            {result.todas.length > 0 && (
+              <ReportBlock
+                title={`Todas as notas (${result.todas.length})`}
+                items={result.todas}
+                reportBusy={reportBusy}
+                onDownload={(fmt) => baixarRelatorio("todas", fmt)}
+                kind="todas"
+              />
             )}
           </motion.div>
         )}
@@ -404,4 +376,124 @@ export default function NfsePdfHomePage() {
 /** Valor monetário ou travessão quando zero. */
 function cell(v: number): string {
   return v > 0 ? fmtBRL(v) : "—";
+}
+
+/** Soma uma coluna numérica dos itens do relatório. */
+function sumCol(items: RetencaoItem[], key: keyof RetencaoItem): number {
+  return items.reduce((s, it) => {
+    const v = it[key];
+    return s + (typeof v === "number" ? v : 0);
+  }, 0);
+}
+
+const TABLE_HEADERS = [
+  "Nº NFS-e",
+  "Prestador",
+  "Mun. Incid. ISSQN",
+  "Cód. Trib.",
+  "Descrição do Serviço",
+  "Valor Bruto",
+  "Valor Líquido",
+  "ISSQN",
+  "IRRF",
+  "Prev. (INSS)",
+  "Contrib. Sociais",
+  "Total Federais",
+] as const;
+
+/** Bloco de relatório: cabeçalho com downloads + tabela com linha de totais. */
+function ReportBlock({
+  title,
+  items,
+  reportBusy,
+  onDownload,
+  kind,
+}: {
+  title: string;
+  items: RetencaoItem[];
+  reportBusy: ReportBusy;
+  onDownload: (fmt: ReportFmt) => void;
+  kind: ReportKind;
+}) {
+  const busyHere = (fmt: ReportFmt) => reportBusy?.kind === kind && reportBusy.fmt === fmt;
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[#347891]">{title}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <motion.button
+            type="button"
+            onClick={() => onDownload("xlsx")}
+            disabled={reportBusy !== null}
+            className="rounded-full bg-gradient-to-br from-[#2f6378] to-[#4583a0] px-4 py-2 text-[12px] font-display font-bold uppercase tracking-wide text-white shadow-sm disabled:opacity-50"
+            whileHover={reportBusy ? undefined : { scale: 1.03 }}
+            whileTap={reportBusy ? undefined : { scale: 0.97 }}
+          >
+            {busyHere("xlsx") ? "Gerando…" : "Baixar relatório (.xlsx)"}
+          </motion.button>
+          <motion.button
+            type="button"
+            onClick={() => onDownload("pdf")}
+            disabled={reportBusy !== null}
+            className="rounded-full border border-[#4583a0]/40 bg-white px-4 py-2 text-[12px] font-display font-bold uppercase tracking-wide text-[#2f6378] shadow-sm disabled:opacity-50"
+            whileHover={reportBusy ? undefined : { scale: 1.03 }}
+            whileTap={reportBusy ? undefined : { scale: 0.97 }}
+          >
+            {busyHere("pdf") ? "Gerando…" : "Baixar relatório (.pdf)"}
+          </motion.button>
+        </div>
+      </div>
+      <div className="max-h-[min(48vh,26rem)] overflow-auto rounded-xl border border-[#d4e4eb] bg-white">
+        <table className="min-w-full border-collapse text-left text-[11px]">
+          <thead className="sticky top-0 bg-[#eef6fb]">
+            <tr>
+              {TABLE_HEADERS.map((h) => (
+                <th key={h} className="whitespace-nowrap border-b border-[#d4e4eb] px-2.5 py-1.5 font-semibold text-[#183844]">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((r, i) => (
+              <tr key={i} className="odd:bg-white even:bg-[#f7fbfd]">
+                <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 font-semibold text-[#1e3d4d]">{r.numero || "—"}</td>
+                <td className="max-w-[220px] truncate border-b border-[#eef2f4] px-2.5 py-1 text-[#1e3d4d]" title={r.prestadorNome}>
+                  {r.prestadorNome || "—"}
+                </td>
+                <td className="max-w-[160px] truncate border-b border-[#eef2f4] px-2.5 py-1 text-[#1e3d4d]" title={r.municipioIncidencia}>
+                  {r.municipioIncidencia || "—"}
+                </td>
+                <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 tabular-nums text-[#1e3d4d]">{r.codTribNac || "—"}</td>
+                <td className="max-w-[280px] truncate border-b border-[#eef2f4] px-2.5 py-1 text-[#1e3d4d]" title={r.descServico}>
+                  {r.descServico || "—"}
+                </td>
+                <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-right font-semibold tabular-nums text-[#0b3a49]">{cell(r.vServ)}</td>
+                <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-right font-semibold tabular-nums text-[#0b3a49]">{cell(r.vLiq)}</td>
+                <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-right tabular-nums">{cell(r.issqnRetido)}</td>
+                <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-right tabular-nums">{cell(r.irrf)}</td>
+                <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-right tabular-nums">{cell(r.previdenciaria)}</td>
+                <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-right tabular-nums" title={r.descContribSociais}>{cell(r.contribSociais)}</td>
+                <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-right font-semibold tabular-nums text-[#0b3a49]">{cell(r.totalFederais)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot className="sticky bottom-0">
+            <tr className="bg-[#eef6fb] font-semibold text-[#0b3a49]">
+              <td className="whitespace-nowrap border-t border-[#d4e4eb] px-2.5 py-1.5" colSpan={5}>
+                TOTAL ({items.length})
+              </td>
+              <td className="whitespace-nowrap border-t border-[#d4e4eb] px-2.5 py-1.5 text-right tabular-nums">{fmtBRL(sumCol(items, "vServ"))}</td>
+              <td className="whitespace-nowrap border-t border-[#d4e4eb] px-2.5 py-1.5 text-right tabular-nums">{fmtBRL(sumCol(items, "vLiq"))}</td>
+              <td className="whitespace-nowrap border-t border-[#d4e4eb] px-2.5 py-1.5 text-right tabular-nums">{fmtBRL(sumCol(items, "issqnRetido"))}</td>
+              <td className="whitespace-nowrap border-t border-[#d4e4eb] px-2.5 py-1.5 text-right tabular-nums">{fmtBRL(sumCol(items, "irrf"))}</td>
+              <td className="whitespace-nowrap border-t border-[#d4e4eb] px-2.5 py-1.5 text-right tabular-nums">{fmtBRL(sumCol(items, "previdenciaria"))}</td>
+              <td className="whitespace-nowrap border-t border-[#d4e4eb] px-2.5 py-1.5 text-right tabular-nums">{fmtBRL(sumCol(items, "contribSociais"))}</td>
+              <td className="whitespace-nowrap border-t border-[#d4e4eb] px-2.5 py-1.5 text-right tabular-nums">{fmtBRL(sumCol(items, "totalFederais"))}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  );
 }

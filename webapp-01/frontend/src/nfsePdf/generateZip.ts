@@ -9,7 +9,7 @@ import { buildEventoDoc } from "./eventoDoc.js";
 import { renderPdf } from "./pdf.js";
 import { loadMunicipios } from "./municipios.js";
 import { qrContentForChave, qrDataUrl } from "./qr.js";
-import { toNumber } from "./format.js";
+import { toNumber, fmtCodTrib } from "./format.js";
 import { fmtRetPisCofins, issqnRetido } from "./nfseEnums.js";
 import { municipioLabel } from "./municipios.js";
 
@@ -24,6 +24,8 @@ export type RetencaoItem = {
   tomadorNome: string;
   tomadorCnpj: string;
   municipioIncidencia: string;
+  codTribNac: string;
+  descServico: string;
   vServ: number;
   issqnRetido: number;
   irrf: number;
@@ -38,17 +40,19 @@ export type GenResult = {
   geradosNfse: number;
   geradosEvento: number;
   ignorados: GenSkip[];
+  /** Todas as NFS-e processadas (com ou sem retenção). */
+  todas: RetencaoItem[];
+  /** Subconjunto de `todas` que teve alguma retenção. */
   retencoes: RetencaoItem[];
   total: number;
 };
 
-/** Extrai as retenções de uma NFS-e; devolve null se nenhuma foi retida. */
-export function extractRetencao(d: NfseData): RetencaoItem | null {
+/** Monta o item de relatório de uma NFS-e (retenções ficam zeradas quando não houver). */
+export function buildNota(d: NfseData): RetencaoItem {
   const issqn = issqnRetido(d.tpRetISSQN) ? toNumber(d.vISSQN) ?? 0 : 0;
   const irrf = toNumber(d.vRetIRRF) ?? 0;
   const prev = toNumber(d.vRetCP) ?? 0;
   const contrib = toNumber(d.vRetCSLL) ?? 0;
-  if (issqn <= 0 && irrf <= 0 && prev <= 0 && contrib <= 0) return null;
   return {
     numero: d.numeroNfse,
     chave: d.chave,
@@ -57,6 +61,8 @@ export function extractRetencao(d: NfseData): RetencaoItem | null {
     tomadorNome: d.toma?.nome ?? "",
     tomadorCnpj: d.toma?.cnpjCpf ?? "",
     municipioIncidencia: d.cLocIncid ? municipioLabel(d.cLocIncid) : d.localIncidencia,
+    codTribNac: d.cTribNac ? fmtCodTrib(d.cTribNac) : "",
+    descServico: cleanDesc(d.xDescServ ?? ""),
     vServ: toNumber(d.vServ) ?? 0,
     issqnRetido: issqn,
     irrf,
@@ -68,6 +74,26 @@ export function extractRetencao(d: NfseData): RetencaoItem | null {
     totalFederais: irrf + prev + contrib,
     vLiq: toNumber(d.vLiq) ?? 0,
   };
+}
+
+/** True se a nota teve alguma retenção (ISSQN municipal ou federais). */
+export function hasRetencao(it: RetencaoItem): boolean {
+  return it.issqnRetido > 0 || it.irrf > 0 || it.previdenciaria > 0 || it.contribSociais > 0;
+}
+
+/** Extrai as retenções de uma NFS-e; devolve null se nenhuma foi retida. */
+export function extractRetencao(d: NfseData): RetencaoItem | null {
+  const nota = buildNota(d);
+  return hasRetencao(nota) ? nota : null;
+}
+
+/** A descrição do serviço vem do XML com quebras (`\r\n` literais ou reais); vira uma linha só. */
+function cleanDesc(s: string): string {
+  return s
+    .replace(/\\r\\n|\\r|\\n/g, " ") // sequências de escape literais
+    .replace(/[\r\n\t]+/g, " ") // quebras reais
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function baseName(name: string): string {
@@ -121,6 +147,7 @@ export async function generateDanfseZip(
     geradosNfse: 0,
     geradosEvento: 0,
     ignorados: [],
+    todas: [],
     retencoes: [],
     total: files.length,
   };
@@ -135,8 +162,9 @@ export async function generateDanfseZip(
         const desired = sanitize(`${parsed.numeroNfse || parsed.chave || baseName(file.name)}.pdf`);
         zip.file(uniqueName(used, desired), await blob.arrayBuffer());
         result.geradosNfse += 1;
-        const ret = extractRetencao(parsed);
-        if (ret) result.retencoes.push(ret);
+        const nota = buildNota(parsed);
+        result.todas.push(nota);
+        if (hasRetencao(nota)) result.retencoes.push(nota);
       } else if (parsed.kind === "evento") {
         const blob = await renderPdf(buildEventoDoc(parsed));
         const desired = sanitize(`evento_${parsed.chave || baseName(file.name)}.pdf`);

@@ -24,6 +24,7 @@ type Col = {
   width: number;
   money?: boolean;
   text?: boolean;
+  wrap?: boolean;
 };
 
 const COLS: Col[] = [
@@ -34,6 +35,8 @@ const COLS: Col[] = [
   { header: "CNPJ Tomador", key: "tomadorCnpj", width: 20, text: true },
   { header: "Tomador", key: "tomadorNome", width: 34 },
   { header: "Município Incidência ISSQN", key: "municipioIncidencia", width: 26 },
+  { header: "Cód. Trib. Nacional", key: "codTribNac", width: 16, text: true },
+  { header: "Descrição do Serviço", key: "descServico", width: 60, wrap: true },
   { header: "Valor do Serviço", key: "vServ", width: 16, money: true },
   { header: "ISSQN Retido", key: "issqnRetido", width: 14, money: true },
   { header: "IRRF Retido", key: "irrf", width: 14, money: true },
@@ -56,11 +59,14 @@ function triggerDownload(blob: Blob, filename: string): void {
 }
 
 /** Monta o workbook ExcelJS (separado do download p/ ser testável fora do browser). */
-export async function buildRetencaoWorkbook(items: RetencaoItem[]): Promise<import("exceljs").Workbook> {
+export async function buildRetencaoWorkbook(
+  items: RetencaoItem[],
+  sheetName = "Retenções",
+): Promise<import("exceljs").Workbook> {
   const ExcelJS = (await import("exceljs")).default;
   const wb = new ExcelJS.Workbook();
   wb.creator = "NFS-e → PDF (DANFSe)";
-  const ws = wb.addWorksheet("Retenções");
+  const ws = wb.addWorksheet(sheetName);
   ws.views = [{ showGridLines: false, state: "frozen", ySplit: 1 }];
 
   ws.columns = COLS.map((c) => ({ header: c.header, key: c.key as string, width: c.width }));
@@ -79,31 +85,38 @@ export async function buildRetencaoWorkbook(items: RetencaoItem[]): Promise<impo
     row.eachCell((cell, col) => {
       const def = COLS[col - 1];
       cell.border = THIN_BORDER;
-      cell.alignment = { vertical: "middle", horizontal: def?.money ? "right" : "left" };
+      cell.alignment = { vertical: "middle", horizontal: "center", wrapText: def?.wrap };
       if (def?.money) cell.numFmt = BRL;
       if (def?.text) cell.numFmt = "@";
     });
   }
 
-  // Linha de totais.
-  const sum = (k: keyof RetencaoItem) =>
-    items.reduce((s, it) => s + (typeof it[k] === "number" ? (it[k] as number) : 0), 0);
-  const totalRow = ws.addRow({
-    prestadorNome: "TOTAL",
-    vServ: sum("vServ"),
-    issqnRetido: sum("issqnRetido"),
-    irrf: sum("irrf"),
-    previdenciaria: sum("previdenciaria"),
-    contribSociais: sum("contribSociais"),
-    totalFederais: sum("totalFederais"),
-    vLiq: sum("vLiq"),
-  } as Partial<RetencaoItem>);
-  totalRow.eachCell((cell, col) => {
-    const def = COLS[col - 1];
+  // AutoFilter no cabeçalho (dados; NÃO inclui a linha de total, que fica logo abaixo).
+  const firstDataRow = 2;
+  const lastDataRow = items.length + 1;
+  ws.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: Math.max(lastDataRow, 1), column: COLS.length },
+  };
+
+  // Linha de totais com SUBTOTAL(9): respeita o AutoFilter — ao filtrar, o total recalcula.
+  const totalRow = ws.addRow([]);
+  COLS.forEach((def, i) => {
+    const cell = totalRow.getCell(i + 1);
     cell.font = { bold: true };
     cell.border = THIN_BORDER;
-    cell.alignment = { vertical: "middle", horizontal: def?.money ? "right" : "left" };
-    if (def?.money) cell.numFmt = BRL;
+    cell.alignment = { vertical: "middle", horizontal: "center" };
+    if (def.key === "prestadorNome") {
+      cell.value = "TOTAL";
+    } else if (def.money) {
+      cell.numFmt = BRL;
+      if (items.length > 0) {
+        const letter = ws.getColumn(i + 1).letter;
+        cell.value = { formula: `SUBTOTAL(9,${letter}${firstDataRow}:${letter}${lastDataRow})` };
+      } else {
+        cell.value = 0;
+      }
+    }
   });
 
   return wb;
@@ -112,8 +125,9 @@ export async function buildRetencaoWorkbook(items: RetencaoItem[]): Promise<impo
 export async function downloadRetencaoReport(
   items: RetencaoItem[],
   filename = "Retencoes NFS-e.xlsx",
+  sheetName = "Retenções",
 ): Promise<void> {
-  const wb = await buildRetencaoWorkbook(items);
+  const wb = await buildRetencaoWorkbook(items, sheetName);
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -128,8 +142,10 @@ type PdfCol = { header: string; key: keyof RetencaoItem; money?: boolean; always
 
 const PDF_COLS: PdfCol[] = [
   { header: "Nº NFS-e", key: "numero", width: "auto" },
-  { header: "Prestador", key: "prestadorNome", width: "*" },
+  { header: "Prestador", key: "prestadorNome", width: 80 },
   { header: "Mun. Incid. ISSQN", key: "municipioIncidencia", width: "auto" },
+  { header: "Cód. Trib.", key: "codTribNac", width: "auto" },
+  { header: "Descrição do Serviço", key: "descServico", width: "*" },
   { header: "Valor Bruto", key: "vServ", money: true, always: true, width: "auto" },
   { header: "Valor Líquido", key: "vLiq", money: true, always: true, width: "auto" },
   { header: "ISSQN", key: "issqnRetido", money: true, width: "auto" },
@@ -144,8 +160,15 @@ function pdfMoney(v: number, always: boolean): string {
   return v > 0 || always ? fmtBRL(v) : "—";
 }
 
+export type RetencaoPdfOpts = { title?: string; subtitle?: string };
+
 /** Monta a definição pdfmake do relatório (separada do download p/ testar). */
-export function buildRetencaoPdfDoc(items: RetencaoItem[]): Record<string, unknown> {
+export function buildRetencaoPdfDoc(
+  items: RetencaoItem[],
+  opts: RetencaoPdfOpts = {},
+): Record<string, unknown> {
+  const title = opts.title ?? "Relatório de Retenções — NFS-e";
+  const subtitle = opts.subtitle ?? `${items.length} nota(s) com retenção`;
   const headerRow = PDF_COLS.map((c) => ({
     text: c.header,
     bold: true,
@@ -177,8 +200,8 @@ export function buildRetencaoPdfDoc(items: RetencaoItem[]): Record<string, unkno
     pageOrientation: "landscape",
     pageMargins: [24, 44, 24, 32],
     content: [
-      { text: "Relatório de Retenções — NFS-e", style: "title" },
-      { text: `${items.length} nota(s) com retenção`, style: "subtitle" },
+      { text: title, style: "title" },
+      { text: subtitle, style: "subtitle" },
       {
         table: {
           headerRows: 1,
@@ -208,7 +231,8 @@ export function buildRetencaoPdfDoc(items: RetencaoItem[]): Record<string, unkno
 export async function downloadRetencaoPdf(
   items: RetencaoItem[],
   filename = "Retencoes NFS-e.pdf",
+  opts: RetencaoPdfOpts = {},
 ): Promise<void> {
-  const blob = await renderPdf(buildRetencaoPdfDoc(items));
+  const blob = await renderPdf(buildRetencaoPdfDoc(items, opts));
   triggerDownload(blob, filename);
 }
