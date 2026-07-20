@@ -1900,6 +1900,131 @@ app.post(`${API_PREFIX}/tools/gnre/jobs`, async (req, reply) => {
   return reply.code(202).send({ id: jobId, status: "queued" as const });
 });
 
+/** Upload em lotes: lotes grandes (centenas de PDFs, muitas vezes lidos de um
+ * share de rede) nao cabem numa unica requisicao dentro do timeout do browser.
+ * Fluxo: POST /jobs/init -> N x POST /jobs/:id/chunk -> POST /jobs/:id/start. */
+function gnreJobPaths(jobId: string) {
+  const base = jobDir(jobId);
+  return { base, inDir: path.join(base, "in"), outDir: path.join(base, "out") };
+}
+
+app.post(`${API_PREFIX}/tools/gnre/jobs/init`, async (req, reply) => {
+  const jobId = randomUUID();
+  const { inDir, outDir } = gnreJobPaths(jobId);
+
+  try {
+    const pong = await getRedis(env).ping();
+    if (pong !== "PONG") throw new Error("Redis não respondeu");
+  } catch (e) {
+    req.log.warn({ err: e }, "redis indisponível ao criar job GNRE");
+    return reply.code(503).send({
+      error:
+        "Redis não está acessível. Inicie o Redis e o worker GNRE (worker-gnre-bridge + Python).",
+    });
+  }
+
+  await fs.promises.mkdir(inDir, { recursive: true });
+  await fs.promises.mkdir(outDir, { recursive: true });
+  return reply.code(201).send({ id: jobId });
+});
+
+app.post<{ Params: { id: string } }>(
+  `${API_PREFIX}/tools/gnre/jobs/:id/chunk`,
+  async (req, reply) => {
+    const { id } = req.params;
+    if (!/^[0-9a-f-]{8,}$/i.test(id)) {
+      return reply.code(400).send({ error: "Id inválido" });
+    }
+    const { base, inDir } = gnreJobPaths(id);
+    if (!fs.existsSync(base)) {
+      return reply.code(404).send({ error: "Job não encontrado (inicie com POST /jobs/init)." });
+    }
+
+    const maxBytes = env.MAX_UPLOAD_NFSE_MB * 1024 * 1024;
+    let totalBytes = 0;
+    let saved = 0;
+
+    try {
+      const parts = req.parts();
+      for await (const part of parts) {
+        if (part.type !== "file") continue;
+        const original = (part.filename ?? "guia.pdf").replace(/[/\\]/g, "_");
+        const ext = path.extname(original).toLowerCase();
+        if (!ALLOWED_GNRE_EXT.has(ext)) {
+          return reply.code(400).send({
+            error: `Formato não suportado: ${original}. Aceitamos apenas .pdf.`,
+          });
+        }
+        const buf = await part.toBuffer();
+        totalBytes += buf.length;
+        if (totalBytes > maxBytes) {
+          return reply.code(413).send({
+            error: `Lote excedeu ${env.MAX_UPLOAD_NFSE_MB} MB. Envie em lotes menores.`,
+          });
+        }
+        /** Preserva o nome original (o dedupe do engine e por nome de arquivo);
+         * so desambigua quando o mesmo nome chega duas vezes. */
+        const safe = original.replace(/[^\w.\-]+/g, "_").slice(0, 180) || "guia.pdf";
+        let dest = path.join(inDir, safe);
+        if (fs.existsSync(dest)) {
+          const stem = path.basename(safe, path.extname(safe));
+          dest = path.join(inDir, `${stem}_${randomUUID().slice(0, 8)}${path.extname(safe)}`);
+        }
+        await fs.promises.writeFile(dest, buf);
+        saved += 1;
+      }
+    } catch (e) {
+      req.log.error({ err: e }, "falha ao ler lote GNRE");
+      return reply.code(400).send({ error: "Falha ao ler upload" });
+    }
+
+    return reply.send({ ok: true, saved });
+  },
+);
+
+app.post<{ Params: { id: string } }>(
+  `${API_PREFIX}/tools/gnre/jobs/:id/start`,
+  async (req, reply) => {
+    const { id } = req.params;
+    if (!/^[0-9a-f-]{8,}$/i.test(id)) {
+      return reply.code(400).send({ error: "Id inválido" });
+    }
+    const { base, inDir, outDir } = gnreJobPaths(id);
+    if (!fs.existsSync(base)) {
+      return reply.code(404).send({ error: "Job não encontrado." });
+    }
+
+    const pdfCount = (await fs.promises.readdir(inDir).catch(() => [])).length;
+    if (pdfCount === 0) {
+      await fs.promises.rm(base, { recursive: true, force: true });
+      return reply.code(400).send({ error: "Nenhum PDF enviado" });
+    }
+
+    const payload: GnreJobPayload = {
+      jobId: id,
+      pdfsDir: inDir,
+      outputXlsx: path.join(outDir, "GNRE_Extracao.xlsx"),
+    };
+
+    try {
+      await Promise.race([
+        gnreQueue.add("extract", payload, { jobId: id }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Fila timeout")), 15_000),
+        ),
+      ]);
+    } catch (e) {
+      req.log.error({ err: e }, "falha ao enfileirar job GNRE");
+      return reply.code(503).send({
+        error:
+          "Não foi possível enfileirar o job. Verifique Redis e o worker-gnre-bridge.",
+      });
+    }
+
+    return reply.code(202).send({ id, status: "queued" as const });
+  },
+);
+
 app.get<{ Params: { id: string } }>(`${API_PREFIX}/tools/gnre/jobs/:id`, async (req, reply) => {
   const { id } = req.params;
   const job = await gnreQueue.getJob(id);

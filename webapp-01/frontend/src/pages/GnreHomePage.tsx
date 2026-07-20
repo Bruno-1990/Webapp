@@ -9,7 +9,7 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import { useDropzone } from "react-dropzone";
 import {
-  createGnreJob,
+  createGnreJobChunked,
   getGnreJob,
   gnreDownloadUrl,
   type GnreJobResponse,
@@ -73,6 +73,7 @@ export default function GnreHomePage() {
   const [job, setJob] = useState<GnreJobResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [upload, setUpload] = useState<{ sent: number; total: number } | null>(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
   /** Garante que o modal abra UMA vez por job concluído (não reabra ao re-render). */
   const [summaryShownFor, setSummaryShownFor] = useState<string | null>(null);
@@ -124,12 +125,16 @@ export default function GnreHomePage() {
     setBusy(true);
     setErr(null);
     setJob(null);
+    setUpload({ sent: 0, total: files.length });
     try {
-      const { id } = await createGnreJob(files);
+      const { id } = await createGnreJobChunked(files, (_frac, sent, total) =>
+        setUpload({ sent, total }),
+      );
       setJob({ id, status: "queued" });
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
+      setUpload(null);
       setBusy(false);
     }
   };
@@ -337,6 +342,32 @@ export default function GnreHomePage() {
         </AnimatePresence>
 
         <AnimatePresence mode="wait">
+          {upload && !job && (
+            <motion.div
+              key="upload"
+              className="space-y-2"
+              aria-live="polite"
+              initial={{ opacity: 0, y: 10, filter: "blur(4px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              exit={{ opacity: 0, y: -6, filter: "blur(3px)" }}
+              transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <p className="text-center text-sm font-semibold text-accent">
+                {`Enviando ${upload.sent} de ${upload.total} PDFs…`}
+              </p>
+              <div className="relative h-3 w-full overflow-hidden rounded-full bg-brand-soft ring-1 ring-brand-line/70">
+                <motion.div
+                  className={toolProgressFillClass}
+                  initial={{ width: 0 }}
+                  animate={{
+                    width: `${upload.total > 0 ? Math.round((upload.sent / upload.total) * 100) : 0}%`,
+                  }}
+                  transition={springSnappy}
+                />
+              </div>
+            </motion.div>
+          )}
+
           {isProcessing && job && (
             <motion.div
               key="prog"
