@@ -228,6 +228,7 @@ SEFAZ×SCI passou para `CECECE`), sem refatorar a estrutura de cada arquivo.
 | **NFe** | `packages/excel-export/src/format-sheet.ts` | ✅ `4169E1` | bordas, alturas 30/22, fonte `1A1A1F` |
 | **NFS-e → PDF (retenções)** | `nfsePdf/retencaoReport.ts` | ✅ `4169E1` | alturas 30/22 |
 | **Conciliador NFS-e** | `engines/sci-portal-nacional/cli.mjs` | ✅ `4169E1` | alturas 30/22 |
+| **Concatenador de Planilhas** | `engines/concatenador-planilhas/cli.mjs` | ✅ `4169E1` | — (conforme; segue a §5 em saídas > 2.500 linhas) |
 | **GNRE** | `engines/gnre/xlsx_export.py` | ✅ `4169E1` | alturas 25/20→30/22, congelar linha 1 |
 | **SPED** | `sped_engine/{config,report,writer_xlsxwriter}.py` | ✅ `4169E1` | alturas, zebra, congelar |
 | **Consolidado SCI** | `engines/sci-consolidado/format.py` | ✅ `4169E1` | zebra/alturas |

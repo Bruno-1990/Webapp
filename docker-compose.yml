@@ -14,6 +14,7 @@
 #   worker-comparacao-nfse     -> engines/comparacao-nfse        (Comparador NFS-e, Gemini OCR)
 #   worker-gnre                -> engines/gnre                   (Extrator GNRE)
 #   worker-sci-portal-nacional -> engines/sci-portal-nacional    (Conciliador NFS-e, Node engine)
+#   worker-concatenador-planilhas -> engines/concatenador-planilhas (Concatenador, Node engine)
 #
 # Bind mount ./temp_jobs:/data/jobs e' compartilhado por todos: a API grava em
 # /data/jobs/<id>/... (caminho do container), que aparece no host Windows em
@@ -149,6 +150,22 @@ services:
       REDIS_URL: redis://redis:6379
       TEMP_JOBS_ROOT: /data/jobs
       SCI_PORTAL_DIR: /app/engines/sci-portal-nacional
+    volumes:
+      - ./temp_jobs:/data/jobs
+    depends_on:
+      - redis
+
+  worker-concatenador-planilhas:
+    profiles: ["comparacao"]
+    build:
+      context: .
+      dockerfile: webapp-01/docker/Dockerfile.worker-concatenador-planilhas
+    env_file:
+      - ./.env
+    environment:
+      REDIS_URL: redis://redis:6379
+      TEMP_JOBS_ROOT: /data/jobs
+      CONCATENADOR_DIR: /app/engines/concatenador-planilhas
     volumes:
       - ./temp_jobs:/data/jobs
     depends_on:

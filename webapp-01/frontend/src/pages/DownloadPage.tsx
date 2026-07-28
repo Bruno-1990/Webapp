@@ -6,8 +6,10 @@ import { ToolPageTitle } from "../components/ToolPageTitle.js";
 import { toolPageShellClass, toolPanelClass, toolProgressFillClass } from "../toolLayout.js";
 import {
   comparacaoPlanilhasDownloadUrl,
+  concatenadorPlanilhasDownloadUrl,
   downloadUrl,
   getComparacaoPlanilhasJob,
+  getConcatenadorPlanilhasJob,
   getJob,
   getSciConsolidadoJob,
   getSciPortalNacionalJob,
@@ -17,7 +19,7 @@ import {
   sciPortalNacionalDownloadUrl,
   spedDownloadUrl,
   spedMergeDownloadUrl,
-  type JobResponse,
+  type ConcatenadorJobResponse,
 } from "../api.js";
 import { fadeUp, transitionFast, transitionSmooth } from "../motion-variants.js";
 
@@ -35,11 +37,13 @@ export default function DownloadPage() {
   const isSci = pathname.includes("/tools/sci-consolidado/download");
   const isComparacao = pathname.includes("/tools/comparacao-planilhas/download");
   const isSciPortal = pathname.includes("/tools/sci-portal-nacional/download");
+  const isConcat = pathname.includes("/tools/concatenador-planilhas/download");
   const isSped =
     pathname.includes("/tools/sped/download") && !isSpedMerge && !isSci && !isComparacao;
   const { jobId: rawId } = useParams<{ jobId: string }>();
   const jobId = rawId ? decodeURIComponent(rawId) : "";
-  const [job, setJob] = useState<JobResponse | null>(null);
+  /** Superset de JobResponse: só o Concatenador devolve `result`. */
+  const [job, setJob] = useState<ConcatenadorJobResponse | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -50,7 +54,9 @@ export default function DownloadPage() {
 
     const tick = async () => {
       try {
-        const j = isSpedMerge
+        const j = isConcat
+          ? await getConcatenadorPlanilhasJob(jobId)
+          : isSpedMerge
           ? await getSpedMergeJob(jobId)
           : isSci
             ? await getSciConsolidadoJob(jobId)
@@ -89,7 +95,7 @@ export default function DownloadPage() {
         timerRef.current = null;
       }
     };
-  }, [jobId, isSped, isSpedMerge, isSci, isComparacao, isSciPortal]);
+  }, [jobId, isSped, isSpedMerge, isSci, isComparacao, isSciPortal, isConcat]);
 
   const showDeterminateBar =
     job?.status === "running" &&
@@ -98,7 +104,9 @@ export default function DownloadPage() {
 
   const progressLabel =
     job?.status === "running"
-      ? isSpedMerge
+      ? isConcat
+        ? "Juntando as planilhas…"
+        : isSpedMerge
         ? "Atualizando arquivo…"
         : isSci
           ? "Gerando planilha SCI…"
@@ -110,6 +118,27 @@ export default function DownloadPage() {
       : job?.status === "queued"
         ? "Na fila…"
         : "Carregando…";
+
+  /** Resumo do Concatenador: quantas partes viraram quantas linhas. */
+  const concatDoneHint = (() => {
+    const r = job?.result;
+    return r?.arquivos != null && r?.linhas != null
+      ? `${r.arquivos} planilha(s) emendada(s) em ${r.linhas.toLocaleString("pt-BR")} linha(s), na ordem da coluna #.`
+      : "As planilhas foram emendadas numa só, na ordem da coluna #.";
+  })();
+
+  /** Quebra de sequência / repetição no "#". A planilha é entregue mesmo assim,
+   *  então o aviso precisa aparecer em destaque — não escondido no subtítulo. */
+  const concatAvisos = useMemo(() => {
+    if (!isConcat) return [];
+    const lista = job?.result?.avisos ?? [];
+    // Alertas (possível perda de dado) antes dos informativos.
+    return [...lista].sort(
+      (a, b) =>
+        Number((b.severidade ?? "alerta") === "alerta") -
+        Number((a.severidade ?? "alerta") === "alerta"),
+    );
+  }, [isConcat, job?.result?.avisos]);
 
   const stillWaiting =
     job == null ||
@@ -157,7 +186,9 @@ export default function DownloadPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...transitionSmooth, delay: 0.08 }}
         >
-          {isSpedMerge ? (
+          {isConcat ? (
+            <ToolPageTitle left="Várias planilhas" right="Uma só" size="download" />
+          ) : isSpedMerge ? (
             <ToolPageTitle left="XLSX" right="SPED" size="download" />
           ) : isSci ? (
             <ToolPageTitle left="SCI" right="Excel" size="download" />
@@ -177,7 +208,9 @@ export default function DownloadPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...transitionSmooth, delay: 0.14 }}
         >
-          {isSpedMerge
+          {isConcat
+            ? "Baixe a planilha unificada"
+            : isSpedMerge
             ? "Baixe o arquivo atualizado"
             : isSci
               ? "Baixe o ProdutosSCI.xlsx"
@@ -313,7 +346,9 @@ export default function DownloadPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={transitionFast}
               >
-                {isSpedMerge
+                {isConcat
+                  ? "Não foi possível juntar as planilhas"
+                  : isSpedMerge
                   ? "Não foi possível atualizar o arquivo"
                   : isComparacao
                     ? "Não foi possível comparar as planilhas"
@@ -362,7 +397,9 @@ export default function DownloadPage() {
                   {isSpedMerge ? "Arquivo pronto" : "Planilha pronta"}
                 </p>
                 <p className="mt-1 text-sm text-[#347891]">
-                  {isSpedMerge
+                  {isConcat
+                    ? concatDoneHint
+                    : isSpedMerge
                     ? "Suas alterações na planilha já estão aplicadas no arquivo para download."
                     : isSci
                       ? "O arquivo inclui as abas Produtos, Base e Consolidado (SCI)."
@@ -375,10 +412,73 @@ export default function DownloadPage() {
                             : "Sua planilha com os dados das notas está pronta para download."}
                 </p>
               </motion.div>
+
+              {concatAvisos.length > 0 && (
+                <motion.section
+                  className="w-full max-w-md overflow-hidden rounded-2xl border border-amber-200/90 bg-white text-left shadow-[0_2px_12px_-4px_rgb(180_130_20/0.18)]"
+                  role="alert"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ ...transitionSmooth, delay: 0.16 }}
+                >
+                  <header className="flex items-center gap-2.5 bg-amber-50 px-4 py-2.5">
+                    <span
+                      aria-hidden
+                      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-400/25 text-[13px] font-bold text-amber-700"
+                    >
+                      !
+                    </span>
+                    <h3 className="font-display flex-1 text-sm font-bold uppercase tracking-wide text-amber-900">
+                      Confira antes de usar
+                    </h3>
+                    <span className="rounded-full bg-amber-400/25 px-2 py-0.5 text-[11px] font-bold text-amber-800">
+                      {concatAvisos.length}
+                    </span>
+                  </header>
+
+                  <ul className="divide-y divide-amber-100">
+                    {concatAvisos.map((a, i) => {
+                      const alerta = (a.severidade ?? "alerta") === "alerta";
+                      return (
+                        <li key={i} className="flex gap-2.5 px-4 py-3">
+                          <span
+                            aria-hidden
+                            className={`mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full ${
+                              alerta ? "bg-amber-500" : "bg-[#8fb8c9]"
+                            }`}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className={`text-[13px] font-semibold leading-snug ${
+                                alerta ? "text-amber-900" : "text-[#1e3d4d]"
+                              }`}
+                            >
+                              {a.titulo}
+                            </p>
+                            {a.detalhe && (
+                              <p className="mt-1 break-words font-mono text-[12px] leading-snug text-[#3c5c6b]">
+                                {a.detalhe}
+                              </p>
+                            )}
+                            {a.dica && (
+                              <p className="mt-1 text-[12px] leading-relaxed text-[#5b7b8a]">
+                                {a.dica}
+                              </p>
+                            )}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </motion.section>
+              )}
+
               <motion.a
                 className="pill-grad-cyan flex w-full max-w-md flex-col items-center gap-2 rounded-full px-5 py-4 text-center text-white shadow-btn"
                 href={
-                  isSpedMerge
+                  isConcat
+                    ? concatenadorPlanilhasDownloadUrl(job.id, job.downloadToken)
+                    : isSpedMerge
                     ? spedMergeDownloadUrl(job.id, job.downloadToken)
                     : isSci
                       ? sciConsolidadoDownloadUrl(job.id, job.downloadToken)
@@ -392,7 +492,9 @@ export default function DownloadPage() {
                 }
                 download={
                   job.fileName ??
-                  (isSpedMerge
+                  (isConcat
+                    ? "Planilha Unificada.xlsx"
+                    : isSpedMerge
                     ? "SPED_mesclado.txt"
                     : isSci
                       ? "ProdutosSCI.xlsx"
@@ -406,7 +508,9 @@ export default function DownloadPage() {
                 }
                 title={
                   job.fileName ??
-                  (isSpedMerge
+                  (isConcat
+                    ? "Planilha Unificada.xlsx"
+                    : isSpedMerge
                     ? "SPED_mesclado.txt"
                     : isSci
                       ? "ProdutosSCI.xlsx"
@@ -429,7 +533,9 @@ export default function DownloadPage() {
                 </span>
                 <span className="w-full break-all font-sans text-[12px] font-medium normal-case leading-snug tracking-normal text-white/95">
                   {job.fileName ??
-                    (isSpedMerge
+                    (isConcat
+                      ? "Planilha Unificada.xlsx"
+                      : isSpedMerge
                       ? "SPED_mesclado.txt"
                       : isSci
                         ? "ProdutosSCI.xlsx"
@@ -455,7 +561,9 @@ export default function DownloadPage() {
           <motion.div whileHover={{ x: -2 }} transition={transitionFast}>
             <Link
               to={
-                isSpedMerge
+                isConcat
+                  ? "/tools/concatenador-planilhas"
+                  : isSpedMerge
                   ? "/tools/sped-merge"
                   : isSci
                     ? "/tools/sci-consolidado"

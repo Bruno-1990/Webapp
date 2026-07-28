@@ -42,6 +42,14 @@ só "onde clicar" para cada ferramenta. Caminhos relativos à raiz `webapp/`.
 
 ### NFS-e → PDF (DANFSe) — `id: nfse-pdf`
 - **Sem backend** — roda 100% no navegador. Seleciona uma **pasta** de XMLs de NFS-e (padrão nacional), gera um PDF DANFSe por nota e baixa tudo num `.zip`. XMLs de evento (cancelamento) viram PDF de evento.
+### Concatenador de Planilhas — `id: concatenador-planilhas`
+- Página: [`ConcatenadorPlanilhasHomePage.tsx`](../webapp-01/frontend/src/pages/ConcatenadorPlanilhasHomePage.tsx)
+- Worker: [`worker-concatenador-planilhas`](../webapp-01/apps/worker-concatenador-planilhas) → Engine: [`engines/concatenador-planilhas`](../engines/concatenador-planilhas) (Node, `cli.mjs`)
+- Dockerfile: [`Dockerfile.worker-concatenador-planilhas`](../webapp-01/docker/Dockerfile.worker-concatenador-planilhas) · env `CONCATENADOR_DIR`
+- Emenda N planilhas de mesmo layout numa só. Ordem dos blocos = menor valor da coluna `#` (fallback: ordem natural do nome). O `#` é **preservado**, nunca reescrito; furos/repetições viram aviso no `result` do job. Cabeçalho divergente é erro. Regras completas no [README do engine](../engines/concatenador-planilhas/README.md).
+- **Confronto antes de concatenar** (mesma regra na API e no frontend, em [`packages/contracts`](../webapp-01/packages/contracts/src/index.ts) → `checkConcatenadorCompatibilidade`): o **CNPJ no início do nome do arquivo** (titular do relatório) e o **tipo** (`Emitente`/`Destinatario`) têm de ser iguais em todas as partes. Divergiu → `400` com `reasons: ["cnpjs_diferentes" | "tipos_misturados"]` e modal na tela. As colunas de CNPJ/CPF *dentro* da planilha não entram na conta — são de clientes/fornecedores de cada nota. Nomes fora do padrão são ignorados na comparação (a ferramenta serve para planilhas genéricas).
+- Nome do arquivo de saída: [`concatenador-filename.ts`](../webapp-01/apps/api/src/concatenador-filename.ts) — reaproveita o prefixo dos nomes de entrada (`<CNPJ>_NFEs_<Emitente|Destinatario>`) e recalcula o período com a **menor data inicial** e a **maior data final** das partes. Prefixos divergentes ou nomes fora do padrão → `Planilha Unificada.xlsx`.
+
 - Entrada por **pasta**: picker nativo (Chrome/Edge) com fallback `webkitdirectory`; reaproveita `pickDirectoryAndReadFiles("xml-only")`/`getXmlOnlyFilesFromEvent` de `dropFiles.ts`.
 - Layout do DANFSe **fiel ao oficial** (NT-008) com logo embutida; discriminação de retenções conforme **NT-007** (`tpRetPisCofins`, `vRetCSLL` = soma PIS+COFINS+CSLL, `vPis`/`vCofins` = débito de apuração própria; ISSQN retido via `tpRetISSQN`).
 - Após gerar, mostra um **painel de retenções** (uma linha por nota com retenção) com download de **relatório `.xlsx`**; se não houver, avisa "nenhuma retenção".

@@ -28,3 +28,6 @@ Thumbs.db
 # Amostras locais / insumos (não versionar dados fiscais reais)
 /exemplo/
 NFS-e  Logo.png
+
+# Saida gerada pelo smoke do concatenador
+engines/concatenador-planilhas/exemplo/**/Planilha Unificada.xlsx

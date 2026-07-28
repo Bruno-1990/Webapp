@@ -24,6 +24,168 @@ export const COMPARACAO_PLANILHAS_QUEUE_NAME = "comparacao-planilhas" as const;
 /** Conciliador NFS-e: SCI x SEFAZ (Portal Nacional) → Conciliação multi-aba (TS puro, engines/sci-portal-nacional). */
 export const SCI_PORTAL_NACIONAL_QUEUE_NAME = "sci-portal-nacional-comparacao" as const;
 
+/** N planilhas de mesmo layout → uma só, ordenadas pela coluna "#" (engines/concatenador-planilhas). */
+export const CONCATENADOR_PLANILHAS_QUEUE_NAME = "concatenador-planilhas" as const;
+
+/**
+ * Tipo do relatório de NF-e da SEFAZ, lido do nome do arquivo
+ * (`<CNPJ>_NFEs_<Emitente|Destinatario>_periodo_...`).
+ *
+ * Emitente (notas que a empresa emitiu) e Destinatário (notas que ela recebeu)
+ * são universos distintos: concatenar os dois gera uma planilha sem sentido
+ * fiscal. Usado pelo Concatenador na API e no frontend — por isso mora aqui.
+ */
+export type NfeRelatorioTipo = "emitente" | "destinatario";
+
+/**
+ * A SEFAZ às vezes entrega o acento corrompido no nome do arquivo:
+ * `Destinatário` sai como `DestinatxE1rio` (o `\xE1` perdeu a barra), e também
+ * aparecem `Destinat%E1rio`, `Destinat\xE1rio` e `DestinatÃ¡rio` (UTF-8 lido
+ * como Latin-1). Por isso o miolo entre "destinat" e "rio" é curinga curto —
+ * qualquer uma dessas formas conta como Destinatário.
+ */
+const NFE_TIPO_RE = /_(emitente|destinat[^_]{0,4}rios?)_/i;
+
+/** Devolve o tipo do relatório, ou null se o nome não seguir o padrão. */
+export function detectNfeRelatorioTipo(fileName: string): NfeRelatorioTipo | null {
+  const norm = fileName.normalize("NFD").replace(/\p{M}/gu, "");
+  const m = NFE_TIPO_RE.exec(norm);
+  if (!m) return null;
+  return m[1].toLowerCase().startsWith("emitente") ? "emitente" : "destinatario";
+}
+
+/**
+ * Conserta o token do tipo quando o acento veio corrompido, para o nome do
+ * arquivo de saída não carregar o defeito adiante. Formas já corretas
+ * (`Destinatario`, `Destinatário`, `DESTINATARIOS`) ficam como estão.
+ */
+export function normalizeNfeTipoNoNome(nome: string): string {
+  return nome.replace(/destinat([^_]{0,4})rios?/gi, (match, meio: string) => {
+    if (/^[aá]?$/i.test(meio)) return match;
+    return "Destinatario";
+  });
+}
+
+/** True se a lista mistura relatórios de Emitente com os de Destinatário. */
+export function hasMixedNfeRelatorioTipos(fileNames: string[]): boolean {
+  const tipos = new Set<NfeRelatorioTipo>();
+  for (const n of fileNames) {
+    const t = detectNfeRelatorioTipo(n);
+    if (t) tipos.add(t);
+  }
+  return tipos.size > 1;
+}
+
+/** Rótulo para mensagens ao usuário. */
+export const NFE_RELATORIO_TIPO_LABEL: Record<NfeRelatorioTipo, string> = {
+  emitente: "Emitente",
+  destinatario: "Destinatário",
+};
+
+/**
+ * CNPJ/CPF do DONO do relatório — os 11-14 dígitos no início do nome do arquivo
+ * (`35060827000175_NFEs_Emitente_...`).
+ *
+ * É o único identificador confiável do titular: as colunas de CNPJ/CPF dentro da
+ * planilha são dos clientes/fornecedores de cada nota, não da empresa.
+ */
+const NFE_CNPJ_PREFIX_RE = /^(\d{11,14})[_-]/;
+
+/** Só os dígitos, como vieram. Null se o nome não começar com CNPJ/CPF. */
+export function extractNfeCnpjFromFileName(fileName: string): string | null {
+  const m = NFE_CNPJ_PREFIX_RE.exec(fileName.trim());
+  return m ? m[1] : null;
+}
+
+/** `35060827000175` → `35.060.827/0001-75` (CPF: `123.456.789-01`). */
+export function formatCnpjCpf(digits: string): string {
+  if (digits.length === 14) {
+    return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
+  }
+  if (digits.length === 11) {
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+  }
+  return digits;
+}
+
+/** Motivos que impedem a concatenação. */
+export type ConcatenadorIncompatibilidade = "tipos_misturados" | "cnpjs_diferentes";
+
+export type ConcatenadorCheck = {
+  ok: boolean;
+  problemas: ConcatenadorIncompatibilidade[];
+  /** Texto pronto para o usuário; null quando `ok`. */
+  mensagem: string | null;
+  /** Valores distintos encontrados (para a UI listar). */
+  tipos: NfeRelatorioTipo[];
+  cnpjs: string[];
+};
+
+export const CONCATENADOR_TIPOS_MISTURADOS_MSG =
+  "A concatenação precisa ser feita com planilhas do mesmo tipo: Emitente com Emitente, " +
+  "Destinatário com Destinatário. Separe os relatórios e gere um arquivo para cada tipo.";
+
+export const CONCATENADOR_CNPJS_DIFERENTES_MSG =
+  "As planilhas são de CNPJs diferentes — o CNPJ no início do nome do arquivo identifica " +
+  "o titular do relatório e precisa ser o mesmo em todas as partes. Concatene um titular por vez.";
+
+/**
+ * Verifica se as planilhas podem ser emendadas. Arquivos cujo nome não traz a
+ * informação (fora do padrão da SEFAZ) são ignorados na comparação — o
+ * concatenador continua servindo para planilhas genéricas.
+ */
+export function checkConcatenadorCompatibilidade(fileNames: string[]): ConcatenadorCheck {
+  const tiposSet = new Set<NfeRelatorioTipo>();
+  const cnpjsSet = new Set<string>();
+  for (const n of fileNames) {
+    const t = detectNfeRelatorioTipo(n);
+    if (t) tiposSet.add(t);
+    const c = extractNfeCnpjFromFileName(n);
+    if (c) cnpjsSet.add(c);
+  }
+
+  const problemas: ConcatenadorIncompatibilidade[] = [];
+  if (cnpjsSet.size > 1) problemas.push("cnpjs_diferentes");
+  if (tiposSet.size > 1) problemas.push("tipos_misturados");
+
+  const partes: string[] = [];
+  if (problemas.includes("cnpjs_diferentes")) partes.push(CONCATENADOR_CNPJS_DIFERENTES_MSG);
+  if (problemas.includes("tipos_misturados")) partes.push(CONCATENADOR_TIPOS_MISTURADOS_MSG);
+
+  return {
+    ok: problemas.length === 0,
+    problemas,
+    mensagem: partes.length > 0 ? partes.join(" ") : null,
+    tipos: [...tiposSet],
+    cnpjs: [...cnpjsSet],
+  };
+}
+
+/**
+ * Aviso do Concatenador em 3 partes, para a tela hierarquizar em vez de exibir
+ * um parágrafo corrido: o QUE aconteceu, os NÚMEROS e o QUE FAZER.
+ * `alerta` = pode faltar/sobrar dado. `info` = decisão nossa, sem perda.
+ */
+export const ConcatenadorAvisoSchema = z.object({
+  titulo: z.string(),
+  detalhe: z.string().optional(),
+  dica: z.string().optional(),
+  severidade: z.enum(["alerta", "info"]).default("alerta"),
+});
+
+export type ConcatenadorAviso = z.infer<typeof ConcatenadorAvisoSchema>;
+
+export const ConcatenadorPlanilhasJobPayloadSchema = z.object({
+  jobId: z.string(),
+  /** Ordem de envio; a ordenação final é feita pela engine (coluna "#"). */
+  inputPaths: z.array(z.string()).min(1),
+  outputPath: z.string(),
+});
+
+export type ConcatenadorPlanilhasJobPayload = z.infer<
+  typeof ConcatenadorPlanilhasJobPayloadSchema
+>;
+
 export const SciConsolidadoJobPayloadSchema = z.object({
   jobId: z.string(),
   inputPath: z.string(),

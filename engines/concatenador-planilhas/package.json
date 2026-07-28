@@ -1,0 +1,18 @@
+{
+  "name": "concatenador-planilhas",
+  "version": "0.1.0",
+  "description": "Concatenador de Planilhas — emenda N planilhas de mesmo layout numa só (engine standalone Node.js).",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "concatenador-planilhas": "./cli.mjs"
+  },
+  "scripts": {
+    "start": "node cli.mjs",
+    "smoke": "node cli.mjs --input \"./exemplo/01/SEFAZ NFEs Emitente parte 2.xlsx\" \"./exemplo/01/SEFAZ NFEs Emitente parte 1.xlsx\" --output \"./exemplo/01/Planilha Unificada.xlsx\""
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  }
+}

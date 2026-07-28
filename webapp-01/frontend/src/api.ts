@@ -235,6 +235,16 @@ function defaultToolsManifest(): ToolManifestEntry[] {
       category: "fiscal",
       tag: { label: "NFS-e · Serviços", tone: "violet" },
     },
+    {
+      id: "concatenador-planilhas",
+      title: "Concatenador",
+      subtitle: "Planilhas SEFAZ",
+      description:
+        "Envie as planilhas quebradas em partes (mesmo layout) e receba uma só, na ordem certa. A coluna # define a sequência, o cabeçalho das partes seguintes é descartado e nenhuma linha em branco entra no meio.",
+      route: "/tools/concatenador-planilhas",
+      available: true,
+      category: "fiscal",
+    },
   ];
 }
 
@@ -968,6 +978,94 @@ export async function getSciPortalNacionalJob(id: string): Promise<JobResponse> 
 
 export function sciPortalNacionalDownloadUrl(id: string, token: string): string {
   return `${baseUrl()}${API_PREFIX}/tools/sci-portal-nacional/jobs/${id}/download?token=${encodeURIComponent(token)}`;
+}
+
+// ── Concatenador de Planilhas (engines/concatenador-planilhas) ───────────
+
+export type ConcatenadorAvisoUi = {
+  titulo: string;
+  detalhe?: string;
+  dica?: string;
+  /** `alerta` = pode faltar/sobrar dado. `info` = decisão nossa, sem perda. */
+  severidade?: "alerta" | "info";
+};
+
+export type ConcatenadorResult = {
+  arquivos?: number;
+  linhas?: number;
+  /** Achados da conferência — informativos, o job conclui mesmo assim. */
+  avisos?: ConcatenadorAvisoUi[];
+};
+
+export type ConcatenadorJobResponse = JobResponse & { result?: ConcatenadorResult };
+
+export async function createConcatenadorPlanilhasJob(
+  files: File[]
+): Promise<{ id: string }> {
+  const fd = new FormData();
+  for (const f of files) fd.append("planilhas", f);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl()}${API_PREFIX}/tools/concatenador-planilhas/jobs`, {
+      method: "POST",
+      body: fd,
+      signal: controller.signal,
+    });
+  } catch (e) {
+    const aborted =
+      (e instanceof DOMException && e.name === "AbortError") ||
+      (e instanceof Error && e.name === "AbortError");
+    if (aborted) {
+      throw new Error(
+        `Envio excedeu ${Math.round(UPLOAD_TIMEOUT_MS / 60_000)} minutos. Verifique Redis, API e worker Concatenador.`
+      );
+    }
+    if (!baseUrl() && isFetchNetworkError(e)) {
+      throw new Error(apiOfflineMessage());
+    }
+    throw e;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    let msg = (err as { error?: string }).error ?? res.statusText;
+    const relative = !baseUrl();
+    if (
+      relative &&
+      (res.status === 500 || res.status === 502 || res.status === 503) &&
+      (msg === "Internal Server Error" || msg.length < 3)
+    ) {
+      msg =
+        "API ou worker Concatenador inativo. Na raiz do projeto: npm run redis:up e npm run dev (worker-concatenador-planilhas + engines/concatenador-planilhas).";
+    }
+    throw new Error(msg);
+  }
+  return res.json() as Promise<{ id: string }>;
+}
+
+export async function getConcatenadorPlanilhasJob(
+  id: string
+): Promise<ConcatenadorJobResponse> {
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl()}${API_PREFIX}/tools/concatenador-planilhas/jobs/${id}`);
+  } catch (e) {
+    if (!baseUrl() && isFetchNetworkError(e)) {
+      throw new Error(apiOfflineMessage());
+    }
+    throw e;
+  }
+  return res.json() as Promise<ConcatenadorJobResponse>;
+}
+
+export function concatenadorPlanilhasDownloadUrl(id: string, token: string): string {
+  return `${baseUrl()}${API_PREFIX}/tools/concatenador-planilhas/jobs/${id}/download?token=${encodeURIComponent(token)}`;
 }
 
 // ── Comparador NFS-e (PDF × XML) ─────────────────────────────────────────

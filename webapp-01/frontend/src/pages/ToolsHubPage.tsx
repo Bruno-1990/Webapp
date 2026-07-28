@@ -10,6 +10,7 @@ import {
   GitCompareArrows,
   Landmark,
   Receipt,
+  Rows3,
   ScrollText,
   Table2,
   TableProperties,
@@ -37,6 +38,7 @@ const TOOL_ICONS: Record<string, LucideIcon> = {
   "nfse-pdf": FileText,
   gnre: Receipt,
   "extrato-edit": TableProperties,
+  "concatenador-planilhas": Rows3,
 };
 
 const TOOL_OWNER: Record<string, string> = {
@@ -50,6 +52,7 @@ const TOOL_OWNER: Record<string, string> = {
   "nfse-pdf": "Bruno",
   gnre: "Bruno",
   "extrato-edit": "Bruno",
+  "concatenador-planilhas": "Bruno",
 };
 
 const TAG_TONE_CLASS: Record<ToolTagTone, string> = {
@@ -71,6 +74,7 @@ const TOOL_ACCENT: Record<string, string> = {
   "nfse-pdf": "from-[#2f6378] via-[#4583a0] to-[#6aa6be]",
   gnre: "from-[#3f6f86] via-[#508aa1] to-[#73a8bd]",
   "extrato-edit": "from-[#3a6d85] via-[#4f8aa3] to-[#6fa3bb]",
+  "concatenador-planilhas": "from-[#42798f] via-[#5590a8] to-[#6aa6be]",
 };
 
 type CategoryDef = {

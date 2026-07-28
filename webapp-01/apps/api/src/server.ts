@@ -14,6 +14,8 @@ import {
   SPED_MAX_SHEETS_CSV_BYTES,
   SPED_MAX_SHEETS_PER_JOB,
   SPED_REG_CODE_RE,
+  checkConcatenadorCompatibilidade,
+  type ConcatenadorAviso,
   type SpedMergeInspectXlsxResponse,
 } from "@webapp/contracts";
 import { getOutName } from "@webapp/nfe-core";
@@ -27,6 +29,7 @@ import {
   getComparacaoNfseQueue,
   getGnreQueue,
   getSciPortalNacionalQueue,
+  getConcatenadorPlanilhasQueue,
   getSpedMergeQueue,
   getSpedMergeInspectQueue,
   getSpedMergeInspectEvents,
@@ -40,9 +43,14 @@ import {
   type ComparacaoNfseJobPayload,
   type GnreJobPayload,
   type SciPortalNacionalJobPayload,
+  type ConcatenadorPlanilhasJobPayload,
 } from "./queue.js";
 import { signDownloadToken, verifyDownloadToken } from "./tokens.js";
 import { buildSpedXlsxFileName, extractSpedRazaoFromBuffer } from "./sped-filename.js";
+import {
+  buildConcatenadorFileName,
+  CONCATENADOR_FALLBACK_FILE_NAME,
+} from "./concatenador-filename.js";
 import { loadSpedCabecalhosMeta } from "./sped-cabecalhos.js";
 import {
   getExtratoDb,
@@ -260,6 +268,7 @@ const comparacaoPlanilhasQueue = getComparacaoPlanilhasQueue(env);
 const comparacaoNfseQueue = getComparacaoNfseQueue(env);
 const gnreQueue = getGnreQueue(env);
 const sciPortalNacionalQueue = getSciPortalNacionalQueue(env);
+const concatenadorPlanilhasQueue = getConcatenadorPlanilhasQueue(env);
 
 function jobDir(id: string): string {
   /** Absoluto para o payload BullMQ: o worker/Python usa outro cwd e paths relativos quebram (ex.: SPED). */
@@ -356,6 +365,16 @@ app.get(`${API_PREFIX}/tools`, async () => ({
       available: true,
       category: "fiscal",
       tag: { label: "NFS-e · Serviços", tone: "violet" },
+    },
+    {
+      id: "concatenador-planilhas",
+      title: "Concatenador",
+      subtitle: "Planilhas SEFAZ",
+      description:
+        "Envie as planilhas quebradas em partes (mesmo layout) e receba uma só, na ordem certa. A coluna # define a sequência, o cabeçalho das partes seguintes é descartado e nenhuma linha em branco entra no meio.",
+      route: "/tools/concatenador-planilhas",
+      available: true,
+      category: "fiscal",
     },
   ],
 }));
@@ -1481,6 +1500,261 @@ app.get<{ Params: { id: string }; Querystring: { token?: string } }>(
     }
 
     const outPath = (job.data as SciPortalNacionalJobPayload).outputPath;
+    if (!outPath || !fs.existsSync(outPath)) {
+      return reply.code(404).send({ error: "Arquivo não encontrado" });
+    }
+
+    const stream = fs.createReadStream(outPath);
+    reply.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    const fn = claims.fileName.replace(/[\r\n"]/g, "_");
+    const asciiFallback = fn.replace(/[^\x20-\x7e]/g, "_");
+    reply.header(
+      "Content-Disposition",
+      `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(fn)}`
+    );
+    return reply.send(stream);
+  }
+);
+
+// ── Concatenador de Planilhas (engines/concatenador-planilhas) ───────────────
+
+const ALLOWED_CONCATENADOR_EXT = new Set([".csv", ".xlsx", ".xls"]);
+
+app.post(
+  `${API_PREFIX}/tools/concatenador-planilhas/jobs`,
+  async (req, reply) => {
+    const jobId = randomUUID();
+    const inDir = path.join(jobDir(jobId), "in");
+    const outDir = path.join(jobDir(jobId), "out");
+
+    try {
+      const pong = await getRedis(env).ping();
+      if (pong !== "PONG") throw new Error("Redis não respondeu");
+    } catch (e) {
+      req.log.warn({ err: e }, "redis indisponível ao criar job concatenador");
+      return reply.code(503).send({
+        error:
+          "Redis não está acessível. Inicie o Redis e o worker Concatenador (worker-concatenador-planilhas).",
+      });
+    }
+
+    await fs.promises.mkdir(inDir, { recursive: true });
+    await fs.promises.mkdir(outDir, { recursive: true });
+
+    let totalBytes = 0;
+    const inputPaths: string[] = [];
+    /** Nomes como o usuário enviou — base do nome do arquivo de saída. */
+    const inputNames: string[] = [];
+    /** Arquivos que chegaram num campo diferente de `planilhas`. */
+    const ignorados: string[] = [];
+
+    const parts = req.parts();
+    for await (const part of parts) {
+      if (part.type !== "file") continue;
+      const name = (part.filename ?? "arquivo").replace(/[/\\]/g, "_");
+      const ext = path.extname(name).toLowerCase();
+      if (!ALLOWED_CONCATENADOR_EXT.has(ext)) {
+        await fs.promises.rm(jobDir(jobId), { recursive: true, force: true });
+        return reply.code(400).send({
+          error: `Formato não suportado: ${name}. Use .csv, .xlsx ou .xls.`,
+        });
+      }
+      const buf = await part.toBuffer();
+      totalBytes += buf.length;
+      if (totalBytes > env.MAX_UPLOAD_MB * 1024 * 1024) {
+        await fs.promises.rm(jobDir(jobId), { recursive: true, force: true });
+        const enviados = (totalBytes / (1024 * 1024)).toFixed(1);
+        return reply.code(413).send({
+          error:
+            `Os arquivos passam de ${env.MAX_UPLOAD_MB} MB por envio (já somavam ${enviados} MB em ` +
+            `${inputPaths.length + 1} arquivo(s)). Concatene em lotes menores e depois junte os resultados.`,
+          reasons: ["limite_tamanho"],
+          limiteMb: env.MAX_UPLOAD_MB,
+        });
+      }
+      // Campo desconhecido: já foi drenado pelo toBuffer acima. Pular ANTES de
+      // consumir o stream trava a requisição (o parser fica esperando o corpo).
+      if (part.fieldname !== "planilhas") {
+        ignorados.push(name);
+        continue;
+      }
+      // Uma subpasta por arquivo: preserva o nome original (as mensagens de erro
+      // da engine citam o basename) e evita colisão — partes do mesmo relatório
+      // costumam chegar com o mesmo nome + " (1)".
+      const slotDir = path.join(inDir, String(inputPaths.length).padStart(3, "0"));
+      await fs.promises.mkdir(slotDir, { recursive: true });
+      const dest = path.join(slotDir, name);
+      await fs.promises.writeFile(dest, buf);
+      inputPaths.push(dest);
+      inputNames.push(name);
+    }
+
+    if (inputPaths.length === 0) {
+      await fs.promises.rm(jobDir(jobId), { recursive: true, force: true });
+      return reply.code(400).send({
+        error:
+          ignorados.length > 0
+            ? `Nenhum arquivo veio no campo 'planilhas' — ${ignorados.length} chegaram em outro campo e foram descartados (${ignorados.join(", ")}).`
+            : "Envie ao menos uma planilha no campo 'planilhas'.",
+        reasons: ["sem_planilhas"],
+      });
+    }
+
+    // Arquivo em campo errado não pode sumir calado: se veio junto de outros
+    // válidos, o job seguiria adiante sem ele.
+    if (ignorados.length > 0) {
+      await fs.promises.rm(jobDir(jobId), { recursive: true, force: true });
+      return reply.code(400).send({
+        error:
+          `${ignorados.length} arquivo(s) chegaram num campo diferente de 'planilhas' e seriam ignorados ` +
+          `(${ignorados.join(", ")}). Reenvie tudo no campo 'planilhas'.`,
+        reasons: ["campo_desconhecido"],
+      });
+    }
+
+    // CNPJ do titular (início do nome) e tipo (Emitente/Destinatário) têm de ser
+    // os mesmos em todas as partes — emendar titulares ou universos distintos
+    // produz uma planilha sem sentido fiscal. O frontend já barra; aqui é a
+    // garantia para quem chamar a API direto.
+    const compat = checkConcatenadorCompatibilidade(inputNames);
+    if (!compat.ok) {
+      await fs.promises.rm(jobDir(jobId), { recursive: true, force: true });
+      return reply.code(400).send({
+        error: compat.mensagem,
+        reasons: compat.problemas,
+        cnpjs: compat.cnpjs,
+        tipos: compat.tipos,
+      });
+    }
+
+    // Nome derivado das entradas: mesmo CNPJ/tipo, período = união dos períodos
+    // enviados. Nomes fora do padrão caem em "Planilha Unificada.xlsx".
+    const outputPath = path.join(outDir, buildConcatenadorFileName(inputNames));
+
+    const payload: ConcatenadorPlanilhasJobPayload = {
+      jobId,
+      inputPaths,
+      outputPath,
+    };
+
+    try {
+      await Promise.race([
+        concatenadorPlanilhasQueue.add("concatenacao", payload, { jobId }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Fila timeout")), 15_000)
+        ),
+      ]);
+    } catch (e) {
+      await fs.promises.rm(jobDir(jobId), { recursive: true, force: true });
+      req.log.error({ err: e }, "falha ao enfileirar job concatenador");
+      return reply.code(503).send({
+        error:
+          "Não foi possível enfileirar o job. Verifique Redis e se o worker-concatenador-planilhas está rodando.",
+      });
+    }
+
+    return reply.code(202).send({ id: jobId, status: "queued" as const });
+  }
+);
+
+app.get<{ Params: { id: string } }>(
+  `${API_PREFIX}/tools/concatenador-planilhas/jobs/:id`,
+  async (req, reply) => {
+    const { id } = req.params;
+    const job = await concatenadorPlanilhasQueue.getJob(id);
+    if (!job) {
+      return reply.code(404).send({
+        id,
+        status: "not_found" as const,
+      });
+    }
+    const state = await job.getState();
+    const status = mapBullState(state);
+    const progress =
+      typeof job.progress === "number" ? Math.round(job.progress) : undefined;
+
+    let downloadToken: string | undefined;
+    let fileName: string | undefined;
+    let error: string | undefined;
+    let result:
+      | { arquivos?: number; linhas?: number; avisos?: ConcatenadorAviso[] }
+      | undefined;
+
+    if (status === "done") {
+      const rv = job.returnvalue as
+        | {
+            fileName?: string;
+            arquivos?: number;
+            linhas?: number;
+            avisos?: Array<string | ConcatenadorAviso>;
+          }
+        | undefined;
+      fileName =
+        rv?.fileName ??
+        path.basename(
+          String(
+            (job.data as ConcatenadorPlanilhasJobPayload).outputPath ??
+              "Planilha Unificada.xlsx"
+          )
+        );
+      downloadToken = await signDownloadToken(env, id, fileName, "concatenador-planilhas");
+      // Worker antigo (imagem sem rebuild) ainda manda string; normaliza para o
+      // formato estruturado que a tela espera.
+      const avisos: ConcatenadorAviso[] = (rv?.avisos ?? []).map((a) =>
+        typeof a === "string" ? { titulo: a, severidade: "alerta" as const } : a
+      );
+      // O nome genérico é uma decisão nossa (não deu para derivar dos arquivos);
+      // sem avisar, o usuário só percebe ao ver o arquivo baixado.
+      if (fileName === CONCATENADOR_FALLBACK_FILE_NAME) {
+        avisos.push({
+          titulo: "Nome genérico no arquivo",
+          detalhe: CONCATENADOR_FALLBACK_FILE_NAME,
+          dica:
+            "Os nomes enviados não seguem o padrão <CNPJ>_NFEs_<Emitente|Destinatario>_periodo_" +
+            "<dd-mm-aaaa>_a_<dd-mm-aaaa>, então não deu para montar o nome com CNPJ e período.",
+          severidade: "info",
+        });
+      }
+      result = {
+        arquivos: rv?.arquivos,
+        linhas: rv?.linhas,
+        avisos,
+      };
+    }
+    if (status === "failed") {
+      error = job.failedReason?.slice(0, 500) ?? "Falha no processamento";
+    }
+
+    return {
+      id,
+      status,
+      progress,
+      error,
+      downloadToken,
+      fileName,
+      result,
+    };
+  }
+);
+
+app.get<{ Params: { id: string }; Querystring: { token?: string } }>(
+  `${API_PREFIX}/tools/concatenador-planilhas/jobs/:id/download`,
+  async (req, reply) => {
+    const { id } = req.params;
+    const token = req.query.token;
+    if (!token) return reply.code(401).send({ error: "Token ausente" });
+
+    const claims = await verifyDownloadToken(env, token);
+    if (!claims || claims.jobId !== id || claims.tool !== "concatenador-planilhas") {
+      return reply.code(401).send({ error: "Token inválido" });
+    }
+
+    const job = await concatenadorPlanilhasQueue.getJob(id);
+    if (!job || (await job.getState()) !== "completed") {
+      return reply.code(404).send({ error: "Job não concluído" });
+    }
+
+    const outPath = (job.data as ConcatenadorPlanilhasJobPayload).outputPath;
     if (!outPath || !fs.existsSync(outPath)) {
       return reply.code(404).send({ error: "Arquivo não encontrado" });
     }

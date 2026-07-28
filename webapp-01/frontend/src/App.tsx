@@ -14,6 +14,9 @@ const GnreHomePage = lazy(() => import("./pages/GnreHomePage.js"));
 const ExtratoEditHomePage = lazy(() => import("./pages/ExtratoEditHomePage.js"));
 const NfsePdfHomePage = lazy(() => import("./pages/NfsePdfHomePage.js"));
 const SciPortalNacionalHomePage = lazy(() => import("./pages/SciPortalNacionalHomePage.js"));
+const ConcatenadorPlanilhasHomePage = lazy(
+  () => import("./pages/ConcatenadorPlanilhasHomePage.js")
+);
 const LegacyDownloadRedirect = lazy(() => import("./pages/LegacyDownloadRedirect.js"));
 
 function LegacyFallback() {
@@ -51,6 +54,11 @@ export default function App() {
           <Route path="/tools/nfse-pdf" element={<NfsePdfHomePage />} />
           <Route path="/tools/sci-portal-nacional" element={<SciPortalNacionalHomePage />} />
           <Route path="/tools/sci-portal-nacional/download/:jobId" element={<DownloadPage />} />
+          <Route path="/tools/concatenador-planilhas" element={<ConcatenadorPlanilhasHomePage />} />
+          <Route
+            path="/tools/concatenador-planilhas/download/:jobId"
+            element={<DownloadPage />}
+          />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
