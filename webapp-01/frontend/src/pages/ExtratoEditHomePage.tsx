@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useDropzone } from "react-dropzone";
 import { GripVertical } from "lucide-react";
-import { fileLabel, getXlsxOnlyFilesFromEvent } from "../dropFiles.js";
+import { fileLabel, getExcelFilesFromEvent } from "../dropFiles.js";
 import { ToolPageTitle } from "../components/ToolPageTitle.js";
 import { Modal } from "../components/Modal.js";
 import {
@@ -142,7 +142,7 @@ export default function ExtratoEditHomePage() {
 
   const zone = useDropzone({
     onDrop,
-    getFilesFromEvent: getXlsxOnlyFilesFromEvent,
+    getFilesFromEvent: getExcelFilesFromEvent,
     useFsAccessApi: false,
     multiple: false,
   });
@@ -313,8 +313,8 @@ export default function ExtratoEditHomePage() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.45, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
         >
-          Envie a planilha do extrato, ajuste as colunas (arraste para reordenar, marque o que exportar) e
-          baixe um <strong>.xlsx</strong> limpo e formatado.
+          Envie a planilha do extrato (<strong>.xls</strong> ou <strong>.xlsx</strong>), ajuste as colunas
+          (arraste para reordenar, marque o que exportar) e baixe um <strong>.xlsx</strong> limpo e formatado.
         </motion.p>
       </motion.header>
 
@@ -378,9 +378,9 @@ export default function ExtratoEditHomePage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={transitionFast}
                 >
-                  {zone.isDragActive ? "Solte a planilha…" : "Arraste ou clique para escolher o .xlsx"}
+                  {zone.isDragActive ? "Solte a planilha…" : "Arraste ou clique para escolher o .xls ou .xlsx"}
                 </motion.p>
-                <p className="mt-2 text-sm text-[#2a4f60]">Um arquivo Excel (.xlsx) por vez.</p>
+                <p className="mt-2 text-sm text-[#2a4f60]">Um arquivo Excel (.xls ou .xlsx) por vez.</p>
                 {file && (
                   <p className="mt-3 text-xs text-accent">
                     {fileLabel(file)} · {formatBytes(file.size)}

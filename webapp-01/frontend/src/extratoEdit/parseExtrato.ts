@@ -25,7 +25,7 @@ import type { Cell as ExcelCell, Row, Worksheet } from "exceljs";
 
 export type Cell = string | number | boolean | Date | null;
 
-export type ParseProfile = "contas-pagas" | "titulos-recebidos" | "generic";
+export type ParseProfile = "contas-pagas" | "titulos-recebidos" | "recebidas-baixa" | "generic";
 
 export type ParseMeta = {
   profile: ParseProfile;
@@ -188,8 +188,18 @@ function formatDateBR(d: Date): string {
 }
 
 export async function parseExtratoFile(file: File): Promise<ParsedExtrato> {
-  const ExcelJS = (await import("exceljs")).default;
   const buf = await file.arrayBuffer();
+
+  // `.xls` (BIFF binário) não é lido pelo ExcelJS — usamos SheetJS para gerar uma
+  // grade 2D e daí parseamos. O ExcelJS segue exclusivo dos formatos `.xlsx`.
+  if (/\.xls$/i.test(file.name)) {
+    const { grid, sheetName } = await readGridWithSheetJS(buf);
+    if (grid.length === 0) throw new Error("A planilha não tem nenhuma aba com dados.");
+    if (isRecebidasBaixaGrid(grid)) return parseRecebidasBaixaGrid(grid, sheetName);
+    return parseGenericGrid(grid, sheetName);
+  }
+
+  const ExcelJS = (await import("exceljs")).default;
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buf);
 
@@ -199,10 +209,52 @@ export async function parseExtratoFile(file: File): Promise<ParsedExtrato> {
   const colCount = Math.max(1, ws.actualColumnCount || ws.columnCount || 1);
   const rowCount = ws.rowCount;
 
+  // "Analítico por Dt. de Baixa" também pode chegar salvo como `.xlsx`. O título
+  // contém "Títulos Recebidos" (que casaria com o perfil RCA), então checamos a
+  // assinatura específica ANTES de `isTitulosRecebidos`.
+  if (isRecebidasBaixaWorksheet(ws, rowCount, colCount)) {
+    const grid = gridFromWorksheet(ws, rowCount, colCount);
+    return parseRecebidasBaixaGrid(grid, ws.name);
+  }
   if (isTitulosRecebidos(ws, rowCount, colCount)) {
     return parseTitulosRecebidos(ws, rowCount, colCount);
   }
   return parseContasPagas(ws, rowCount, colCount);
+}
+
+/** Lê o 1º sheet com dados via SheetJS numa grade 2D (datas preservadas). */
+async function readGridWithSheetJS(buf: ArrayBuffer): Promise<{ grid: Cell[][]; sheetName: string }> {
+  const XLSX = await import("xlsx");
+  const wb = XLSX.read(buf, { type: "array", cellDates: true });
+  const sheetName =
+    wb.SheetNames.find((n) => {
+      const ref = wb.Sheets[n]?.["!ref"];
+      return typeof ref === "string" && ref.length > 0;
+    }) ?? wb.SheetNames[0];
+  if (!sheetName) return { grid: [], sheetName: "" };
+  const ws = wb.Sheets[sheetName];
+  const raw = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: true, defval: null, blankrows: true });
+  const grid: Cell[][] = raw.map((row) =>
+    (row ?? []).map((v) => {
+      if (v == null) return null;
+      if (v instanceof Date) return v;
+      if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return v;
+      return String(v);
+    }),
+  );
+  return { grid, sheetName };
+}
+
+/** Monta uma grade 2D (índice 0-based) a partir de um Worksheet ExcelJS. */
+function gridFromWorksheet(ws: Worksheet, rowCount: number, colCount: number): Cell[][] {
+  const grid: Cell[][] = [];
+  for (let r = 1; r <= rowCount; r++) {
+    const row = ws.getRow(r);
+    const arr: Cell[] = [];
+    for (let c = 1; c <= colCount; c++) arr.push(cellOut(row.getCell(c).value));
+    grid.push(arr);
+  }
+  return grid;
 }
 
 /** Detecta o relatório "Títulos Recebidos por RCA" pela assinatura nas 1ªs linhas. */
@@ -443,6 +495,211 @@ function parseTitulosRecebidos(ws: Worksheet, rowCount: number, colCount: number
       totalsRemoved,
       headerRepeatsRemoved,
       usedFallback: false,
+    },
+  };
+}
+
+// ── Perfil: Títulos Recebidos - Analítico por Dt. de Baixa (SIST 1220) ────────
+//
+// Relatório `.xls` paginado (repete título + preâmbulo de filtros a cada página).
+// O agrupador é a data de baixa em linhas `DATA BAIXA: <data>`. O cabeçalho ocupa
+// três linhas desalinhadas das colunas de dados, então mapeamos por índice fixo
+// (validado: a soma de "Vlr Pago" bate com o TOTAL GERAL do próprio relatório).
+
+/** Assinatura do relatório (título na 1ª coluna das primeiras linhas). */
+const RB_TITLE_RE = /an[aá]l[ií]tico\s+por\s+dt\.?\s+de\s+baixa/i;
+const RB_DATA_BAIXA_RE = /^data\s+baixa/i;
+const RB_HEADER_C1_RE = /^cliente$/i;
+const RB_TOTAL_RE = /total\s+por\s+dia|total\s+geral|presta[cç][õo]es\s+listadas/i;
+const RB_DIGITS_RE = /^\d+$/;
+
+/** Esquema fixo por índice de coluna de dados (0-based) → rótulo. */
+const RB_SCHEMA: ReadonlyArray<{ col: number; label: string }> = [
+  { col: 0, label: "Cód. Cliente" },
+  { col: 2, label: "Cliente" },
+  { col: 6, label: "Fil." },
+  { col: 7, label: "Duplicata" },
+  { col: 9, label: "Parc." },
+  { col: 10, label: "Carteira" },
+  { col: 11, label: "Nosso N. Bco." },
+  { col: 13, label: "Vlr Dupl." },
+  { col: 14, label: "Juros/Desp." },
+  { col: 16, label: "Desc." },
+  { col: 17, label: "Vlr Pago" },
+  { col: 19, label: "Cob." },
+  { col: 20, label: "Dt.Pagto" },
+  { col: 22, label: "Cód. Baixa" },
+  { col: 23, label: "Banco Baixa" },
+  { col: 24, label: "Moeda" },
+];
+
+const RB_RECOMMENDED = [
+  "Data Baixa",
+  "Cód. Cliente",
+  "Cliente",
+  "Duplicata",
+  "Vlr Dupl.",
+  "Juros/Desp.",
+  "Desc.",
+  "Vlr Pago",
+  "Cob.",
+  "Dt.Pagto",
+  "Banco Baixa",
+];
+
+function cellStr(v: Cell): string {
+  if (v == null) return "";
+  if (v instanceof Date) return v.toISOString();
+  return String(v).trim();
+}
+
+function gridRowText(row: Cell[]): string {
+  return row.map(cellStr).join(" ");
+}
+
+function gridRowBlank(row: Cell[]): boolean {
+  return row.every((v) => cellStr(v) === "");
+}
+
+function gridRowDate(row: Cell[]): Date | null {
+  for (const v of row) if (v instanceof Date) return v;
+  return null;
+}
+
+/** Detecta a assinatura do relatório numa grade 2D (primeiras linhas). */
+function isRecebidasBaixaGrid(grid: Cell[][]): boolean {
+  for (let r = 0; r < Math.min(8, grid.length); r++) {
+    if (RB_TITLE_RE.test(cellStr(grid[r]?.[0]))) return true;
+  }
+  return false;
+}
+
+/** Mesma assinatura, mas varrendo um Worksheet ExcelJS (caso `.xlsx`). */
+function isRecebidasBaixaWorksheet(ws: Worksheet, rowCount: number, colCount: number): boolean {
+  for (let r = 1; r <= Math.min(8, rowCount); r++) {
+    if (rowMatches(ws.getRow(r), colCount, RB_TITLE_RE)) return true;
+  }
+  return false;
+}
+
+function parseRecebidasBaixaGrid(grid: Cell[][], sheetName: string): ParsedExtrato {
+  let currentDate: Date | null = null;
+  let collecting = false; // só coleta após um `DATA BAIXA:` — descarta o preâmbulo de cada página
+  let groupApplied = 0;
+  let blankRemoved = 0;
+  let totalsRemoved = 0;
+  let headerRepeatsRemoved = 0;
+
+  type RawRow = { date: Date | null; values: Cell[] };
+  const collected: RawRow[] = [];
+
+  for (const row of grid) {
+    const c0 = cellStr(row[0]);
+
+    // Título de página: fecha a coleta até o próximo `DATA BAIXA` (mata o preâmbulo abaixo).
+    if (RB_TITLE_RE.test(c0)) {
+      collecting = false;
+      continue;
+    }
+    if (RB_DATA_BAIXA_RE.test(c0)) {
+      const d = gridRowDate(row);
+      if (d) currentDate = d;
+      collecting = true;
+      continue;
+    }
+    if (!collecting) continue; // preâmbulo de filtros entre o título e o 1º `DATA BAIXA`
+    if (gridRowBlank(row)) {
+      blankRemoved++;
+      continue;
+    }
+    if (RB_HEADER_C1_RE.test(c0)) {
+      headerRepeatsRemoved++;
+      continue;
+    }
+    if (RB_TOTAL_RE.test(gridRowText(row))) {
+      totalsRemoved++;
+      continue;
+    }
+    // Linha de dados sempre tem o cód. do cliente (numérico) na 1ª coluna; o resto
+    // (sub-cabeçalho, nota de rodapé `* Título...`) é ignorado silenciosamente.
+    if (!RB_DIGITS_RE.test(c0)) continue;
+
+    const values = RB_SCHEMA.map(({ col }) => row[col] ?? null);
+    if (currentDate) groupApplied++;
+    collected.push({ date: currentDate, values });
+  }
+
+  if (collected.length === 0) {
+    throw new Error("Nenhum lançamento foi encontrado após as linhas de DATA BAIXA.");
+  }
+
+  const headers = ["Data Baixa", ...RB_SCHEMA.map((s) => s.label)];
+  const rows: Cell[][] = collected.map((r) => [r.date ? formatDateBR(r.date) : "", ...r.values]);
+
+  return {
+    headers,
+    rows,
+    recommended: RB_RECOMMENDED,
+    meta: {
+      profile: "recebidas-baixa",
+      sheetName,
+      groupLabel: "Data Baixa",
+      groupApplied,
+      blankRemoved,
+      totalsRemoved,
+      headerRepeatsRemoved,
+      usedFallback: false,
+    },
+  };
+}
+
+// ── Fallback genérico sobre grade 2D (para `.xls` de formato não reconhecido) ──
+
+function parseGenericGrid(grid: Cell[][], sheetName: string): ParsedExtrato {
+  // 1ª linha não-vazia vira cabeçalho; colunas = células não-vazias dessa linha.
+  let headerRow = -1;
+  for (let r = 0; r < grid.length; r++) {
+    if (!gridRowBlank(grid[r])) {
+      headerRow = r;
+      break;
+    }
+  }
+  if (headerRow === -1) throw new Error("A planilha não tem nenhuma linha com dados.");
+
+  const cols: Array<{ col: number; label: string }> = [];
+  const seen = new Map<string, number>();
+  grid[headerRow].forEach((v, i) => {
+    const label = cellStr(v);
+    if (!label) return;
+    const n = seen.get(label) ?? 0;
+    seen.set(label, n + 1);
+    cols.push({ col: i, label: n === 0 ? label : `${label} (${n + 1})` });
+  });
+  if (cols.length === 0) throw new Error("O cabeçalho identificado não tem colunas com título.");
+
+  let blankRemoved = 0;
+  const rows: Cell[][] = [];
+  for (let r = headerRow + 1; r < grid.length; r++) {
+    if (gridRowBlank(grid[r])) {
+      blankRemoved++;
+      continue;
+    }
+    rows.push(cols.map(({ col }) => grid[r][col] ?? null));
+  }
+
+  return {
+    headers: cols.map((c) => c.label),
+    rows,
+    recommended: [],
+    meta: {
+      profile: "generic",
+      sheetName,
+      groupLabel: null,
+      groupApplied: 0,
+      blankRemoved,
+      totalsRemoved: 0,
+      headerRepeatsRemoved: 0,
+      usedFallback: true,
     },
   };
 }
