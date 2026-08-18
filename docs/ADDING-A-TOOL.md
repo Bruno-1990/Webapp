@@ -20,6 +20,11 @@ Use uma ferramenta existente como molde (ex.: GNRE é a mais simples e isolada).
    o default da dir da engine é
    `path.resolve(__dirname, "../../../../engines/<nome>")` (4 níveis: `src` →
    `worker` → `apps` → `webapp-01` → raiz). Copie de um worker irmão.
+   No `tsconfig.json`, declare em `references` cada dependência `@webapp/*` que
+   você pôs no `package.json` (normalmente só `contracts`):
+   `"references": [{ "path": "../../packages/contracts" }]`. É daí que o
+   `tsc -b` descobre a ordem de compilação — sem isso o build do worker falha
+   por não achar o `dist` da dependência.
 4. **Dockerfile** — crie `webapp-01/docker/Dockerfile.worker-<nome>` no padrão dos
    outros (multi-stage: build-js Node + runtime). Para engine Python: instala o
    venv com `pip install -r /app/engines/<nome>/requirements.txt`. As linhas-chave:
@@ -39,8 +44,18 @@ Use uma ferramenta existente como molde (ex.: GNRE é a mais simples e isolada).
      [`api.ts`](../webapp-01/frontend/src/api.ts) (mesmo `id`/`route`).
    - Ícone/owner/cor nos mapas de
      [`ToolsHubPage.tsx`](../webapp-01/frontend/src/pages/ToolsHubPage.tsx) (chave = `id`).
-8. **Build scripts** — inclua o novo worker em `dev:all`/`build`/`dev:backend` no
-   [`webapp-01/package.json`](../webapp-01/package.json) (mesmo padrão dos outros).
+8. **Build e scripts de dev** —
+   - Adicione `{ "path": "apps/worker-<nome>-bridge" }` em
+     [`webapp-01/tsconfig.build.json`](../webapp-01/tsconfig.build.json). Essa é a
+     **única** lista de projetos do monorepo: `npm run build`, `build:ts` e
+     `watch:ts` derivam dela, e os Dockerfiles usam `tsc -b apps/<dir>`, que segue
+     as `references` do passo 3. Não há lista de pacotes nos Dockerfiles.
+   - Em [`webapp-01/package.json`](../webapp-01/package.json), crie o par
+     `dev:worker-<nome>:only` e `dev:worker-<nome>:watch` e inclua os dois nos
+     `concurrently` de `dev:all`/`dev:backend` e `dev:watch`/`dev:backend:watch`.
+   - Se for rodar em Docker, adicione o service em
+     [`docker-compose.dev.yml`](../docker-compose.dev.yml) copiando o padrão
+     `npx nodemon -L ...` de um worker irmão.
 9. **Docs** — adicione a linha na tabela de [ARCHITECTURE.md](ARCHITECTURE.md) e a
    seção em [TOOLS.md](TOOLS.md).
 

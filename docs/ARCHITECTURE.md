@@ -105,6 +105,22 @@ legados numerados (`webapp-0X`) para os semânticos, caso uma API antiga ainda o
 envie. Ícone/owner/cor de cada card ficam em mapas keyados por `id` no
 `ToolsHubPage.tsx`.
 
+## Informação duplicada e como ela é vigiada
+
+Algumas listas precisam existir dos dois lados da fronteira Python/TypeScript.
+`npm run check:sync` (dentro do `npm run lint` e do CI) compara:
+
+| O quê | Fonte Python | Fonte TypeScript |
+|-------|--------------|------------------|
+| Abas do export SPED | `engines/sped/sped_engine/config.py` → `SHEET_ORDER` | `packages/contracts` → `SPED_EXPORT_SHEET_KEYS` (+ um rótulo por aba) |
+| Guia de registros EFD | `engines/sped/sped_engine/cabecalhos_sped.txt` | cópia em `apps/api/src/data/cabecalhos-sped.txt` (servida em `/tools/sped/reg-meta`) |
+
+O que **não** deve ser duplicado já deriva da fonte: `CORE_SHEETS` em
+`engines/sped-merge/inspect_xlsx.py` vem do `SHEET_ORDER`, e a lista esperada em
+`scripts/run-sped-smoke.cjs` vem dos contracts. Ao criar uma duplicação nova,
+acrescente a comparação em `scripts/check-sync.mjs` — a mensagem de erro deve
+dizer qual arquivo atualizar.
+
 ## Subir o stack (a partir da raiz `webapp/`)
 
 ```bash
@@ -116,6 +132,12 @@ docker compose --profile sped --profile comparacao --profile nfse --profile gnre
 
 Frontend Vite roda **fora** do Docker (porta 5176). Build context dos workers
 Python é a raiz `webapp/` (por isso os Dockerfiles fazem `COPY engines/<nome> …`).
+
+> ⚠️ **As engines Python são copiadas para dentro da imagem** (`COPY engines/<nome> …`),
+> não montadas por volume. Editar um arquivo em `engines/` no host **não muda nada**
+> no container até o rebuild — sintoma típico: a alteração passa nos testes locais
+> mas o job continua com o comportamento antigo. Rebuild só do necessário:
+> `docker compose --profile sped up -d --build api worker-sped worker-sped-merge`.
 
 > ⚠️ **Sempre use `--build`** ao subir. Imagens antigas anteriores ao refactor
 > `engines/` (2026-06-22) ainda têm a árvore `/app/webapp-0X`; com o compose novo

@@ -69,7 +69,10 @@
       "Bash(docker exec -w /app/webapp-05 webapp-worker-comparacao-planilhas-1 python -c ' *)",
       "Bash(docker exec webapp-worker-comparacao-planilhas-1 sh -c 'cd /app/webapp-05 && python -c \" *)",
       "Bash(docker exec webapp-worker-comparacao-planilhas-1 *)",
-      "Bash(docker cp *)"
+      "Bash(docker cp *)",
+      "Bash(MSYS_NO_PATHCONV=1 docker compose exec -T worker-comparacao-planilhas grep -nc \"norm_nota\" //app/webapp-05/cli.py)",
+      "PowerShell(docker stats *)",
+      "Bash(grep -oE \"[A-Z0-9_]+'?\\\\\"?$\")"
     ]
   },
   "enableAllProjectMcpServers": true,
