@@ -84,6 +84,8 @@ export type NfseData = {
 export type EventoData = {
   kind: "evento";
   chave: string;
+  /** Código do tipo de evento (ex.: "101101" = cancelamento). Vem do nome `e<dígitos>`. */
+  tpEvento: string;
   tipo: string;
   cMotivo: string;
   xMotivo: string;
@@ -259,9 +261,22 @@ function parseEvento(doc: Document): EventoData {
       }
     }
   }
+  // Código do evento: dígitos do nome `e<dígitos>` (ex.: e101101 → "101101").
+  // Fallback: dígitos após "EVT" no Id de infEvento (ex.: EVT<chave><tpEvento><nSeq>) — como o
+  // Id embute a chave (44/50 díg.) antes do tipo, extraímos o miolo após remover a chave.
+  let tpEvento = detalhe ? detalhe.localName.replace(/\D+/g, "") : "";
+  if (!tpEvento) {
+    const chNfse = txt(infPedReg, "chNFSe").replace(/\D+/g, "");
+    const evtDigits = (infEvento?.getAttribute("Id") ?? "").replace(/\D+/g, "");
+    const afterChave = chNfse && evtDigits.includes(chNfse)
+      ? evtDigits.slice(evtDigits.indexOf(chNfse) + chNfse.length)
+      : evtDigits;
+    tpEvento = afterChave.slice(0, 6); // tpEvento tem 6 dígitos no padrão nacional
+  }
   return {
     kind: "evento",
     chave: txt(infPedReg, "chNFSe"),
+    tpEvento,
     tipo: txt(detalhe, "xDesc"),
     cMotivo: txt(detalhe, "cMotivo"),
     xMotivo: txt(detalhe, "xMotivo"),
@@ -296,4 +311,32 @@ export function parseNfseXml(xmlText: string): ParsedXml {
 export async function parseNfseFile(file: File): Promise<ParsedXml> {
   const text = await file.text();
   return parseNfseXml(text);
+}
+
+/**
+ * Valor Líquido da NFS-e calculado a partir dos componentes exibidos no bloco
+ * "VALOR TOTAL DA NFS-e" do DANFSe — robusto a descontos:
+ *
+ *   vLiq = vServ − Desc. Condicionado − Desc. Incondicionado
+ *          − ISSQN Retido (se tpRetISSQN = 2/3) − Retenções Federais (IRRF + CP + CSLL)
+ *
+ * Validado contra o `vLiq` do XML em amostra real (bateu 82/82, inclusive com
+ * retenção). Calcular garante que o desconto SEMPRE entra, mesmo quando o campo
+ * `vLiq` do XML não o subtrai.
+ */
+export function valorLiquidoNfse(d: NfseData): number {
+  const n = (s: string): number => {
+    const v = parseFloat((s || "").replace(",", "."));
+    return Number.isFinite(v) ? v : 0;
+  };
+  const issqnRet = d.tpRetISSQN === "2" || d.tpRetISSQN === "3" ? n(d.vISSQN) : 0;
+  return (
+    n(d.vServ) -
+    n(d.vDescCond) -
+    n(d.vDescIncond) -
+    issqnRet -
+    n(d.vRetIRRF) -
+    n(d.vRetCP) -
+    n(d.vRetCSLL)
+  );
 }

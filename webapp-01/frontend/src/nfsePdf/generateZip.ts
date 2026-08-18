@@ -3,9 +3,8 @@
  * empacota tudo num .zip (JSZip, carregado sob demanda) e dispara o download.
  * Nenhum dado sai do navegador.
  */
-import { parseNfseFile, type NfseData } from "./parseNfse.js";
+import { parseNfseFile, valorLiquidoNfse, type NfseData, type EventoData } from "./parseNfse.js";
 import { buildDanfseDoc } from "./danfseDoc.js";
-import { buildEventoDoc } from "./eventoDoc.js";
 import { renderPdf } from "./pdf.js";
 import { loadMunicipios } from "./municipios.js";
 import { qrContentForChave, qrDataUrl } from "./qr.js";
@@ -18,6 +17,10 @@ export type GenSkip = { arquivo: string; motivo: string };
 /** Retenções de uma NFS-e (só as que efetivamente foram retidas). */
 export type RetencaoItem = {
   numero: string;
+  /** Situação da nota: "Ativa" ou "Cancelada" (para exibir/exportar nos relatórios). */
+  status: string;
+  /** True quando há evento de cancelamento/substituição para a nota. */
+  cancelada: boolean;
   chave: string;
   prestadorNome: string;
   prestadorCnpj: string;
@@ -37,24 +40,40 @@ export type RetencaoItem = {
 };
 
 export type GenResult = {
+  /** DANFSe geradas no total (ativas + canceladas). */
   geradosNfse: number;
-  geradosEvento: number;
+  /** Notas vigentes (sem evento de cancelamento). */
+  ativas: number;
+  /** Notas marcadas com a marca d'água CANCELADA. */
+  canceladas: number;
+  /** Eventos de cancelamento/substituição lidos (controle interno; não viram PDF). */
+  eventosCancel: number;
   ignorados: GenSkip[];
-  /** Todas as NFS-e processadas (com ou sem retenção). */
+  /** NFS-e ativas processadas (canceladas são excluídas dos relatórios). */
   todas: RetencaoItem[];
   /** Subconjunto de `todas` que teve alguma retenção. */
   retencoes: RetencaoItem[];
   total: number;
 };
 
+/** Códigos de evento (padrão nacional) que invalidam a nota → marca d'água CANCELADA. */
+const TP_EVENTO_CANCELA = new Set(["101101", "105102"]);
+
+/** Só os dígitos da chave, para confrontar nota (Id "NFS<chave>") com evento (chNFSe). */
+function normChave(chave: string): string {
+  return chave.replace(/\D+/g, "");
+}
+
 /** Monta o item de relatório de uma NFS-e (retenções ficam zeradas quando não houver). */
-export function buildNota(d: NfseData): RetencaoItem {
+export function buildNota(d: NfseData, cancelada = false): RetencaoItem {
   const issqn = issqnRetido(d.tpRetISSQN) ? toNumber(d.vISSQN) ?? 0 : 0;
   const irrf = toNumber(d.vRetIRRF) ?? 0;
   const prev = toNumber(d.vRetCP) ?? 0;
   const contrib = toNumber(d.vRetCSLL) ?? 0;
   return {
     numero: d.numeroNfse,
+    status: cancelada ? "Cancelada" : "Ativa",
+    cancelada,
     chave: d.chave,
     prestadorNome: d.emit.nome,
     prestadorCnpj: d.emit.cnpjCpf,
@@ -72,7 +91,8 @@ export function buildNota(d: NfseData): RetencaoItem {
     // Total de retenções FEDERAIS apenas (IRRF + Previdenciária + Contrib. Sociais).
     // ISSQN é municipal e NÃO entra aqui — fica na coluna própria de ISSQN Retido.
     totalFederais: irrf + prev + contrib,
-    vLiq: toNumber(d.vLiq) ?? 0,
+    // Líquido calculado (subtrai descontos + retenções), consistente com o DANFSe.
+    vLiq: valorLiquidoNfse(d),
   };
 }
 
@@ -145,41 +165,78 @@ export async function generateDanfseZip(
   const used = new Set<string>();
   const result: GenResult = {
     geradosNfse: 0,
-    geradosEvento: 0,
+    ativas: 0,
+    canceladas: 0,
+    eventosCancel: 0,
     ignorados: [],
     todas: [],
     retencoes: [],
     total: files.length,
   };
 
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
+  // ── Passe 1: parse de todos os arquivos, separando notas de eventos ─────────
+  const notas: { file: File; data: NfseData }[] = [];
+  const eventos: EventoData[] = [];
+  for (const file of files) {
     try {
       const parsed = await parseNfseFile(file);
       if (parsed.kind === "nfse") {
-        const qr = parsed.chave ? await qrDataUrl(qrContentForChave(parsed.chave)) : null;
-        const blob = await renderPdf(buildDanfseDoc(parsed, qr));
-        const desired = sanitize(`${parsed.numeroNfse || parsed.chave || baseName(file.name)}.pdf`);
-        zip.file(uniqueName(used, desired), await blob.arrayBuffer());
-        result.geradosNfse += 1;
-        const nota = buildNota(parsed);
-        result.todas.push(nota);
-        if (hasRetencao(nota)) result.retencoes.push(nota);
+        notas.push({ file, data: parsed });
       } else if (parsed.kind === "evento") {
-        const blob = await renderPdf(buildEventoDoc(parsed));
-        const desired = sanitize(`evento_${parsed.chave || baseName(file.name)}.pdf`);
-        zip.file(uniqueName(used, desired), await blob.arrayBuffer());
-        result.geradosEvento += 1;
+        eventos.push(parsed);
       } else {
         result.ignorados.push({ arquivo: file.name, motivo: parsed.reason });
       }
     } catch (e) {
       result.ignorados.push({ arquivo: file.name, motivo: e instanceof Error ? e.message : String(e) });
     }
-    onProgress?.(i + 1, files.length);
   }
 
-  if (result.geradosNfse + result.geradosEvento === 0) {
+  // ── Confronto: chaves canceladas a partir dos eventos de cancelamento ───────
+  const canceladas = new Set<string>();
+  for (const ev of eventos) {
+    if (TP_EVENTO_CANCELA.has(ev.tpEvento)) {
+      const ch = normChave(ev.chave);
+      if (ch) canceladas.add(ch);
+      result.eventosCancel += 1;
+    }
+  }
+
+  // ── Passe 2: render das notas (com marca d'água quando cancelada) ───────────
+  // O total do progresso considera só as notas — eventos são controle interno.
+  for (let i = 0; i < notas.length; i++) {
+    const { file, data } = notas[i];
+    try {
+      const cancelada = canceladas.has(normChave(data.chave));
+      const qr = data.chave ? await qrDataUrl(qrContentForChave(data.chave)) : null;
+      const blob = await renderPdf(buildDanfseDoc(data, qr, { cancelada }));
+      const nome = data.numeroNfse || data.chave || baseName(file.name);
+      // Canceladas levam "_CANCELADA" no nome do arquivo, junto ao número da NF.
+      const desired = sanitize(`${nome}${cancelada ? "_CANCELADA" : ""}.pdf`);
+      const pasta = cancelada ? "Canceladas/" : "Ativas/";
+      zip.file(uniqueName(used, pasta + desired), await blob.arrayBuffer());
+      result.geradosNfse += 1;
+      if (cancelada) result.canceladas += 1;
+      else result.ativas += 1;
+      // Todas as notas entram nos relatórios (canceladas marcadas como "Cancelada",
+      // para conferência); os totais somam só as ativas (ver retencaoReport / sumCol).
+      const nota = buildNota(data, cancelada);
+      result.todas.push(nota);
+      if (hasRetencao(nota)) result.retencoes.push(nota);
+    } catch (e) {
+      result.ignorados.push({ arquivo: file.name, motivo: e instanceof Error ? e.message : String(e) });
+    }
+    onProgress?.(i + 1, notas.length);
+  }
+
+  // Canceladas primeiro nos relatórios (bloco no topo, com subtotal próprio); as
+  // ativas vêm abaixo e são as únicas que entram no total. Array.sort é estável,
+  // então a ordem de arquivo dentro de cada grupo é preservada.
+  const canceladasPrimeiro = (a: RetencaoItem, b: RetencaoItem) => Number(b.cancelada) - Number(a.cancelada);
+  result.todas.sort(canceladasPrimeiro);
+  result.retencoes.sort(canceladasPrimeiro);
+
+  if (result.geradosNfse === 0) {
     return result;
   }
 

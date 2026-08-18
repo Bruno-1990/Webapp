@@ -6,7 +6,7 @@
  *
  * As células ficam numa grade de 4 colunas; faixas de seção ocupam as 4 (colSpan).
  */
-import type { NfseData } from "./parseNfse.js";
+import { type NfseData, valorLiquidoNfse } from "./parseNfse.js";
 import {
   DASH,
   fmtBRL,
@@ -81,7 +81,13 @@ function enderecoPessoa(p: {
   return joinEndereco([p.logradouro, p.numero, p.complemento, p.bairro]);
 }
 
-export function buildDanfseDoc(data: NfseData, qrImage: string | null): unknown {
+export type DanfseOptions = { cancelada?: boolean };
+
+export function buildDanfseDoc(
+  data: NfseData,
+  qrImage: string | null,
+  options: DanfseOptions = {},
+): unknown {
   const body: Row[] = [];
 
   // ── Faixa: Chave de acesso + números ──────────────────────────────────
@@ -263,9 +269,11 @@ export function buildDanfseDoc(data: NfseData, qrImage: string | null): unknown 
       field("PIS/COFINS - Débito Apur. Própria", temDebitoPisCofins ? fmtBRL(debitoPisCofins) : DASH, 3),
     ]),
   );
+  // Líquido calculado dos componentes (subtrai descontos + retenções), não o campo
+  // vLiq cru do XML — garante que o desconto sempre entra.
   body.push(
     gridRow([
-      field("Valor Líquido da NFS-e", data.vLiq ? fmtBRL(data.vLiq) : DASH, COLS, true),
+      field("Valor Líquido da NFS-e", data.vServ ? fmtBRL(valorLiquidoNfse(data)) : DASH, COLS, true),
     ]),
   );
 
@@ -295,6 +303,10 @@ export function buildDanfseDoc(data: NfseData, qrImage: string | null): unknown 
     pageSize: "A4",
     pageMargins: [28, 22, 28, 22],
     defaultStyle: { font: "Roboto", fontSize: 8, color: "#161616" },
+    // Marca d'água diagonal em notas canceladas (evento de cancelamento/substituição).
+    ...(options.cancelada
+      ? { watermark: { text: "CANCELADA", color: "#d11a2a", opacity: 0.32, bold: true, angle: -35 } }
+      : {}),
     content: [
       {
         columns: [

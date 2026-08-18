@@ -1,4 +1,4 @@
-import { type InputHTMLAttributes, type MouseEvent as ReactMouseEvent, useCallback, useState } from "react";
+import { Fragment, type InputHTMLAttributes, type MouseEvent as ReactMouseEvent, useCallback, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useDropzone } from "react-dropzone";
 import {
@@ -127,7 +127,7 @@ export default function NfsePdfHomePage() {
     try {
       const r = await generateDanfseZip(files, (done, total) => setProgress({ done, total }));
       setResult(r);
-      if (r.geradosNfse + r.geradosEvento === 0) {
+      if (r.geradosNfse === 0) {
         setErr("Nenhum XML de NFS-e válido foi encontrado nos arquivos enviados.");
       }
     } catch (e) {
@@ -197,7 +197,7 @@ export default function NfsePdfHomePage() {
             >
               {isDragActive ? "Solte a pasta com os XMLs…" : "Clique para escolher a pasta, ou arraste-a aqui"}
             </motion.p>
-            <p className="mt-2 text-sm text-[#347891]">Todos os .xml dentro da pasta são lidos automaticamente. Eventos de cancelamento também geram PDF.</p>
+            <p className="mt-2 text-sm text-[#347891]">Todos os .xml dentro da pasta são lidos automaticamente. Os XMLs de evento de cancelamento não viram PDF — eles marcam as notas correspondentes com a marca d'água <strong>CANCELADA</strong>.</p>
           </motion.div>
         </section>
       )}
@@ -310,7 +310,7 @@ export default function NfsePdfHomePage() {
       <Modal open={!!err} onClose={() => setErr(null)} tone="error" title="Algo deu errado" message={err} />
 
       <AnimatePresence>
-        {result && result.geradosNfse + result.geradosEvento > 0 && (
+        {result && result.geradosNfse > 0 && (
           <motion.div
             key="result-panel"
             className={`flex flex-col gap-4 p-5 ${toolPanelClass}`}
@@ -324,9 +324,9 @@ export default function NfsePdfHomePage() {
               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-[12px] font-medium text-emerald-800">
                 <span className="font-display font-bold">{result.geradosNfse}</span> DANFSe
               </span>
-              {result.geradosEvento > 0 && (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#c5dfe8] bg-[#f2fafd] px-3 py-1 text-[12px] font-medium text-[#2d6a82]">
-                  <span className="font-display font-bold">{result.geradosEvento}</span> evento(s)
+              {result.canceladas > 0 && (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-300/70 bg-rose-50 px-3 py-1 text-[12px] font-medium text-rose-800">
+                  <span className="font-display font-bold">{result.canceladas}</span> cancelada(s)
                 </span>
               )}
               {result.ignorados.length > 0 && (
@@ -345,7 +345,7 @@ export default function NfsePdfHomePage() {
 
             {result.retencoes.length === 0 ? (
               <div className="rounded-xl border border-dashed border-[#cdd9df] bg-[#f7fbfd] px-4 py-6 text-center text-[13px] text-[#52636b]">
-                Nenhuma retenção encontrada nos {result.geradosNfse} XML(s) de NFS-e analisados.
+                Nenhuma retenção encontrada nas {result.ativas} nota(s) de NFS-e ativa(s) analisada(s).
               </div>
             ) : (
               <ReportBlock
@@ -378,16 +378,30 @@ function cell(v: number): string {
   return v > 0 ? fmtBRL(v) : "—";
 }
 
-/** Soma uma coluna numérica dos itens do relatório. */
+/** Colunas monetárias, na ordem em que aparecem na tabela (após as 6 colunas de texto). */
+const MONEY_KEYS: (keyof RetencaoItem)[] = [
+  "vServ",
+  "vLiq",
+  "issqnRetido",
+  "irrf",
+  "previdenciaria",
+  "contribSociais",
+  "totalFederais",
+];
+
+/** Soma uma coluna numérica dos itens dados (sem filtrar por status). */
+function sumOf(items: RetencaoItem[], key: keyof RetencaoItem): number {
+  return items.reduce((s, it) => s + (typeof it[key] === "number" ? (it[key] as number) : 0), 0);
+}
+
+/** Soma uma coluna numérica só das notas ativas (canceladas não somam). */
 function sumCol(items: RetencaoItem[], key: keyof RetencaoItem): number {
-  return items.reduce((s, it) => {
-    const v = it[key];
-    return s + (typeof v === "number" ? v : 0);
-  }, 0);
+  return sumOf(items.filter((it) => !it.cancelada), key);
 }
 
 const TABLE_HEADERS = [
   "Nº NFS-e",
+  "Status",
   "Prestador",
   "Mun. Incid. ISSQN",
   "Cód. Trib.",
@@ -416,6 +430,10 @@ function ReportBlock({
   kind: ReportKind;
 }) {
   const busyHere = (fmt: ReportFmt) => reportBusy?.kind === kind && reportBusy.fmt === fmt;
+  // Itens já vêm ordenados com as canceladas no topo (ver generateZip).
+  const canceladas = items.filter((it) => it.cancelada);
+  const nCanc = canceladas.length;
+  const nAtivas = items.length - nCanc;
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -456,8 +474,16 @@ function ReportBlock({
           </thead>
           <tbody>
             {items.map((r, i) => (
-              <tr key={i} className="odd:bg-white even:bg-[#f7fbfd]">
+              <Fragment key={i}>
+              <tr className={r.cancelada ? "bg-rose-50/80 text-rose-800" : "odd:bg-white even:bg-[#f7fbfd]"}>
                 <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 font-semibold text-[#1e3d4d]">{r.numero || "—"}</td>
+                <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1">
+                  {r.cancelada ? (
+                    <span className="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700">Cancelada</span>
+                  ) : (
+                    <span className="text-[11px] text-[#52636b]">Ativa</span>
+                  )}
+                </td>
                 <td className="max-w-[220px] truncate border-b border-[#eef2f4] px-2.5 py-1 text-[#1e3d4d]" title={r.prestadorNome}>
                   {r.prestadorNome || "—"}
                 </td>
@@ -476,12 +502,25 @@ function ReportBlock({
                 <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-right tabular-nums" title={r.descContribSociais}>{cell(r.contribSociais)}</td>
                 <td className="whitespace-nowrap border-b border-[#eef2f4] px-2.5 py-1 text-right font-semibold tabular-nums text-[#0b3a49]">{cell(r.totalFederais)}</td>
               </tr>
+              {r.cancelada && i === nCanc - 1 && (
+                <tr className="bg-rose-100/80 font-semibold text-rose-800">
+                  <td className="whitespace-nowrap border-y border-rose-200 px-2.5 py-1.5" colSpan={6}>
+                    Subtotal canceladas ({nCanc}) — não somadas no total
+                  </td>
+                  {MONEY_KEYS.map((k) => (
+                    <td key={k} className="whitespace-nowrap border-y border-rose-200 px-2.5 py-1.5 text-right tabular-nums">
+                      {fmtBRL(sumOf(canceladas, k))}
+                    </td>
+                  ))}
+                </tr>
+              )}
+              </Fragment>
             ))}
           </tbody>
           <tfoot className="sticky bottom-0">
             <tr className="bg-[#eef6fb] font-semibold text-[#0b3a49]">
-              <td className="whitespace-nowrap border-t border-[#d4e4eb] px-2.5 py-1.5" colSpan={5}>
-                TOTAL ({items.length})
+              <td className="whitespace-nowrap border-t border-[#d4e4eb] px-2.5 py-1.5" colSpan={6}>
+                TOTAL ativas ({nAtivas})
               </td>
               <td className="whitespace-nowrap border-t border-[#d4e4eb] px-2.5 py-1.5 text-right tabular-nums">{fmtBRL(sumCol(items, "vServ"))}</td>
               <td className="whitespace-nowrap border-t border-[#d4e4eb] px-2.5 py-1.5 text-right tabular-nums">{fmtBRL(sumCol(items, "vLiq"))}</td>
