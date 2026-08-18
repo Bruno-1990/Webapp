@@ -5,9 +5,10 @@ import { Redis } from "ioredis";
 import { buildXlsx } from "@webapp/excel-export";
 import {
   buildNfeExportFileName,
-  consolidateXmls,
+  consolidateXmlsFull,
   emptyRow,
   pickDominantEmit,
+  type EventoRow,
   type NfeRow,
 } from "@webapp/nfe-core";
 import { QUEUE_NAME } from "@webapp/contracts";
@@ -42,23 +43,25 @@ new Worker<NfeJobPayload>(
     await job.updateProgress(2);
 
     const allRows: NfeRow[] = [];
+    const allEventos: EventoRow[] = [];
     for (let offset = 0; offset < total; offset += chunkSize) {
       const slice = xmlPaths.slice(offset, offset + chunkSize);
       const inputs = slice.map((p) => ({
         fileName: path.basename(p),
         content: readFileSync(p, "utf-8"),
       }));
-      const chunkRows = consolidateXmls(inputs);
+      const { rows: chunkRows, eventos: chunkEventos } = consolidateXmlsFull(inputs);
       if (allRows.length > 0 && chunkRows.length > 0) {
         allRows.push(emptyRow(), emptyRow());
       }
       allRows.push(...chunkRows);
+      allEventos.push(...chunkEventos);
       const done = Math.min(offset + slice.length, total);
       await job.updateProgress(5 + Math.round((45 * done) / Math.max(1, total)));
     }
 
     await job.updateProgress(52);
-    await buildXlsx(allRows, outputPath);
+    await buildXlsx(allRows, outputPath, allEventos);
     await job.updateProgress(100);
 
     const { emitXNome, emitCnpj } = pickDominantEmit(allRows);

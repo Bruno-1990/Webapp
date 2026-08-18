@@ -169,3 +169,96 @@ export function formatProductsSheet(ws: Worksheet): void {
     formatProductsSheetSmall(ws);
   }
 }
+
+const CANCELADA_FONT_COLOR = "FFFF0000";
+
+/**
+ * Pinta em vermelho as linhas da PRODUTOS cujas NF-e foram canceladas, para o
+ * cancelamento ser visível sem trocar de aba.
+ *
+ * Roda DEPOIS de `formatProductsSheet`: aquela função define fonte apenas no
+ * cabeçalho, então preservar `cell.font` aqui não desfaz nada dela.
+ */
+export function paintCanceladasRows(
+  ws: Worksheet,
+  excelRows: Iterable<number>,
+  colCount: number
+): void {
+  for (const r of excelRows) {
+    const row = ws.getRow(r);
+    for (let c = 1; c <= colCount; c++) {
+      const cell = row.getCell(c);
+      cell.font = { ...(cell.font ?? {}), color: { argb: CANCELADA_FONT_COLOR } };
+    }
+  }
+}
+
+const EVENTO_LEFT_ALIGNED = new Set([
+  "Evento",
+  "Motivo",
+  "Justificativa",
+  "Nome Emit.",
+  "Nome Dest.",
+  "Vínculo",
+  "Arquivo",
+]);
+
+const EVENTO_WIDTHS: Record<string, number> = {
+  "Chave NFe": 46,
+  Evento: 30,
+  "Cód. Evento": 12,
+  "Seq.": 7,
+  "Data do Evento": 22,
+  Protocolo: 18,
+  Status: 8,
+  Motivo: 38,
+  Justificativa: 44,
+  "CNPJ/CPF Autor": 18,
+  "Nº NF": 10,
+  "Emissão NF": 22,
+  "CNPJ Emit.": 18,
+  "Nome Emit.": 38,
+  "CNPJ Dest.": 18,
+  "Nome Dest.": 38,
+  "Vlr Produtos": 14,
+  Vínculo: 28,
+  "Ir para a NF": 22,
+  Arquivo: 44,
+};
+
+/** Aba de eventos: mesmo visual da PRODUTOS, com larguras fixas por coluna. */
+export function formatEventosSheet(ws: Worksheet): void {
+  ws.views = [{ state: "frozen", ySplit: 1 }];
+
+  const maxRow = ws.rowCount || 1;
+  const maxCol = ws.columnCount || 1;
+
+  ws.getRow(1).height = 22;
+
+  for (let c = 1; c <= maxCol; c++) {
+    const header = String(ws.getRow(1).getCell(c).value ?? "");
+    const hcell = ws.getRow(1).getCell(c);
+    hcell.fill = HEADER_FILL;
+    hcell.font = HEADER_FONT;
+    hcell.alignment = ALIGN_CENTER;
+
+    const col = ws.getColumn(c);
+    col.alignment = EVENTO_LEFT_ALIGNED.has(header) ? ALIGN_LEFT : ALIGN_CENTER;
+    col.width = EVENTO_WIDTHS[header] ?? Math.max(12, header.length + 4);
+  }
+
+  const headerToCol = headerToColMap(ws);
+  const vProdCol = headerToCol.get("Vlr Produtos");
+  if (vProdCol) {
+    for (let r = 2; r <= maxRow; r++) {
+      const cell = ws.getRow(r).getCell(vProdCol);
+      if (typeof cell.value === "string") {
+        const n = coerceNumericString(cell.value);
+        if (n !== null && !Number.isNaN(n)) cell.value = n;
+      }
+      cell.numFmt = "#,##0.00";
+    }
+  }
+
+  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: maxRow, column: maxCol } };
+}

@@ -1,4 +1,5 @@
 import { emptyRow, type NfeRow } from "./cols.js";
+import { isEventoXml, parseEventoXml, type EventoRow } from "./evento.js";
 import { parseNfeXml } from "./parse.js";
 
 export interface XmlInput {
@@ -6,38 +7,59 @@ export interface XmlInput {
   content: string;
 }
 
-export function consolidateXmls(inputs: XmlInput[]): NfeRow[] {
-  if (inputs.length === 0) return [];
+export interface ConsolidateResult {
+  /** Linhas da aba PRODUTOS (eventos não entram aqui). */
+  rows: NfeRow[];
+  /** Eventos (cancelamento, carta de correção, manifestação…) na ordem de leitura. */
+  eventos: EventoRow[];
+}
 
-  const allRows: NfeRow[] = [];
-  const lastIdx = inputs.length - 1;
+export function consolidateXmlsFull(inputs: XmlInput[]): ConsolidateResult {
+  const rows: NfeRow[] = [];
+  const eventos: EventoRow[] = [];
+  if (inputs.length === 0) return { rows, eventos };
 
-  for (let idx = 0; idx < inputs.length; idx++) {
-    const { fileName, content } = inputs[idx]!;
+  for (const { fileName, content } of inputs) {
+    if (isEventoXml(content)) {
+      const evento = parseEventoXml(content, fileName);
+      if (evento) {
+        eventos.push(evento);
+        continue;
+      }
+      // Não deu para ler como evento: cai no caminho de NF-e para o problema
+      // continuar visível na aba principal.
+    }
+
+    const block: NfeRow[] = [];
     try {
-      const rows = parseNfeXml(content, fileName);
-      if (rows.length > 0) {
-        allRows.push(...rows);
+      const parsed = parseNfeXml(content, fileName);
+      if (parsed.length > 0) {
+        block.push(...parsed);
       } else {
         const r = emptyRow();
         r.chNFe = `VAZIO: ${fileName}`;
         r.xProd = "Nenhum item <det/prod> encontrado";
-        allRows.push(r);
+        block.push(r);
       }
     } catch (e) {
       const r = emptyRow();
       r.chNFe = `ERRO: ${fileName}`;
       r.xProd = e instanceof Error ? e.message : String(e);
-      allRows.push(r);
+      block.push(r);
     }
 
-    if (idx < lastIdx) {
-      allRows.push(emptyRow());
-      allRows.push(emptyRow());
+    // Duas linhas em branco separam arquivos — nunca no começo nem no fim.
+    if (rows.length > 0) {
+      rows.push(emptyRow(), emptyRow());
     }
+    rows.push(...block);
   }
 
-  return allRows;
+  return { rows, eventos };
+}
+
+export function consolidateXmls(inputs: XmlInput[]): NfeRow[] {
+  return consolidateXmlsFull(inputs).rows;
 }
 
 export function consolidateFromPaths(
