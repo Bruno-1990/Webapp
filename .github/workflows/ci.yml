@@ -19,10 +19,42 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: webapp-01/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - run: npm ci
+      # `lint` roda o build dos contracts e o check:sync (config.py × contracts,
+      # guia de registros × cópia da API).
       - run: npm run lint
       - run: npm run build
       - run: npm test
+
+      - name: Dependências Python das engines
+        run: |
+          pip install -r ../engines/sped/requirements.txt
+          pip install -r ../engines/sped-merge/requirements.txt
+          pip install -r ../engines/sci-consolidado/requirements.txt
+          pip install -r ../engines/comparacao-nfse/requirements.txt
+          pip install openpyxl
+      # Cada suíte roda a partir da pasta da engine: os testes importam os módulos
+      # pelo cwd (`python -m pytest` insere o diretório atual no sys.path).
+      - name: Testes — engines/sped
+        working-directory: engines/sped
+        run: python -m pytest tests -q
+      - name: Testes — engines/sped-merge
+        working-directory: engines/sped-merge
+        run: python -m pytest tests -q
+      - name: Testes — engines/sci-consolidado
+        working-directory: engines/sci-consolidado
+        run: python -m pytest tests -q
+      - name: Testes — engines/comparacao-nfse
+        working-directory: engines/comparacao-nfse
+        run: python -m pytest tests -q
+      # PYTHON_CMD: no Linux não existe o launcher `py`, default dos scripts no Windows.
+      - name: Smoke SPED (cli.py ponta a ponta)
+        env:
+          PYTHON_CMD: python3
+        run: npm run test:sped-smoke
 
   docker:
     runs-on: ubuntu-latest

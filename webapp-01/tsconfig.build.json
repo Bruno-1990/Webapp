@@ -1,0 +1,21 @@
+{
+  // Solução do monorepo Node (o frontend fica de fora — quem compila é o Vite).
+  // `tsc -b tsconfig.build.json` compila os 13 projetos na ordem de dependência;
+  // com `--watch`, um único processo recompila só o que mudou e seus dependentes.
+  "files": [],
+  "references": [
+    { "path": "packages/contracts" },
+    { "path": "packages/nfe-core" },
+    { "path": "packages/excel-export" },
+    { "path": "apps/api" },
+    { "path": "apps/worker" },
+    { "path": "apps/worker-sped-bridge" },
+    { "path": "apps/worker-sped-merge-bridge" },
+    { "path": "apps/worker-sci-consolidado" },
+    { "path": "apps/worker-comparacao-planilhas" },
+    { "path": "apps/worker-comparacao-nfse" },
+    { "path": "apps/worker-gnre-bridge" },
+    { "path": "apps/worker-sci-portal-nacional" },
+    { "path": "apps/worker-concatenador-planilhas" }
+  ]
+}

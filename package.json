@@ -4,7 +4,12 @@
   "description": "Monorepo: docker-compose.yml e Redis vivem aqui. Plataforma Node/TS em webapp-01; engines (Python/Node) em engines/. npm run dev na raiz delega para webapp-01. Mapa em docs/ARCHITECTURE.md.",
   "scripts": {
     "dev": "npm run dev --prefix webapp-01",
+    "dev:watch": "npm run dev:watch --prefix webapp-01",
     "dev:stack": "npm run redis:up && npm run dev --prefix webapp-01",
+    "dev:stack:watch": "npm run redis:up && npm run dev:watch --prefix webapp-01",
+    "docker:watch": "docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile sped --profile comparacao --profile nfse --profile gnre up -d",
+    "docker:watch:logs": "docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f ts-builder api worker",
+    "docker:watch:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile sped --profile comparacao --profile nfse --profile gnre down",
     "redis:up": "docker compose up -d redis",
     "redis:down": "docker compose stop redis",
     "install:app": "npm install --prefix webapp-01",

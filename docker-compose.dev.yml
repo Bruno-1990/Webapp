@@ -1,0 +1,91 @@
+# Override de DESENVOLVIMENTO — recarrega API e workers sem rebuildar imagem.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#   (ou, da raiz:  npm run docker:watch)
+#
+# Como funciona
+#   1. `ts-builder` roda `tsc -b --watch` e escreve o `dist` no bind mount, ou
+#      seja, direto no disco do host (webapp-01/packages e webapp-01/apps).
+#   2. API e workers montam esse mesmo fonte e rodam sob `nodemon`, que reinicia
+#      o processo quando o `dist` correspondente muda.
+#
+# Por que POLLING em tudo (-L no nodemon, watchFile/watchDirectory no tsc)
+#   Bind mount de disco Windows no Docker Desktop/WSL2 nao propaga inotify.
+#   Medido nesta maquina: fs.watch NAO dispara; polling detecta em ~9ms. Sem as
+#   flags de polling o watch fica em silencio e parece "nao funcionar".
+#
+# node_modules
+#   O volume anonimo `/app/node_modules` preserva o node_modules Linux da imagem
+#   e impede que o node_modules do Windows (com binarios nativos incompativeis,
+#   ex.: better-sqlite3) vaze do host para dentro do container.
+#
+# Producao NAO usa este arquivo — `docker compose up -d --build` continua igual.
+
+x-src-mounts: &src-mounts
+  - ./webapp-01/packages:/app/packages
+  - ./webapp-01/apps:/app/apps
+  - /app/node_modules
+
+services:
+  ts-builder:
+    image: webapp-worker:latest
+    working_dir: /app
+    command: >
+      npx tsc -b tsconfig.build.json --watch --preserveWatchOutput
+      --watchFile priorityPollingInterval
+      --watchDirectory dynamicPriorityPolling
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./webapp-01/packages:/app/packages
+      - ./webapp-01/apps:/app/apps
+      - ./webapp-01/tsconfig.base.json:/app/tsconfig.base.json:ro
+      - ./webapp-01/tsconfig.build.json:/app/tsconfig.build.json:ro
+      - /app/node_modules
+    restart: unless-stopped
+
+  # Os mounts da base (temp_jobs, extrato-data, gnre-data) sao preservados: o
+  # Compose mescla `volumes` usando o destino como chave.
+  api:
+    command: npx nodemon -L -q --watch apps/api/dist --watch packages -e js apps/api/dist/server.js
+    environment:
+      NODE_ENV: development
+    volumes: *src-mounts
+
+  worker:
+    command: npx nodemon -L -q --watch apps/worker/dist --watch packages -e js apps/worker/dist/index.js
+    environment:
+      NODE_ENV: development
+    volumes: *src-mounts
+
+  worker-sci-consolidado:
+    command: npx nodemon -L -q --watch apps/worker-sci-consolidado/dist --watch packages -e js apps/worker-sci-consolidado/dist/index.js
+    volumes: *src-mounts
+
+  worker-sped:
+    command: npx nodemon -L -q --watch apps/worker-sped-bridge/dist --watch packages -e js apps/worker-sped-bridge/dist/index.js
+    volumes: *src-mounts
+
+  worker-sped-merge:
+    command: npx nodemon -L -q --watch apps/worker-sped-merge-bridge/dist --watch packages -e js apps/worker-sped-merge-bridge/dist/index.js
+    volumes: *src-mounts
+
+  worker-comparacao-planilhas:
+    command: npx nodemon -L -q --watch apps/worker-comparacao-planilhas/dist --watch packages -e js apps/worker-comparacao-planilhas/dist/index.js
+    volumes: *src-mounts
+
+  worker-sci-portal-nacional:
+    command: npx nodemon -L -q --watch apps/worker-sci-portal-nacional/dist --watch packages -e js apps/worker-sci-portal-nacional/dist/index.js
+    volumes: *src-mounts
+
+  worker-concatenador-planilhas:
+    command: npx nodemon -L -q --watch apps/worker-concatenador-planilhas/dist --watch packages -e js apps/worker-concatenador-planilhas/dist/index.js
+    volumes: *src-mounts
+
+  worker-comparacao-nfse:
+    command: npx nodemon -L -q --watch apps/worker-comparacao-nfse/dist --watch packages -e js apps/worker-comparacao-nfse/dist/index.js
+    volumes: *src-mounts
+
+  worker-gnre:
+    command: npx nodemon -L -q --watch apps/worker-gnre-bridge/dist --watch packages -e js apps/worker-gnre-bridge/dist/index.js
+    volumes: *src-mounts
