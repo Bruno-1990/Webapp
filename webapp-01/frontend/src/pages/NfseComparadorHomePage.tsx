@@ -583,19 +583,20 @@ function NfseResultView({
       </div>
 
       {result.extractStats &&
-        !result.extractStats.ocr_disponivel &&
+        result.extractStats.ocr_local_disponivel === false &&
         result.pdfFalhos &&
         result.pdfFalhos.length > 0 && (
           <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
             <p className="flex items-center gap-2 font-semibold">
               <span aria-hidden className="text-base">⚠️</span>
-              OCR desativado — {result.pdfFalhos.length}{" "}
-              {result.pdfFalhos.length === 1 ? "arquivo nao foi lido" : "arquivos nao foram lidos"}
+              OCR local indisponível — {result.pdfFalhos.length}{" "}
+              {result.pdfFalhos.length === 1 ? "arquivo não foi lido" : "arquivos não foram lidos"}
             </p>
             <p className="mt-1 text-xs leading-relaxed">
-              Estes PDFs/imagens precisam de OCR (Gemini), mas a chave nao esta configurada.
-              Defina <span className="font-mono">GEMINI_API_KEY</span> em{" "}
-              <span className="font-mono">.env</span> e reinicie o stack.
+              Estes PDFs/imagens não têm texto extraível e precisam de OCR, mas as
+              dependências não estão instaladas no worker. Rode{" "}
+              <span className="font-mono">pip install -r requirements.txt</span> em{" "}
+              <span className="font-mono">engines/comparacao-nfse</span> e reinicie o stack.
             </p>
           </div>
         )}
@@ -619,11 +620,19 @@ function NfseResultView({
               tone="ok"
             />
             <ExtractChip
-              label="OCR Gemini (PDFs)"
-              hint="PDFs escaneados"
-              value={result.extractStats.ocr}
-              tone="warn"
+              label="OCR local"
+              hint="PDF sem texto · offline"
+              value={result.extractStats.ocr_local ?? 0}
+              tone="info"
             />
+            {result.extractStats.ocr > 0 && (
+              <ExtractChip
+                label="OCR Gemini (PDFs)"
+                hint="fallback"
+                value={result.extractStats.ocr}
+                tone="warn"
+              />
+            )}
             {result.extractStats.imagens > 0 && (
               <ExtractChip
                 label="OCR Gemini (imagens)"
@@ -642,7 +651,11 @@ function NfseResultView({
       {result.pdfFalhos && result.pdfFalhos.length > 0 && (
         <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900">
           <p className="font-semibold">
-            {result.pdfFalhos.length} PDF/imagem não puderam ser lidos pelo OCR:
+            {result.pdfFalhos.length}{" "}
+            {result.pdfFalhos.length === 1
+              ? "arquivo não pôde ser lido"
+              : "arquivos não puderam ser lidos"}{" "}
+            — nenhuma nota destes entrou na comparação:
           </p>
           <ul className="mt-1 space-y-0.5">
             {result.pdfFalhos.slice(0, 10).map((f, i) => {
@@ -659,6 +672,10 @@ function NfseResultView({
               <li className="italic">…e mais {result.pdfFalhos.length - 10}</li>
             )}
           </ul>
+          <p className="mt-2 text-[11px] leading-relaxed text-rose-800">
+            A lista completa, com o motivo de cada um, está na aba{" "}
+            <span className="font-semibold">“Nao lidos”</span> do XLSX.
+          </p>
         </div>
       )}
       {result.xmlIgnorados && result.xmlIgnorados.length > 0 && (
@@ -818,13 +835,16 @@ function ExtractChip({
   label: string;
   hint?: string;
   value: number;
-  tone: "ok" | "warn";
+  tone: "ok" | "warn" | "info";
 }) {
   const toneClass =
     tone === "ok"
       ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+      : tone === "info"
+      ? "border-sky-300 bg-sky-50 text-sky-900"
       : "border-amber-300 bg-amber-50 text-amber-900";
-  const dotClass = tone === "ok" ? "bg-emerald-500" : "bg-amber-500";
+  const dotClass =
+    tone === "ok" ? "bg-emerald-500" : tone === "info" ? "bg-sky-500" : "bg-amber-500";
   return (
     <div className={`flex items-center gap-2.5 rounded-full border px-3 py-1.5 text-xs ${toneClass}`}>
       <span aria-hidden className={`h-2 w-2 rounded-full ${dotClass}`} />
@@ -835,12 +855,20 @@ function ExtractChip({
   );
 }
 
-function MethodBadge({ method }: { method?: "local" | "ocr" | null }) {
+function MethodBadge({ method }: { method?: "local" | "ocr-local" | "ocr" | null }) {
   if (method === "local") {
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800">
         <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
         Local
+      </span>
+    );
+  }
+  if (method === "ocr-local") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-sky-300 bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800">
+        <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-sky-500" />
+        OCR local
       </span>
     );
   }

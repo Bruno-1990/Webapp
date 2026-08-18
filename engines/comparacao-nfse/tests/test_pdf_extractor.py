@@ -100,8 +100,10 @@ def test_batch_processamento(tmp_path, monkeypatch):
     it = iter(respostas)
     monkeypatch.setattr(pdf_extractor, "_call_gemini", lambda *a, **kw: next(it))
     # Forca todos a cair no Gemini (PDFs falsos nao tem texto extraivel).
+    import ocr_local
     import pdf_text_extractor
     monkeypatch.setattr(pdf_text_extractor, "extract_from_pdf_local", lambda p: None)
+    monkeypatch.setattr(ocr_local, "available", lambda: False)
 
     progresso = []
     entries, failed, stats = pdf_extractor.extract_from_directory(
@@ -112,7 +114,14 @@ def test_batch_processamento(tmp_path, monkeypatch):
     assert len(entries) == 3
     assert failed == []
     assert progresso[-1] == (3, 3)
-    assert stats == {"local": 0, "ocr": 3, "imagens": 0, "ocr_disponivel": True}
+    assert stats == {
+        "local": 0,
+        "ocr_local": 0,
+        "ocr": 3,
+        "imagens": 0,
+        "ocr_disponivel": True,
+        "ocr_local_disponivel": False,
+    }
 
 
 def test_mime_type_para_pdf_e_imagens():
@@ -180,18 +189,31 @@ def test_local_extraido_nao_chama_gemini(tmp_path, monkeypatch):
     assert stats["ocr"] == 0
 
 
-def test_sem_api_key_pdf_scan_vai_pra_failed(tmp_path, monkeypatch):
-    """Sem GEMINI_API_KEY, PDFs sem texto extraivel devem ir pra falhas com motivo claro."""
+def test_sem_nenhum_ocr_pdf_scan_vai_pra_failed(tmp_path, monkeypatch):
+    """Sem OCR local nem Gemini, o arquivo precisa ser LISTADO com motivo claro.
+
+    Silenciar aqui seria o pior resultado possivel: o usuario receberia um
+    comparativo incompleto sem saber que faltou nota.
+    """
     _write_fake_pdf(tmp_path / "scan.pdf")
+    import ocr_local
     import pdf_text_extractor
     monkeypatch.setattr(pdf_text_extractor, "extract_from_pdf_local", lambda p: None)
+    monkeypatch.setattr(ocr_local, "available", lambda: False)
 
     entries, failed, stats = pdf_extractor.extract_from_directory(tmp_path, api_key=None)
     assert entries == []
     assert len(failed) == 1
     assert failed[0]["file"] == "scan.pdf"
-    assert "GEMINI_API_KEY" in failed[0]["reason"]
-    assert stats == {"local": 0, "ocr": 0, "imagens": 0, "ocr_disponivel": False}
+    assert "OCR local indisponivel" in failed[0]["reason"]
+    assert stats == {
+        "local": 0,
+        "ocr_local": 0,
+        "ocr": 0,
+        "imagens": 0,
+        "ocr_disponivel": False,
+        "ocr_local_disponivel": False,
+    }
 
 
 # ─── Integracao com governor (rate limit + circuit breaker) ──────────────────

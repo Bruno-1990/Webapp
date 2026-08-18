@@ -6,8 +6,55 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from excel import HEADERS, gerar_xlsx
+from excel import HEADERS, HEADERS_NAO_LIDOS, gerar_xlsx
 from xml_parser import NfseEntry
+
+
+# ─── Aba "Nao lidos" ─────────────────────────────────────────────────────────
+# A tela lista so os 10 primeiros arquivos que falharam. Quem precisa auditar o
+# lote inteiro depende desta aba — ela e o unico lugar com a lista completa.
+
+
+def test_aba_nao_lidos_lista_todos_com_motivo(tmp_path):
+    openpyxl = pytest.importorskip("openpyxl")
+
+    falhas = [
+        {"file": "scan.pdf", "reason": "OCR local nao encontrou chave nem CNPJ + numero"},
+        {"file": "quebrado.xml", "reason": "XML invalido ou sem dados de NFS-e reconheciveis"},
+    ]
+    out = tmp_path / "com_falhas.xlsx"
+    gerar_xlsx(out, [], [], falhas)
+
+    wb = openpyxl.load_workbook(out)
+    assert "Nao lidos" in wb.sheetnames
+    ws = wb["Nao lidos"]
+    assert [c.value for c in ws[1]] == list(HEADERS_NAO_LIDOS)
+    assert [c.value for c in ws[2]] == ["scan.pdf", falhas[0]["reason"]]
+    assert [c.value for c in ws[3]] == ["quebrado.xml", falhas[1]["reason"]]
+
+
+def test_aba_nao_lidos_nao_aparece_quando_tudo_foi_lido(tmp_path):
+    """Sem falha, a aba nao existe — nao poluir o resultado do caso feliz."""
+    openpyxl = pytest.importorskip("openpyxl")
+
+    out = tmp_path / "sem_falhas.xlsx"
+    gerar_xlsx(out, [], [], [])
+    assert "Nao lidos" not in openpyxl.load_workbook(out).sheetnames
+
+    out2 = tmp_path / "sem_arg.xlsx"
+    gerar_xlsx(out2, [], [])
+    assert "Nao lidos" not in openpyxl.load_workbook(out2).sheetnames
+
+
+def test_aba_nao_lidos_aceita_formato_legado_de_string(tmp_path):
+    """`pdfFalhos` ja foi lista de string antes de virar {file, reason}."""
+    openpyxl = pytest.importorskip("openpyxl")
+
+    out = tmp_path / "legado.xlsx"
+    gerar_xlsx(out, [], [], ["antigo.pdf"])
+
+    ws = openpyxl.load_workbook(out)["Nao lidos"]
+    assert [c.value for c in ws[2]] == ["antigo.pdf", None]
 
 
 def test_headers_incluem_prestador():

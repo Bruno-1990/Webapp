@@ -283,27 +283,49 @@ def extract_from_directory(
 ) -> tuple[list[NfseEntry], list[dict], dict]:
     """Extrai entries de PDFs/imagens em `directory`.
 
-    Pass 1 (sequencial, rapido): pdfplumber em todos os PDFs.
-    Pass 2 (paralelo, lento): OCR Gemini nos que ficaram + imagens.
+    Tres passes, do mais barato para o mais caro:
+      1. pdfplumber — texto nativo do PDF. Resolve ~90% dos lotes reais.
+      2. OCR local  — rasteriza e le os pixels. Sem API, sem cota, offline.
+      3. OCR Gemini — fallback opcional, so roda se sobrou algo E ha chave.
 
-    Retorna `(entries, failed, stats)`:
-      stats = {"local": int, "ocr": int, "imagens": int, "ocr_disponivel": bool}
+    Todo arquivo que nao for identificado em nenhum passe entra em `failed`
+    com o motivo, para ser listado ao usuario no fim do job.
+
+    Retorna `(entries, failed, stats)`.
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    import ocr_local
     from pdf_text_extractor import extract_from_pdf_local
 
     base = Path(directory)
     files = _list_supported(base)
     total = len(files)
     failed: list[dict] = []
-    stats = {"local": 0, "ocr": 0, "imagens": 0, "ocr_disponivel": bool(api_key)}
+    stats = {
+        "local": 0,
+        "ocr_local": 0,
+        "ocr": 0,
+        "imagens": 0,
+        "ocr_disponivel": bool(api_key),
+        "ocr_local_disponivel": ocr_local.available(),
+    }
 
     # Mapeia indice -> entry (preserva ordem original ao final)
     entries_by_idx: dict[int, NfseEntry] = {}
     needs_ocr: list[tuple[int, Path]] = []
-    local_done = 0
 
-    # ── Pass 1: extracao local em paralelo (pdfplumber) ──────────────────
+    # Progresso conta arquivo RESOLVIDO (com entry ou com falha final), uma vez
+    # so — um arquivo que atravessa os tres passes nao pode contar tres vezes.
+    done = 0
+
+    def bump() -> None:
+        nonlocal done
+        done += 1
+        if on_progress:
+            on_progress(done, total)
+
+    # ── Pass 1: texto nativo (pdfplumber) ────────────────────────────────
     pdf_items = [(i, f) for i, f in enumerate(files) if f.suffix.lower() == ".pdf"]
     non_pdf_items = [(i, f) for i, f in enumerate(files) if f.suffix.lower() != ".pdf"]
 
@@ -322,35 +344,55 @@ def extract_from_directory(
                 if entry is not None:
                     entries_by_idx[i] = entry
                     stats["local"] += 1
-                    local_done += 1
-                    if on_progress:
-                        on_progress(local_done, total)
+                    bump()
                 else:
-                    # PDF falhou pass 1 -> vai pra pass 2 (OCR). NAO incrementa
-                    # local_done para nao contar duas vezes no progresso total.
                     needs_ocr.append((i, f))
 
-    # Imagens vao direto pro OCR (nunca passam por pdfplumber)
+    # Imagens nunca passam por pdfplumber — vao direto para OCR.
     needs_ocr.extend(non_pdf_items)
     needs_ocr.sort(key=lambda t: t[0])
 
-    # ── Pass 2: OCR Gemini (paralelo) ────────────────────────────────────
-    if needs_ocr:
+    # ── Pass 2: OCR local ────────────────────────────────────────────────
+    # `restantes` guarda (indice, path, motivo_do_ocr_local) para o passe 3.
+    restantes: list[tuple[int, Path, str | None]] = []
+
+    if needs_ocr and stats["ocr_local_disponivel"]:
+        workers = min(ocr_local.concurrency(), len(needs_ocr))
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            future_to_item = {
+                ex.submit(ocr_local.extract_local_ocr, f): (i, f) for i, f in needs_ocr
+            }
+            for fut in as_completed(future_to_item):
+                i, f = future_to_item[fut]
+                try:
+                    entry, reason = fut.result()
+                except Exception as exc:
+                    entry, reason = None, f"OCR local falhou: {_summarize_error(exc)}"
+                if entry is not None:
+                    entries_by_idx[i] = entry
+                    stats["ocr_local"] += 1
+                    bump()
+                else:
+                    restantes.append((i, f, reason))
+    else:
+        motivo = (
+            None
+            if not needs_ocr
+            else "OCR local indisponivel (instale pymupdf, rapidocr-onnxruntime e opencv-python-headless)"
+        )
+        restantes = [(i, f, motivo) for i, f in needs_ocr]
+
+    # ── Pass 3: OCR Gemini (fallback opcional) ───────────────────────────
+    if restantes:
         if not api_key:
-            for _, f in needs_ocr:
-                ext = f.suffix.lower()
+            for _i, f, motivo in restantes:
                 failed.append({
                     "file": display_name(f.name),
-                    "reason": (
-                        "PDF sem texto extraivel (provavel scan) e GEMINI_API_KEY "
-                        "ausente — defina a chave para habilitar OCR."
-                    )
-                    if ext == ".pdf"
-                    else "Imagem requer OCR mas GEMINI_API_KEY nao foi definida.",
+                    "reason": motivo or "nao foi possivel extrair os dados do arquivo",
                 })
+                bump()
         else:
-            workers = min(_ocr_concurrency(), len(needs_ocr))
-            ocr_done = 0
+            workers = min(_ocr_concurrency(), len(restantes))
             with ThreadPoolExecutor(max_workers=workers) as ex:
                 future_to_item = {
                     ex.submit(
@@ -359,30 +401,30 @@ def extract_from_directory(
                         api_key=api_key,
                         model=model,
                         governor=governor,
-                    ): (i, f)
-                    for i, f in needs_ocr
+                    ): (i, f, motivo)
+                    for i, f, motivo in restantes
                 }
                 for fut in as_completed(future_to_item):
-                    i, f = future_to_item[fut]
+                    i, f, motivo_local = future_to_item[fut]
                     try:
                         ocr_entry, reason = fut.result()
                     except Exception as exc:
                         ocr_entry, reason = None, _summarize_error(exc)
-                    ext = f.suffix.lower()
                     if ocr_entry is not None:
                         entries_by_idx[i] = ocr_entry
-                        if ext == ".pdf":
+                        if f.suffix.lower() == ".pdf":
                             stats["ocr"] += 1
                         else:
                             stats["imagens"] += 1
                     else:
+                        # Mostra os dois motivos: o usuario precisa saber que
+                        # ambos os caminhos foram tentados e por que falharam.
+                        partes = [p for p in (motivo_local, reason) if p]
                         failed.append({
                             "file": display_name(f.name),
-                            "reason": reason or "desconhecido",
+                            "reason": " | ".join(partes) or "desconhecido",
                         })
-                    ocr_done += 1
-                    if on_progress:
-                        on_progress(local_done + ocr_done, total)
+                    bump()
 
     # Ordena por indice original para estabilidade de saida
     entries = [entries_by_idx[i] for i in sorted(entries_by_idx.keys())]

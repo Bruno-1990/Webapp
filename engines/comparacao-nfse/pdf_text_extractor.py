@@ -39,6 +39,18 @@ _NUMERO_PATTERNS = [
 # notas curtas legitimas.
 _MIN_TEXT_LEN = 100
 
+# PDF com fonte sem mapa ToUnicode: o pdfplumber devolve "(cid:12)(cid:7)..."
+# em vez de letras. Passa folgado no _MIN_TEXT_LEN (milhares de chars) mas nao
+# tem UMA informacao aproveitavel — precisa ir para OCR como se fosse scan.
+_CID_RE = re.compile(r"\(cid:\d+\)")
+_CID_RATIO_MAX = 0.30
+
+
+def _is_cid_garbage(text: str) -> bool:
+    """True quando o texto e majoritariamente placeholder de glifo nao mapeado."""
+    consumido = sum(len(m.group(0)) for m in _CID_RE.finditer(text))
+    return bool(text) and consumido / len(text) > _CID_RATIO_MAX
+
 
 def _normalize(text: str) -> str:
     """Minusculas + sem diacriticos para matching tolerante."""
@@ -64,6 +76,8 @@ def extract_text(pdf_path: Path) -> str | None:
 
     full = "\n".join(parts).strip()
     if len(full) < _MIN_TEXT_LEN:
+        return None
+    if _is_cid_garbage(full):
         return None
     return full
 
@@ -200,12 +214,31 @@ def _find_tomador_cnpj(text: str) -> str | None:
     return None
 
 
+# Regioes de onde o numero da nota NUNCA pode sair. O gap largo dos padroes
+# acima (`[^\d]{0,120}?`) atravessa celulas da tabela e ja pescou "59" de
+# dentro do CNPJ "59.955.346/0001-96" e dia/mes de datas de emissao.
+_LONG_DIGITS_RE = re.compile(r"\d{11,}")
+_DATE_RE = re.compile(r"\b\d{1,2}/\d{1,2}/\d{2,4}\b")
+
+
+def _spans_proibidos(text: str) -> list[tuple[int, int]]:
+    spans: list[tuple[int, int]] = []
+    for rx in (_CNPJ_RE, _LONG_DIGITS_RE, _DATE_RE):
+        spans.extend(m.span() for m in rx.finditer(text))
+    return spans
+
+
+def _dentro(pos: int, spans: list[tuple[int, int]]) -> bool:
+    return any(ini <= pos < fim for ini, fim in spans)
+
+
 def _find_numero(text: str) -> str | None:
+    proibidos = _spans_proibidos(text)
     for pattern in _NUMERO_PATTERNS:
-        m = pattern.search(text)
-        if m:
-            num = m.group(1).lstrip("0") or "0"
-            return num
+        for m in pattern.finditer(text):
+            if _dentro(m.start(1), proibidos):
+                continue  # digito veio de um CNPJ/chave/data, nao do numero
+            return m.group(1).lstrip("0") or "0"
     return None
 
 

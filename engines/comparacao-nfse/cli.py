@@ -217,7 +217,13 @@ def processar(pdfs_dir: Path, xmls_dir: Path, output_xlsx: Path, output_json: Pa
         encoding="utf-8",
     )
 
-    gerar_xlsx(output_xlsx, res.so_pdf, res.so_xml)
+    # `pdf_failed` + `xml_ignorados` viram a aba "Nao lidos": tudo que entrou
+    # no job mas nao saiu em nenhuma das duas listas de comparacao.
+    nao_lidos = list(pdf_failed) + [
+        {"file": nome, "reason": "XML invalido ou sem dados de NFS-e reconheciveis"}
+        for nome in xml_ignorados
+    ]
+    gerar_xlsx(output_xlsx, res.so_pdf, res.so_xml, nao_lidos)
     progress(100)
     return payload
 

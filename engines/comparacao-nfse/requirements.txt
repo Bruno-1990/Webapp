@@ -4,3 +4,9 @@ xlsxwriter>=3.1
 redis>=5.0
 pytest>=8.0
 fakeredis[lua]>=2.20
+# OCR local (sem API, sem cota, offline). Todos wheels puros — nao exigem
+# binario de sistema, entao o Dockerfile nao precisa de apt-get extra.
+pymupdf>=1.24
+rapidocr-onnxruntime>=1.3
+opencv-python-headless>=4.9
+numpy>=1.26

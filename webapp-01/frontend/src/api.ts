@@ -1075,7 +1075,8 @@ export type NfseEntry = {
   numeroNf?: string | null;
   chaveNf?: string | null;
   sourceFile: string;
-  method?: "local" | "ocr" | null;
+  /** "local" = texto nativo, "ocr-local" = OCR offline, "ocr" = Gemini. */
+  method?: "local" | "ocr-local" | "ocr" | null;
   cnpjPrestador?: string | null;
   razaoSocialPrestador?: string | null;
   razaoSocialTomador?: string | null;
@@ -1085,9 +1086,12 @@ export type NfseFailure = { file: string; reason: string };
 
 export type NfseExtractStats = {
   local: number;
+  /** Resolvidos por OCR local (rasteriza e le). Opcional: backend antigo nao envia. */
+  ocr_local?: number;
   ocr: number;
   imagens: number;
   ocr_disponivel: boolean;
+  ocr_local_disponivel?: boolean;
 };
 
 export type NfseFailureKind = "quota" | "auth" | "timeout" | "internal";
