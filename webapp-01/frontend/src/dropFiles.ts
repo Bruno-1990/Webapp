@@ -42,6 +42,11 @@ function allowXlsxOnly(file: File): boolean {
   return file.name.toLowerCase().endsWith(".xlsx");
 }
 
+function allowExcel(file: File): boolean {
+  const n = file.name.toLowerCase();
+  return n.endsWith(".xlsx") || n.endsWith(".xls");
+}
+
 function readEntriesAsync(reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> {
   return new Promise((resolve, reject) => {
     const acc: FileSystemEntry[] = [];
@@ -96,10 +101,22 @@ async function extractFromDataTransfer(
 ): Promise<File[]> {
   const items = dt.items;
   if (items?.length && typeof items[0].webkitGetAsEntry === "function") {
-    const out: File[] = [];
+    // CRÍTICO: colher TODAS as entries de forma síncrona, antes de qualquer await.
+    // O DataTransferItemList só é válido durante o despacho do evento — após o
+    // primeiro await ele é neutralizado e `webkitGetAsEntry()` dos itens seguintes
+    // retorna null. (Era por isso que, ao arrastar vários arquivos, só o 1º era lido.)
+    const entries: FileSystemEntry[] = [];
     for (let i = 0; i < items.length; i++) {
       const entry = items[i].webkitGetAsEntry?.();
-      if (entry) out.push(...(await entryToFiles(entry, 0, allowRoot, allowInside)));
+      if (entry) entries.push(entry);
+    }
+    // Fallback síncrono: se nenhuma entry veio (navegador sem suporte), usa dt.files.
+    if (entries.length === 0) {
+      return Array.from(dt.files).filter(allowRoot);
+    }
+    const out: File[] = [];
+    for (const entry of entries) {
+      out.push(...(await entryToFiles(entry, 0, allowRoot, allowInside)));
     }
     return out;
   }
@@ -172,7 +189,7 @@ export async function getPdfOnlyFilesFromEvent(event: unknown): Promise<File[]> 
   return [];
 }
 
-/** Editor de Extrato: aceita só `.xlsx` (raiz e dentro de pastas). */
+/** Cadastro de clientes/fornecedores: aceita só `.xlsx` (parser ExcelJS). */
 export async function getXlsxOnlyFilesFromEvent(event: unknown): Promise<File[]> {
   const dt = dataTransferFrom(event);
   if (dt) {
@@ -181,6 +198,19 @@ export async function getXlsxOnlyFilesFromEvent(event: unknown): Promise<File[]>
   const t = (event as { target?: EventTarget | null }).target as HTMLInputElement | null;
   if (t?.files?.length) {
     return Array.from(t.files).filter(allowXlsxOnly);
+  }
+  return [];
+}
+
+/** Editor de Extrato: aceita `.xlsx` e `.xls` (raiz e dentro de pastas). */
+export async function getExcelFilesFromEvent(event: unknown): Promise<File[]> {
+  const dt = dataTransferFrom(event);
+  if (dt) {
+    return extractFromDataTransfer(dt, allowExcel, allowExcel);
+  }
+  const t = (event as { target?: EventTarget | null }).target as HTMLInputElement | null;
+  if (t?.files?.length) {
+    return Array.from(t.files).filter(allowExcel);
   }
   return [];
 }
@@ -212,18 +242,28 @@ type FsHandle = {
   getFile: () => Promise<File>;
 };
 
-async function collectFromHandle(dir: FsHandle, accept: (f: File) => boolean): Promise<File[]> {
+async function collectFromHandle(
+  dir: FsHandle,
+  accept: (f: File) => boolean,
+  skipped: string[],
+): Promise<File[]> {
   const out: File[] = [];
   for await (const entry of dir.values()) {
     if (entry.kind === "file") {
-      try {
-        const f = await entry.getFile();
-        if (accept(f)) out.push(f);
-      } catch {
-        /* arquivo sem permissao — ignora */
+      // Leitura em pastas de rede (\\SERV02) falha de forma intermitente; tenta
+      // algumas vezes antes de desistir. Se falhar de vez, registra em `skipped`
+      // (NÃO descarta em silêncio — faltar nota caladо é inaceitável num tool fiscal).
+      let f: File | null = null;
+      for (let attempt = 0; attempt < 3 && !f; attempt++) {
+        try {
+          f = await entry.getFile();
+        } catch {
+          if (attempt === 2) skipped.push(entry.name);
+        }
       }
+      if (f && accept(f)) out.push(f);
     } else if (entry.kind === "directory") {
-      out.push(...(await collectFromHandle(entry, accept)));
+      out.push(...(await collectFromHandle(entry, accept, skipped)));
     }
   }
   return out;
@@ -248,7 +288,20 @@ export async function pickDirectoryAndReadFiles(
   }).showDirectoryPicker;
   try {
     const handle = await showDirectoryPicker({ mode: "read" });
-    return await collectFromHandle(handle, filter);
+    const skipped: string[] = [];
+    const files = await collectFromHandle(handle, filter, skipped);
+    if (skipped.length > 0) {
+      // Falha ao ler parte da pasta (típico de pasta em rede). Avisa em vez de
+      // entregar um conjunto incompleto sem o usuário perceber.
+      const amostra = skipped.slice(0, 3).join(", ");
+      throw new Error(
+        `${skipped.length} arquivo(s) da pasta não puderam ser lidos pelo navegador — ` +
+          `isso costuma acontecer com pastas em rede (ex.: \\\\SERV02). ` +
+          `Copie a pasta para o computador local e tente de novo. ` +
+          `Ex.: ${amostra}${skipped.length > 3 ? "…" : ""}`,
+      );
+    }
+    return files;
   } catch (e) {
     /** AbortError = user cancelou (Esc / fechou). Devolve null para sinalizar. */
     if (e instanceof DOMException && e.name === "AbortError") return null;
