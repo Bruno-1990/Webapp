@@ -6,7 +6,7 @@ REG_RE = re.compile(r"^[0-9A-Z]{4}$")
 
 
 def _resolve_export_regs(requested):
-    """Lista de abas a exportar; vazio/None = os 11 blocos core. Aceita qualquer REG de 4 caracteres."""
+    """Lista de abas a exportar; vazio/None = os blocos core (SHEET_ORDER). Aceita qualquer REG de 4 caracteres."""
     if not requested:
         return list(SHEET_ORDER)
     out = []
@@ -27,7 +27,7 @@ def minimal_context_regs(export_set):
         need.add("C100")
     if "C590" in export_set:
         need.add("C500")
-    if "D190" in export_set:
+    if export_set & {"D101", "D105", "D190"}:
         need.add("D100")
     if "D590" in export_set:
         need.add("D500")
@@ -105,7 +105,7 @@ class Processor:
             elif regx == "D100":
                 current_num_doc = fields[9] if len(fields) > 9 else ""
                 current_chv = fields[10] if len(fields) > 10 else ""
-            elif regx == "D190":
+            elif regx in ("D101", "D105", "D190"):
                 expected[regx].append({"NUM_DOC": current_num_doc, "CHV_CTE": current_chv})
             elif regx == "D500":
                 current_num_doc_d500 = fields[9] if len(fields) > 9 else ""
@@ -113,7 +113,7 @@ class Processor:
                 expected[regx].append({"NUM_DOC": current_num_doc_d500})
 
         link_checks = {}
-        for _reg in ("C170", "C190", "C590", "D190", "D590"):
+        for _reg in ("C170", "C190", "C590", "D101", "D105", "D190", "D590"):
             try:
                 df_tmp = dfs.get(_reg)
                 exp_list = expected.get(_reg, [])

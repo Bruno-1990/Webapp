@@ -21,6 +21,12 @@ HEADERS = {
     "D100": ["REG","IND_OPER","IND_EMIT","COD_PART","COD_MOD","COD_SIT","SER","SUB","NUM_DOC","CHV_CTE","DT_DOC","DT_A_P",
              "TP_CTE","CHV_CTE_REF","VL_DOC","VL_DESC","IND_FRT","VL_SERV","VL_BC_ICMS","VL_ICMS","VL_NT","COD_INF",
              "COD_CTA","COD_MUN_ORIG","COD_MUN_DEST"],
+    # D101/D105 — filhos do D100 na EFD Contribuições (PIS/PASEP e COFINS).
+    # NUM_DOC/CHV_CTE sao injetados pelo parser a partir do D100 pai.
+    "D101": ["REG","NUM_DOC","CHV_CTE","IND_NAT_FRT","VL_ITEM","CST_PIS","NAT_BC_CRED","VL_BC_PIS","ALIQ_PIS",
+             "VL_PIS","COD_CTA","COD_CCUS"],
+    "D105": ["REG","NUM_DOC","CHV_CTE","IND_NAT_FRT","VL_ITEM","CST_COFINS","NAT_BC_CRED","VL_BC_COFINS","ALIQ_COFINS",
+             "VL_COFINS","COD_CTA","COD_CCUS"],
     "D190": ["REG","NUM_DOC","CHV_CTE","CST_ICMS","CFOP","ALIQ_ICMS","VL_OPR","VL_BC_ICMS","VL_ICMS","VL_RED_BC","COD_OBS"],
     "D500": ["REG","IND_OPER","IND_EMIT","COD_PART","COD_MOD","COD_SIT","SER","SUB","NUM_DOC","DT_DOC","DT_A_P","VL_DOC",
              "VL_DESC","VL_SERV","VL_SERV_NT","VL_TERC","VL_DA","VL_BC_ICMS","VL_ICMS","COD_INF","VL_PIS","VL_COFINS","TP_ASSINANTE"],
@@ -30,7 +36,7 @@ HEADERS = {
     # REG K200 — Bloco K, estoque escriturado (Guia EFD ICMS/IPI)
     "K200": ["REG", "DT_EST", "COD_ITEM", "QTD", "IND_EST", "COD_PART"],
 }
-# Ordem canónica dos 11 blocos principais — manter igual a SPED_EXPORT_SHEET_KEYS nos contracts
+# Ordem canónica dos blocos core — manter igual a SPED_EXPORT_SHEET_KEYS nos contracts
 SHEET_ORDER = [
     "0150",
     "0200",
@@ -40,6 +46,8 @@ SHEET_ORDER = [
     "C500",
     "C590",
     "D100",
+    "D101",
+    "D105",
     "D190",
     "D500",
     "D590",

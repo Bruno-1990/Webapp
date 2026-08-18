@@ -413,3 +413,139 @@ def test_inner_payload_c170_skips_injected() -> None:
     assert inner[1] == "1"
     assert inner[2] == "ABC"
     assert build_sped_line(inner).startswith("|C170|1|ABC|")
+
+
+_FIXTURE_BLOCO_D = _ROOT.parent / "sped" / "tests" / "fixtures" / "sped_bloco_d.txt"
+
+
+@pytest.mark.skipif(not _FIXTURE_BLOCO_D.is_file(), reason="fixture do bloco D ausente")
+@pytest.mark.skipif(not _CLI_EXPORT.is_file(), reason="sped_engine ausente")
+def test_roundtrip_bloco_d_com_d101_d105(tmp_path: Path) -> None:
+    """D101/D105 exportados e mesclados de volta não podem alterar o .txt original."""
+    xlsx = tmp_path / "bloco_d.xlsx"
+    out_txt = tmp_path / "bloco_d_merged.txt"
+    subprocess.run(
+        [sys.executable, str(_CLI_EXPORT), "--input", str(_FIXTURE_BLOCO_D), "--output", str(xlsx)],
+        cwd=str(_ENGINE),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        [sys.executable, str(_CLI_MERGE), "--sped", str(_FIXTURE_BLOCO_D), "--xlsx", str(xlsx), "--output", str(out_txt)],
+        cwd=str(_ROOT),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    orig_txt = _FIXTURE_BLOCO_D.read_text(encoding="utf-8", errors="replace")
+    merged_txt = out_txt.read_text(encoding="utf-8", errors="replace")
+    assert merged_txt.rstrip("\r\n") == orig_txt.rstrip("\r\n")
+
+    vistos = {l.split("|")[1] for l in merged_txt.splitlines() if l.startswith("|")}
+    assert {"D100", "D101", "D105", "D190"} <= vistos
+
+
+@pytest.mark.parametrize("reg", ["D101", "D105"])
+def test_inner_payload_d101_d105_skips_injected(reg: str) -> None:
+    sys.path.insert(0, str(_ROOT.parent / "sped" / "sped_engine"))
+    from config import HEADERS  # noqa: WPS433
+
+    from line_builders import build_sped_line, inner_payload_for_register
+
+    row = {
+        "REG": reg,
+        "NUM_DOC": "12345",
+        "CHV_CTE": "chave",
+        "IND_NAT_FRT": "0",
+        "VL_ITEM": "1000,00",
+    }
+    inner = inner_payload_for_register(reg, row, HEADERS[reg])
+    assert inner[0] == reg
+    assert "12345" not in inner and "chave" not in inner
+    assert inner[1] == "0"
+    assert inner[2] == "1000,00"
+    assert build_sped_line(inner).startswith(f"|{reg}|0|1000,00|")
+
+
+def test_campo_numerico_nao_editado_preserva_formato_original() -> None:
+    """ALIQ_* volta do Excel como número (7,60 -> 7.6); se o valor não mudou, manter o texto original."""
+    from line_builders import normalize_sped_field
+
+    assert normalize_sped_field("ALIQ_COFINS", 7.6, "7,60") == "7,60"
+    assert normalize_sped_field("ALIQ_PIS", 1.65, "1,65") == "1,65"
+    assert normalize_sped_field("ALIQ_ICMS", 12.0, "12,00") == "12,00"
+    assert normalize_sped_field("VL_ITEM", "1.000,00", "1000,00") == "1000,00"
+    # Template inteiro continua vencendo (comportamento já existente)
+    assert normalize_sped_field("VL_TOT_DEBITOS", "0,00", "0") == "0"
+
+
+def test_campo_numerico_editado_usa_o_valor_novo() -> None:
+    from line_builders import normalize_sped_field
+
+    assert normalize_sped_field("ALIQ_COFINS", 8.5, "7,60") not in ("7,60", "7,6")
+    assert normalize_sped_field("ALIQ_COFINS", 8.5, "7,60").replace(",", ".") == "8.5"
+
+
+def _planilha_com_abas(path: Path, abas: list[str]) -> None:
+    """Monta um XLSX no formato do exportador: _LINHA + cabeçalhos do registro, _LINHA sem buracos."""
+    sys.path.insert(0, str(_ROOT.parent / "sped" / "sped_engine"))
+    from cabecalhos_sped import merge_headers  # noqa: WPS433
+    from config import HEADERS  # noqa: WPS433
+
+    cols = merge_headers(HEADERS)
+    wb = Workbook()
+    wb.remove(wb.active)
+    linha = 1
+    for reg in abas:
+        ws = wb.create_sheet(reg)
+        ws.append(["_LINHA"] + cols[reg])
+        ws.append([linha, reg] + [""] * (len(cols[reg]) - 1))
+        linha += 1
+    wb.save(path)
+
+
+def test_inspect_planilha_antiga_sem_d101_d105_continua_completa(tmp_path: Path) -> None:
+    """Planilhas exportadas antes do D101/D105 não podem passar a exigir o SPED original."""
+    from inspect_xlsx import inspect_xlsx
+
+    xlsx = tmp_path / "antiga.xlsx"
+    _planilha_com_abas(
+        xlsx,
+        ["0150", "0200", "C100", "C170", "C190", "C500", "C590", "D100", "D190", "D500", "D590"],
+    )
+    out = inspect_xlsx(xlsx)
+    assert out["complete"] is True, out["reasons"]
+    assert out["requiresOriginal"] is False
+
+
+def test_inspect_planilha_sem_aba_core_obrigatoria_exige_original(tmp_path: Path) -> None:
+    from inspect_xlsx import inspect_xlsx
+
+    xlsx = tmp_path / "faltando.xlsx"
+    _planilha_com_abas(xlsx, ["0150", "0200", "C100"])
+    out = inspect_xlsx(xlsx)
+    assert out["complete"] is False
+    assert any("core" in r for r in out["reasons"]), out["reasons"]
+
+
+def test_inspect_planilha_nova_com_d101_d105_completa(tmp_path: Path) -> None:
+    from inspect_xlsx import inspect_xlsx
+    from config import SHEET_ORDER  # noqa: WPS433
+
+    xlsx = tmp_path / "nova.xlsx"
+    _planilha_com_abas(xlsx, list(SHEET_ORDER))
+    out = inspect_xlsx(xlsx)
+    assert out["complete"] is True, out["reasons"]
+    assert {"D101", "D105"} <= set(out["regSheets"])
+
+
+def test_core_sheets_derivam_do_exportador() -> None:
+    """CORE_SHEETS não pode ser uma cópia manual: tem que acompanhar SHEET_ORDER."""
+    sys.path.insert(0, str(_ROOT.parent / "sped" / "sped_engine"))
+    from config import SHEET_ORDER  # noqa: WPS433
+
+    from inspect_xlsx import CORE_SHEETS, CORE_SHEETS_OPCIONAIS
+
+    assert list(CORE_SHEETS) == list(SHEET_ORDER)
+    assert set(CORE_SHEETS_OPCIONAIS) <= set(CORE_SHEETS)

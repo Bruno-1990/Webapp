@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-_INJECT_REGS = frozenset({"C170", "C190", "C590", "D190", "D590"})
+_INJECT_REGS = frozenset({"C170", "C190", "C590", "D101", "D105", "D190", "D590"})
 # Traço ASCII, en-dash (U+2013) ou em-dash (U+2014) entre código e descrição
 _REG_LINE = re.compile(r"^([0-9A-Z]{4})\s*[\u2013\u2014\-]\s*(.+)$", re.I)
 _SEP_LINE = re.compile(r"^=+$")

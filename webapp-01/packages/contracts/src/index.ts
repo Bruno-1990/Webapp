@@ -208,6 +208,8 @@ export const SPED_EXPORT_SHEET_KEYS = [
   "C500",
   "C590",
   "D100",
+  "D101",
+  "D105",
   "D190",
   "D500",
   "D590",
@@ -247,6 +249,8 @@ export const SPED_EXPORT_SHEET_LABELS: Record<SpedExportSheetKey, string> = {
   C500: "C500 — Nota de energia, gás, água e comunicação",
   C590: "C590 — Registro analítico (C500)",
   D100: "D100 — Documento de transporte (CT-e e equivalentes)",
+  D101: "D101 — Complemento do CT-e — PIS/PASEP (EFD Contribuições)",
+  D105: "D105 — Complemento do CT-e — COFINS (EFD Contribuições)",
   D190: "D190 — Registro analítico do CT-e",
   D500: "D500 — Nota de serviço de comunicação e telecomunicação",
   D590: "D590 — Registro analítico (D500)",
@@ -364,8 +368,8 @@ export const NfseEntrySchema = z.object({
   numeroNf: z.string().nullable().optional(),
   chaveNf: z.string().nullable().optional(),
   sourceFile: z.string(),
-  /** "local" = pdfplumber, "ocr" = Gemini, undefined = entry de XML. */
-  method: z.enum(["local", "ocr"]).nullable().optional(),
+  /** "local" = pdfplumber, "ocr-local" = OCR offline, "ocr" = Gemini, undefined = XML. */
+  method: z.enum(["local", "ocr-local", "ocr"]).nullable().optional(),
   /** CNPJ do prestador (quem emitiu a nota). */
   cnpjPrestador: z.string().nullable().optional(),
   /** Razao Social do prestador. */
@@ -384,14 +388,18 @@ export const NfseFailureSchema = z.object({
 export type NfseFailure = z.infer<typeof NfseFailureSchema>;
 
 export const NfseExtractStatsSchema = z.object({
-  /** PDFs extraidos localmente (pdfplumber, gratis e instantaneo). */
+  /** PDFs extraidos do texto nativo (pdfplumber, gratis e instantaneo). */
   local: z.number(),
-  /** PDFs que cairam no OCR Gemini (so imagem ou layout incomum). */
+  /** PDFs/imagens resolvidos por OCR local (rasteriza e le; sem API, sem cota). */
+  ocr_local: z.number().optional(),
+  /** PDFs que cairam no OCR Gemini (fallback opcional). */
   ocr: z.number(),
   /** Imagens (.jpg/.png) processadas via Gemini. */
   imagens: z.number(),
-  /** True se a chave Gemini estava configurada (false desabilita OCR fallback). */
+  /** True se a chave Gemini estava configurada (false desabilita o fallback). */
   ocr_disponivel: z.boolean(),
+  /** True se as dependencias de OCR local estao instaladas no worker. */
+  ocr_local_disponivel: z.boolean().optional(),
 });
 
 export type NfseExtractStats = z.infer<typeof NfseExtractStatsSchema>;

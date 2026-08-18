@@ -169,7 +169,7 @@ function validateSpedJobSheetsAndPresent(
     return {
       ok: false,
       error:
-        "Envie presentRegs (JSON) com os REGs do arquivo quando sheets incluir blocos fora dos 11 principais (use POST /tools/sped/inspect no mesmo ficheiro).",
+        "Envie presentRegs (JSON) com os REGs do arquivo quando sheets incluir blocos fora dos principais (use POST /tools/sped/inspect no mesmo ficheiro).",
     };
   }
   if (presentRegs.length > SPED_MAX_PRESENT_REGS) {
@@ -180,7 +180,7 @@ function validateSpedJobSheetsAndPresent(
     if (!SPED_CORE.has(s) && !prSet.has(s)) {
       return {
         ok: false,
-        error: `Aba ${s} não está nos 11 principais e não consta em presentRegs.`,
+        error: `Aba ${s} não está nos principais e não consta em presentRegs.`,
       };
     }
   }

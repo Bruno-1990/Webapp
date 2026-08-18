@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import re
 import unicodedata
+from decimal import Decimal, InvalidOperation
 from datetime import date, datetime
 from typing import Any
 
@@ -107,6 +108,18 @@ def _normalize_numeric(value: Any) -> str:
     return s
 
 
+def _numeros_iguais(valor: str, template: str) -> bool:
+    """Mesmo número escrito de outra forma? ('7,6' vs '7,60', '0' vs '0,00')."""
+    if not valor or not template:
+        return False
+    if not _TEMPLATE_NUMERIC_RE.fullmatch(template):
+        return False
+    try:
+        return Decimal(valor.replace(",", ".")) == Decimal(template.replace(",", "."))
+    except (InvalidOperation, ValueError):
+        return False
+
+
 def _normalize_with_template(value: Any, template_value: str) -> str:
     t = template_value.strip()
     if not t:
@@ -141,6 +154,11 @@ def normalize_sped_field(field_name: str, value: Any, template_value: str | None
         v = _normalize_numeric(value)
         if template_value:
             t = template_value.strip()
+            # Campo não editado: devolve o texto original. O Excel guarda ALIQ_*/QTD como
+            # número, então "7,60" volta como 7.6; sem isto o .txt remontado ficaria com
+            # diferenças puramente de formatação.
+            if _numeros_iguais(v, t):
+                return t
             if "." in t and "," not in t:
                 return v.replace(",", ".")
             # Template inteiro (sem separador decimal) → remover decimais zerados
@@ -184,7 +202,7 @@ def inner_payload_for_register_with_template(
     reg: str, row: dict[str, Any], headers_rec: list[str], template_inner: list[str] | None
 ) -> list[str]:
     h = headers_rec
-    if reg in ("C170", "C190", "D190"):
+    if reg in ("C170", "C190", "D101", "D105", "D190"):
         names = [h[0]] + h[3:]
     elif reg in ("C590", "D590"):
         names = [h[0]] + h[2:]

@@ -92,7 +92,7 @@ class DefaultReportBuilder:
         ws.append(["VÍNCULO", "LINHAS NO EXCEL", "LINHAS NO TXT", "POSSUI NUM_DOC", "POSSUI CHAVE", "DIVERGÊNCIAS"])
         start_row = ws.max_row
         if link_checks:
-            for k in ("C170", "C190", "C590", "D190", "D590"):
+            for k in ("C170", "C190", "C590", "D101", "D105", "D190", "D590"):
                 info = link_checks.get(k, {})
                 if not info:
                     continue
@@ -100,8 +100,8 @@ class DefaultReportBuilder:
                     vinculo = "C100 → " + k
                 elif k == "C590":
                     vinculo = "C500 → C590"
-                elif k == "D190":
-                    vinculo = "D100 → D190"
+                elif k in ("D101", "D105", "D190"):
+                    vinculo = "D100 → " + k
                 else:  # D590
                     vinculo = "D500 → D590"
                 ws.append([
@@ -130,7 +130,7 @@ class DefaultReportBuilder:
         ws.append([])
         self._format_section_title(ws, ws.max_row + 1, "⚠️ Divergências Detalhadas")
         if link_checks:
-            for k in ("C170", "C190", "C590", "D190", "D590"):
+            for k in ("C170", "C190", "C590", "D101", "D105", "D190", "D590"):
                 info = link_checks.get(k, {})
                 if not info or not info.get("mismatches"):
                     continue

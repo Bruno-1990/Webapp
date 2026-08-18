@@ -16,9 +16,13 @@ if _SPED_ENGINE.is_dir():
     sys.path.insert(0, str(_SPED_ENGINE))
 
 from cabecalhos_sped import merge_headers  # noqa: E402
-from config import HEADERS  # noqa: E402
+from config import HEADERS, SHEET_ORDER  # noqa: E402
 
-CORE_SHEETS = ("0150", "0200", "C100", "C170", "C190", "C500", "C590", "D100", "D190", "D500", "D590")
+# Derivado do exportador: as abas que um export completo produz. Não duplicar a lista.
+CORE_SHEETS = tuple(SHEET_ORDER)
+# Abas core acrescentadas depois que planilhas já circulavam: a ausência não invalida
+# a planilha (a checagem de sequência do _LINHA acusa se as linhas do .txt sumiram).
+CORE_SHEETS_OPCIONAIS = ("D101", "D105")
 REG_RE = re.compile(r"^[0-9A-Z]{4}$")
 MERGE_HEADERS = merge_headers(HEADERS)
 
@@ -63,7 +67,9 @@ def inspect_xlsx(path: Path) -> dict:
                 continue
             line_numbers.add(ln)
 
-    missing_core = [s for s in CORE_SHEETS if s not in reg_sheets]
+    missing_core = [
+        s for s in CORE_SHEETS if s not in reg_sheets and s not in CORE_SHEETS_OPCIONAIS
+    ]
     if missing_core:
         reasons.append("Abas core ausentes: " + ",".join(missing_core))
 

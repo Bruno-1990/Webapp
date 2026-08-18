@@ -62,7 +62,7 @@ class DefaultSpedParser:
                     data[reg].append((line_no, parts))
                 continue
 
-            if reg == "D190":
+            if reg in ("D101", "D105", "D190"):
                 parts = [payload[0], current_num_doc_d, current_chv_cte] + payload[1:]
                 if reg in data:
                     data[reg].append((line_no, parts))

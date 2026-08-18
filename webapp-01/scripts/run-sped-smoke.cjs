@@ -1,11 +1,16 @@
 /**
  * Smoke: gera XLSX a partir de tests/fixtures/sped_minimo.txt via engines/sped/sped_engine/cli.py
- * Valida: export completo (11 abas), --sheets C100 e --sheets 0000 (cabeçalhos do guia).
+ * Valida: export completo, --sheets C100 e --sheets 0000 (cabeçalhos do guia).
+ *
+ * A lista de abas esperadas vem dos contracts (não é copiada aqui): o teste vale
+ * também como checagem cruzada entre o `SHEET_ORDER` do Python e o
+ * `SPED_EXPORT_SHEET_KEYS` do TypeScript. Requer `npm run build -w @webapp/contracts`.
  */
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { pathToFileURL } = require("node:url");
 
 const root = path.resolve(__dirname, "..");
 const engine = path.resolve(root, "..", "engines", "sped", "sped_engine");
@@ -55,19 +60,21 @@ function listSheetNames(xlsxPath) {
   return r.stdout.trim().split("|").filter(Boolean);
 }
 
-const expectedFull = [
-  "0150",
-  "0200",
-  "C100",
-  "C170",
-  "C190",
-  "C500",
-  "C590",
-  "D100",
-  "D190",
-  "D500",
-  "D590",
-];
+async function abasEsperadas() {
+  const dist = path.join(root, "packages", "contracts", "dist", "index.js");
+  if (!fs.existsSync(dist)) {
+    console.error(
+      "contracts sem build:", dist,
+      "\nRode: npm run build -w @webapp/contracts"
+    );
+    process.exit(1);
+  }
+  const { SPED_EXPORT_SHEET_KEYS } = await import(pathToFileURL(dist).href);
+  return [...SPED_EXPORT_SHEET_KEYS];
+}
+
+async function main() {
+const expectedFull = await abasEsperadas();
 
 const r1 = runCli(outFull);
 if (r1.status !== 0) {
@@ -115,7 +122,15 @@ if (namesGen.join(",") !== "0000") {
   process.exit(1);
 }
 
-console.log("OK: export completo + --sheets C100 + --sheets 0000 (guia cabeçalhos)");
+console.log(
+  `OK: export completo (${expectedFull.length} abas dos contracts) + --sheets C100 + --sheets 0000 (guia cabeçalhos)`
+);
 fs.unlinkSync(outFull);
 fs.unlinkSync(outSub);
 fs.unlinkSync(outGeneric);
+}
+
+main().catch((e) => {
+  console.error("Smoke falhou:", e);
+  process.exit(1);
+});
