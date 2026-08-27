@@ -41,7 +41,6 @@ const FONT_SIZE = 11;
 const FILL_FALHA = "FFFADBD8";
 const FILL_ALERTA = "FFFCF3CF";
 const FILL_NEUTRO = "FFEAEDED";
-const FILL_RESUMO = "FFDCE9F5";
 const FONT_FALHA = "FFA13024";
 
 const THIN_BORDER: Partial<Borders> = {
@@ -158,13 +157,6 @@ function destacar(
   });
 }
 
-function negritarLinha(ws: Worksheet, r: number, ateColuna?: number): void {
-  ws.getRow(r).eachCell({ includeEmpty: true }, (cell, c) => {
-    if (ateColuna != null && c > ateColuna) return;
-    cell.font = { name: FONT_NAME, size: FONT_SIZE, bold: true, color: { argb: DATA_FONT_ARGB } };
-  });
-}
-
 function formatarColuna(ws: Worksheet, indice: number, formato: string): void {
   ws.getColumn(indice).numFmt = formato;
 }
@@ -183,55 +175,14 @@ const CAB_CONFERENCIA = [
   "Até",
   "Qtd",
   "Data",
-  "Valor Total",
-  "ICMS",
   "Observação",
   "Justificativa",
   "Conferido por / em",
 ];
 
 /** Última coluna que recebe o fundo de destaque — as de trabalho ficam brancas. */
-const COL_ATE_DESTAQUE = 9;
+const COL_ATE_DESTAQUE = 7;
 const COL_DATA = 6;
-const COL_VALOR = 7;
-const COL_ICMS = 8;
-
-/** tpEmis (dígito 35 da chave) fora do normal. */
-const TP_EMIS: Record<string, string> = {
-  "2": "contingência FS-IA",
-  "3": "SCAN",
-  "4": "DPEC",
-  "5": "contingência FS-DA",
-  "6": "SVC-AN",
-  "7": "SVC-RS",
-  "9": "offline",
-};
-
-/** Índice da coluna da planilha de origem cujo cabeçalho casa com um dos alvos. */
-function colunaOrigem(c: Conferencia, ...alvos: string[]): number {
-  const chaves = c.cabecalhos.map(norm);
-  for (const a of alvos) {
-    const i = chaves.indexOf(a);
-    if (i >= 0) return i;
-  }
-  for (const a of alvos) {
-    const i = chaves.findIndex((k) => k.startsWith(a));
-    if (i >= 0) return i;
-  }
-  return -1;
-}
-
-/** Soma uma coluna de valor da origem. `null` quando a coluna não existe. */
-function somar(notas: Nota[], col: number): number | null {
-  if (col < 0) return null;
-  let total = 0;
-  for (const n of notas) {
-    const v = talvezNumero(n.valores[col] ?? null);
-    if (typeof v === "number" && Number.isFinite(v)) total += v;
-  }
-  // Centavos: evita o 0.1 + 0.2 de sempre aparecer no total.
-  return Math.round(total * 100) / 100;
-}
 
 /** dd/mm/aaaa a partir do que veio na planilha (texto ou Date). */
 function textoData(v: Celula): string {
@@ -242,23 +193,15 @@ function textoData(v: Celula): string {
   return String(v).trim();
 }
 
-function faixaNumeros(notas: Nota[]): [number | null, number | null] {
-  if (notas.length === 0) return [null, null];
-  let min = notas[0].numero;
-  let max = notas[0].numero;
-  for (const n of notas) {
-    if (n.numero < min) min = n.numero;
-    if (n.numero > max) max = n.numero;
-  }
-  return [min, max];
-}
-
 /**
- * A aba de conferência abre com um bloco de resumo (uma linha por assunto, em
- * azul) e segue com o que exige ação **neste** período: números sem nota e
- * duplicatas. Canceladas, denegadas, contingência e notas de mês anterior
- * entram como linha de resumo e ficam detalhadas na aba da própria série —
- * listá-las uma a uma aqui enchia a aba de linhas repetindo o mesmo texto.
+ * A aba de conferência lista só o que exige ação **neste** período: números sem
+ * nota e duplicatas. Canceladas, denegadas e notas de mês anterior ficam
+ * detalhadas na aba da própria série — listá-las aqui, uma por linha, enchia a
+ * aba de linhas repetindo o mesmo texto.
+ *
+ * `Até` fica vazio quando é um número só, e `Observação` fica vazia quando não
+ * há nada de específico a dizer: repetir "nenhuma nota emitida com este
+ * número" em 180 linhas não informa nada e só faz volume.
  *
  * As duas últimas colunas nascem vazias, de propósito: são onde o analista
  * escreve a justificativa de cada furo (inutilização, nota não transmitida,
@@ -266,8 +209,6 @@ function faixaNumeros(notas: Nota[]): [number | null, number | null] {
  */
 function linhasConferencia(c: Conferencia): Celula[][] {
   const linhas: Celula[][] = [];
-  const colValor = colunaOrigem(c, "valortotal", "valor");
-  const colIcms = colunaOrigem(c, "valoricms");
 
   const linha = (
     serie: string,
@@ -276,86 +217,8 @@ function linhasConferencia(c: Conferencia): Celula[][] {
     ate: Celula,
     qtd: Celula,
     data: Celula,
-    valor: Celula,
-    icms: Celula,
     obs: Celula,
-  ): Celula[] => [serie, ocorrencia, de, ate, qtd, data, valor, icms, obs, "", ""];
-
-  for (const s of c.series) {
-    const rot = rotuloSerie(s.serie);
-    const validas = s.doPeriodo.filter((n) => !s.canceladas.includes(n));
-
-    linhas.push(
-      linha(
-        rot,
-        "Resumo · Período",
-        s.primeira,
-        s.ultima,
-        s.doPeriodo.length,
-        null,
-        somar(validas, colValor),
-        somar(validas, colIcms),
-        s.ultima != null
-          ? `Valores sem as canceladas. A próxima planilha deve começar em ${s.ultima + 1}.`
-          : null,
-      ),
-    );
-
-    linhas.push(
-      linha(
-        rot,
-        "Resumo · Sem nota",
-        null,
-        null,
-        s.faltantes.length,
-        null,
-        null,
-        null,
-        s.faltantes.length === 0
-          ? "Sequência completa — nenhum número sem nota."
-          : `Furos em ${s.diasComFuro} dos ${s.diasComEmissao} dias com emissão.`,
-      ),
-    );
-
-    if (s.duplicadas.length > 0) {
-      linhas.push(
-        linha(rot, "Resumo · Duplicadas", null, null, s.duplicadas.length, null, null, null,
-          "Mesma chave em mais de uma linha da planilha de origem."),
-      );
-    }
-
-    if (s.mesAnterior.length > 0) {
-      const [min, max] = faixaNumeros(s.mesAnterior);
-      const meses = [...new Set(s.mesAnterior.map((n) => rotuloPeriodo(n.aamm)))].join(", ");
-      linhas.push(
-        linha(rot, "Resumo · Mês anterior", min, max, s.mesAnterior.length, null, null, null,
-          `Emitidas em ${meses} e transmitidas neste período — confira na sequência de origem.`),
-      );
-    }
-
-    if (s.canceladas.length > 0) {
-      linhas.push(
-        linha(rot, "Resumo · Canceladas", null, null, s.canceladas.length, null,
-          somar(s.canceladas, colValor), null,
-          "O número foi utilizado — não é falha de sequência."),
-      );
-    }
-
-    if (s.denegadas.length > 0) {
-      linhas.push(
-        linha(rot, "Resumo · Denegadas", null, null, s.denegadas.length, null, null, null,
-          "O número foi utilizado — não é falha de sequência."),
-      );
-    }
-
-    if (s.contingencia.length > 0) {
-      const tipos = [...new Set(s.contingencia.map((n) => TP_EMIS[n.tpEmis] ?? `tpEmis ${n.tpEmis}`))];
-      linhas.push(
-        linha(rot, "Resumo · Contingência", null, null, s.contingencia.length, null, null, null,
-          `Emitidas fora do modo normal (${tipos.join(", ")}) — costuma explicar furo de sequência.`),
-      );
-    }
-  }
+  ): Celula[] => [serie, ocorrencia, de, ate, qtd, data, obs, "", ""];
 
   for (const s of c.series) {
     for (const b of s.blocos) {
@@ -370,8 +233,6 @@ function linhasConferencia(c: Conferencia): Celula[][] {
           qtd === 1 ? null : b.ate,
           qtd,
           talvezData(b.dataAntes),
-          null,
-          null,
           // Só avisa quando os vizinhos discordam: aí o furo é uma janela de
           // datas, não um dia certo. "de número seguinte" e não "seguinte"
           // porque a numeração nem sempre segue a ordem das datas — a data do
@@ -400,8 +261,6 @@ function linhasConferencia(c: Conferencia): Celula[][] {
           null,
           notas.length,
           talvezData(notas[0].data),
-          null,
-          null,
           `Mesma chave nas linhas ${notas.map((n) => n.linha).join(", ")} da planilha`,
         ),
       );
@@ -417,17 +276,10 @@ function abaConferencia(ws: Worksheet, c: Conferencia): void {
   for (const l of linhas) ws.addRow(l);
   aplicarPadrao(ws, CAB_CONFERENCIA, linhas);
   formatarColuna(ws, COL_DATA, "dd/mm/yyyy");
-  formatarColuna(ws, COL_VALOR, "#,##0.00");
-  formatarColuna(ws, COL_ICMS, "#,##0.00");
 
   for (let r = 2; r <= ws.rowCount; r++) {
     const tipo = String(ws.getRow(r).getCell(2).value ?? "");
-    if (tipo.startsWith("Resumo")) {
-      // O resumo abre a aba: fundo azul-claro e negrito, para ler como bloco
-      // de cabeçalho e não como mais uma ocorrência.
-      destacar(ws, r, FILL_RESUMO, undefined, COL_ATE_DESTAQUE);
-      negritarLinha(ws, r, COL_ATE_DESTAQUE);
-    } else if (tipo.includes("faltante")) {
+    if (tipo.includes("faltante")) {
       destacar(ws, r, FILL_FALHA, undefined, COL_ATE_DESTAQUE);
     } else if (tipo === "Duplicada") {
       destacar(ws, r, FILL_ALERTA, undefined, COL_ATE_DESTAQUE);
