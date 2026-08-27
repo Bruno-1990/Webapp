@@ -201,6 +201,14 @@ alinhamento por célula (trava o navegador / estoura memória). Em vez disso:
 (Já é o que o NFe faz em `packages/excel-export/src/format-sheet.ts` ao passar de
 `LARGE_SHEET_MIN_ROWS`.)
 
+> **O limite de 2.500 é conservador — meça antes de abrir mão do padrão.** Numa
+> aba de **23.636 × 17** (ExcelJS, no navegador), o caminho aliviado levou
+> **3,1 s** e o padrão completo por célula (altura 22 + fonte + borda) levou
+> **5,1 s**: 2 s a mais por uma planilha visualmente igual às demais. A
+> Conferência de Sequência aplica o padrão completo em todas as abas por causa
+> disso. O alívio da §5 existe para não *travar* o navegador — abaixo da escala
+> em que ele trava, prefira a conformidade.
+
 ---
 
 ## 6. Checklist de conformidade
@@ -234,6 +242,7 @@ SEFAZ×SCI passou para `CECECE`), sem refatorar a estrutura de cada arquivo.
 | **Consolidado SCI** | `engines/sci-consolidado/format.py` | ✅ `4169E1` | zebra/alturas |
 | **Comparador SEFAZ×SCI** | `engines/comparacao-planilhas/cli.py` | ✅ `4169E1` (borda→`CECECE`) | alturas |
 | **Comparador NFS-e** | `engines/comparacao-nfse/excel.py` | ✅ `4169E1` | alturas 25/20→30/22 |
+| **Conferência de Sequência** | `frontend/src/conferenciaSequencia/exportConferencia.ts` | ✅ `4169E1` | — (conforme: alturas 30/22, bordas, fonte, freeze e larguras em **todas** as abas) |
 
 > A coluna "Falta" lista o que ainda diverge do padrão (alturas, bordas, zebra,
 > freeze) — são mudanças de **estrutura/comportamento**, deixadas para depois.

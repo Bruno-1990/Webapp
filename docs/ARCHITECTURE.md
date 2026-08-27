@@ -76,8 +76,9 @@ ver tabela). No Docker, o Dockerfile copia a engine e fixa essa env var.
 | Concatenador de Planilhas | `concatenador-planilhas` | `ConcatenadorPlanilhasHomePage.tsx` | `worker-concatenador-planilhas` | `concatenador-planilhas` (Node) | `CONCATENADOR_DIR` | `concatenador-planilhas` | `Dockerfile.worker-concatenador-planilhas` | `worker-concatenador-planilhas` | `comparacao` |
 | **Editor de Extrato** | `extrato-edit` | `ExtratoEditHomePage.tsx` | — (rotas na `api`) | — | — | — | — | `api` (DB SQLite) | core |
 | **NFS-e → PDF (DANFSe)** | `nfse-pdf` | `NfsePdfHomePage.tsx` | — | — | — | — | — | — | — |
+| **Conferência de Sequência** | `conferencia-sequencia` | `ConferenciaSequenciaHomePage.tsx` | — | — | — | — | — | — | — |
 
-**NFS-e → PDF** roda **100% no navegador**, sem API, fila, worker, engine ou
+**NFS-e → PDF** e **Conferência de Sequência** rodam **100% no navegador**, sem API, fila, worker, engine ou
 Docker. O **Editor de Extrato** parseia e exporta o `.xlsx` no navegador, mas tem
 um **cadastro de clientes/fornecedores server-side**: rotas REST simples
 (sem fila/Redis) em `apps/api/src/server.ts` + `apps/api/src/extrato-db.ts`
@@ -94,7 +95,7 @@ carregada sob demanda).
 
 Categorias do hub: **Fiscal** = nfe, sped, sped-merge, sci-consolidado,
 comparacao-planilhas, comparacao-nfse, sci-portal-nacional, nfse-pdf,
-concatenador-planilhas. **Contábil** = gnre, extrato-edit.
+concatenador-planilhas, conferencia-sequencia. **Contábil** = gnre, extrato-edit.
 
 ## Como o frontend descobre as ferramentas
 

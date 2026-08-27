@@ -17,6 +17,9 @@ const SciPortalNacionalHomePage = lazy(() => import("./pages/SciPortalNacionalHo
 const ConcatenadorPlanilhasHomePage = lazy(
   () => import("./pages/ConcatenadorPlanilhasHomePage.js")
 );
+const ConferenciaSequenciaHomePage = lazy(
+  () => import("./pages/ConferenciaSequenciaHomePage.js")
+);
 const LegacyDownloadRedirect = lazy(() => import("./pages/LegacyDownloadRedirect.js"));
 
 function LegacyFallback() {
@@ -59,6 +62,8 @@ export default function App() {
             path="/tools/concatenador-planilhas/download/:jobId"
             element={<DownloadPage />}
           />
+          {/* Roda 100% no navegador: sem rota de download por job. */}
+          <Route path="/tools/conferencia-sequencia" element={<ConferenciaSequenciaHomePage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

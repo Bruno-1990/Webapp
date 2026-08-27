@@ -75,6 +75,21 @@ só "onde clicar" para cada ferramenta. Caminhos relativos à raiz `webapp/`.
 - Lógica: [`frontend/src/nfsePdf/`](../webapp-01/frontend/src/nfsePdf) — `parseNfse.ts` (DOMParser) · `nfseEnums.ts`/`format.ts` (domínios NT-007 + formatação) · `danfseDoc.ts`/`eventoDoc.ts` (pdfmake) · `logoData.ts` (logo NFS-e base64) · `generateZip.ts` (JSZip + coleta de retenções) · `retencaoReport.ts` (relatório ExcelJS) · `qr.ts` (qrcode) · `municipios.ts` (+ `municipios.json`, tabela IBGE lazy)
 - Libs: `pdfmake`, `jszip`, `qrcode`, `exceljs` (todas carregadas sob demanda).
 
+### Conferência de Sequência — `id: conferencia-sequencia`
+- **Sem backend** — roda 100% no navegador (ExcelJS; `.xls` binario via SheetJS). A planilha fiscal nao sai da maquina do usuario.
+- Recebe **uma** planilha de NFes emitidas da SEFAZ e aponta os numeros que ficaram sem nota, por serie.
+- **A serie vem da chave de acesso, nao da faixa do numero.** A chave de 44 digitos tem layout fixo `cUF(2) AAMM(4) CNPJ(14) mod(2) SERIE(3) nNF(9) tpEmis(1) cNF(8) cDV(1)`, entao a serie sai dos digitos 23–25 e o numero dos 26–34. Agrupar por magnitude (“os que comecam com 80 mil”) quebra quando duas series tem faixas proximas.
+- **Notas de meses anteriores ficam fora da contagem.** O `AAMM` da chave diz o mes de emissao real; notas transmitidas com atraso caem no relatorio do mes seguinte e pertencem a sequencia de origem. Sem separa-las o menor numero da serie despenca e a ferramenta acusa milhares de faltantes inexistentes (num caso real: 13.464 falsos contra 184 reais).
+- Tambem sinaliza **duplicadas** (mesma chave em mais de uma linha), **canceladas** e **denegadas** — estas ocupam o numero e nao sao falha de sequencia.
+- Resultado na tela (por serie: faixa, contagens e as faixas faltantes) + download do `.xlsx` com **`Conferencia`**, **`Base Original`** (entrada + Serie/Numero/AAMM/Modelo/Escopo) e **uma aba por serie** com o salto marcado em vermelho.
+- A aba **`Conferencia`** abre com um bloco de resumo (uma linha por assunto, em azul: Periodo com Valor Total e ICMS *sem as canceladas* e o numero em que a proxima planilha deve comecar, Sem nota, Duplicadas, Mes anterior, Canceladas, Denegadas, Contingencia) e segue com o que exige acao **neste** periodo: numeros sem nota e duplicatas. Canceladas, denegadas, contingencia e notas de mes anterior ficam so no resumo e detalhadas na aba da serie — listadas uma a uma aqui, enchiam a aba de linhas repetindo o mesmo texto.
+- **Cada furo vem datado.** A data sai das notas que cercam o furo: quando as duas batem, o dia e certo (97% dos furos no arquivo de referencia); quando divergem, a coluna `Observacao` avisa a data da nota de *numero* seguinte, e o furo vira uma janela. Diz-se "de numero seguinte" porque a numeracao nem sempre segue a ordem das datas — na serie 1 do arquivo de referencia, 3,1% dos pares estao fora de ordem, com recuo de ate 10 dias.
+- As duas ultimas colunas (`Justificativa` e `Conferido por / em`) nascem **vazias e sem fundo**, de proposito: sao onde o analista escreve o porque de cada furo (inutilizacao, nota nao transmitida, emitida no mes seguinte) e assina. O arquivo volta preenchido.
+- Todas as abas tem **filtro no cabecalho** (`autoFilter`), para isolar uma serie ou um tipo de ocorrencia.
+- Cabecalho e colunas sao achados pelo nome (`Chave Acesso`, `Num.`, `Data Emissao`, `Situacao`), varrendo as 15 primeiras linhas — aguenta o titulo do relatorio acima do cabecalho.
+- Pagina: [`ConferenciaSequenciaHomePage.tsx`](../webapp-01/frontend/src/pages/ConferenciaSequenciaHomePage.tsx)
+- Logica: [`frontend/src/conferenciaSequencia/`](../webapp-01/frontend/src/conferenciaSequencia) — `analise.ts` (leitura, series, lacunas) · `exportConferencia.ts` (ExcelJS, segue [EXPORT-STANDARD.md](EXPORT-STANDARD.md) incl. §5 para as abas grandes)
+
 ## Contábeis
 
 ### Extrator GNRE (PDF → XLSX) — `id: gnre`

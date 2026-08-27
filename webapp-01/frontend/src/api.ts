@@ -245,6 +245,17 @@ function defaultToolsManifest(): ToolManifestEntry[] {
       available: true,
       category: "fiscal",
     },
+    {
+      id: "conferencia-sequencia",
+      title: "Conferência de Sequência",
+      subtitle: "Numeração das notas · SEFAZ",
+      description:
+        "Envie a planilha de NFes emitidas da SEFAZ e veja quais números ficaram sem nota. As séries são separadas pela chave de acesso (não pela faixa do número) e as notas de meses anteriores transmitidas com atraso ficam fora da contagem. Roda 100% no navegador — nada é enviado a servidores.",
+      route: "/tools/conferencia-sequencia",
+      available: true,
+      category: "fiscal",
+      tag: { label: "NF-e · Produtos", tone: "blue" },
+    },
   ];
 }
 
