@@ -1991,8 +1991,26 @@ app.get<{ Params: { id: string } }>(`${API_PREFIX}/tools/comparacao-nfse/jobs/:i
   }
   const state = await job.getState();
   const status = mapBullState(state);
-  const progress =
-    typeof job.progress === "number" ? Math.round(job.progress) : undefined;
+
+  /** O worker envia progresso como objeto {value, stage, ...} para o frontend
+   * distinguir o passe rapido (texto) do lento (OCR). Jobs antigos e os demais
+   * caminhos ainda mandam numero puro — as duas formas seguem aceitas. */
+  const rawProgress = job.progress as
+    | number
+    | { value?: unknown; stage?: unknown; stageDone?: unknown; stageTotal?: unknown }
+    | undefined;
+  let progress: number | undefined;
+  let stage: string | undefined;
+  let stageDone: number | undefined;
+  let stageTotal: number | undefined;
+  if (typeof rawProgress === "number") {
+    progress = Math.round(rawProgress);
+  } else if (rawProgress && typeof rawProgress === "object") {
+    if (typeof rawProgress.value === "number") progress = Math.round(rawProgress.value);
+    if (typeof rawProgress.stage === "string") stage = rawProgress.stage;
+    if (typeof rawProgress.stageDone === "number") stageDone = rawProgress.stageDone;
+    if (typeof rawProgress.stageTotal === "number") stageTotal = rawProgress.stageTotal;
+  }
 
   let downloadToken: string | undefined;
   let fileName: string | undefined;
@@ -2044,6 +2062,9 @@ app.get<{ Params: { id: string } }>(`${API_PREFIX}/tools/comparacao-nfse/jobs/:i
     id,
     status,
     progress,
+    stage,
+    stageDone,
+    stageTotal,
     error,
     downloadToken,
     fileName,

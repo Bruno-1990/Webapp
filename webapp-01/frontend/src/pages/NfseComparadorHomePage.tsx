@@ -284,14 +284,37 @@ export default function NfseComparadorHomePage() {
 
   const readyToSubmit = pdfFiles.length > 0 && xmlFiles.length > 0 && !isProcessing;
 
+  /** Rótulo da barra. O passe de texto resolve ~88% dos arquivos em segundos e
+   * o de OCR leva ~20s cada — como a barra é linear em contagem de arquivo, ela
+   * praticamente para nos últimos pontos. Mostrar o passe e o contador "N de M"
+   * é o que prova ao usuário que o processo está vivo. */
   const barLabel = useMemo(() => {
     if (uploadPct != null) return `Enviando arquivos (${uploadPct}%)`;
     if (job?.status === "queued") return "Na fila…";
-    if (job?.status === "running") {
-      return pdfFiles.length > 0 ? "Lendo PDFs/imagens (OCR) e XMLs…" : "Lendo XMLs…";
+    if (job?.status !== "running") return "Carregando…";
+
+    const feitos = job.stageDone ?? 0;
+    const total = job.stageTotal ?? 0;
+    const contador = total > 0 ? ` — ${feitos} de ${total}` : "";
+
+    switch (job.stage) {
+      case "xml":
+        return "Lendo XMLs…";
+      case "texto":
+        return `Lendo PDFs com texto${contador}`;
+      case "ocr_local":
+        return `Reconhecendo PDFs escaneados (OCR)${contador} · etapa mais lenta`;
+      case "ocr_gemini":
+        return `OCR avançado${contador} · etapa mais lenta`;
+      case "comparando":
+        return "Comparando PDFs × XMLs…";
+      case "planilha":
+        return "Gerando planilha…";
+      default:
+        // Sem `stage`: worker antigo, ou job criado antes desta versão.
+        return pdfFiles.length > 0 ? "Lendo PDFs/imagens (OCR) e XMLs…" : "Lendo XMLs…";
     }
-    return "Carregando…";
-  }, [uploadPct, job?.status, pdfFiles.length]);
+  }, [uploadPct, job?.status, job?.stage, job?.stageDone, job?.stageTotal, pdfFiles.length]);
 
   return (
     <motion.div

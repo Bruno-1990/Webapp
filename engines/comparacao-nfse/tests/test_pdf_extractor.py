@@ -109,7 +109,7 @@ def test_batch_processamento(tmp_path, monkeypatch):
     entries, failed, stats = pdf_extractor.extract_from_directory(
         tmp_path,
         api_key="fake",
-        on_progress=lambda i, n: progresso.append((i, n)),
+        on_progress=lambda i, n, *a: progresso.append((i, n)),
     )
     assert len(entries) == 3
     assert failed == []

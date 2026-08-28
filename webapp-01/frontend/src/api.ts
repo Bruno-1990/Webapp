@@ -41,10 +41,23 @@ function baseUrl(): string {
 
 export type JobStatus = "queued" | "running" | "done" | "failed" | "not_found";
 
+/** Passe atual do motor. Só o Comparador NFS-e preenche hoje; as demais tools
+ * seguem mandando apenas `progress` numérico. */
+export type JobStage =
+  | "xml"
+  | "texto"
+  | "ocr_local"
+  | "ocr_gemini"
+  | "comparando"
+  | "planilha";
+
 export type JobResponse = {
   id: string;
   status: JobStatus;
   progress?: number;
+  stage?: JobStage;
+  stageDone?: number;
+  stageTotal?: number;
   error?: string;
   downloadToken?: string;
   fileName?: string;

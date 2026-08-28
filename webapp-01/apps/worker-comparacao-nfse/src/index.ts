@@ -44,7 +44,7 @@ type RunOutcome = {
 };
 
 function runNfseCli(
-  job: { updateProgress: (n: number) => Promise<void> },
+  job: { updateProgress: (n: number | object) => Promise<void> },
   data: ComparacaoNfseJobPayload,
 ): Promise<RunOutcome> {
   return new Promise((resolve, reject) => {
@@ -93,8 +93,19 @@ function runNfseCli(
     rl.on("line", (line) => {
       const event = parseStdoutLine(line);
       if (event) {
-        applyEvent(state, event, (v) => {
-          void job.updateProgress(v);
+        applyEvent(state, event, (detail) => {
+          // Objeto (nao numero) para o frontend saber em qual passe estamos.
+          // A API aceita as duas formas — jobs antigos continuam numericos.
+          void job.updateProgress(
+            detail.stage
+              ? {
+                  value: detail.value,
+                  stage: detail.stage,
+                  stageDone: detail.stageDone ?? 0,
+                  stageTotal: detail.stageTotal ?? 0,
+                }
+              : detail.value,
+          );
         });
       }
     });

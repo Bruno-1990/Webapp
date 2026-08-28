@@ -24,8 +24,12 @@ def emit(kind: str, **kw):
     print(json.dumps({"kind": kind, **kw}), flush=True)
 
 
-def progress(value: int):
-    emit("progress", value=max(0, min(100, value)))
+def progress(value: int, **etapa):
+    """Emite progresso. `etapa` carrega o passe atual e seus contadores para o
+    frontend distinguir "lendo texto" (rapido) de "OCR" (lento) — sem isso a
+    barra parece travada nos ultimos 8 pontos, que sao os arquivos escaneados.
+    """
+    emit("progress", value=max(0, min(100, value)), **etapa)
 
 
 def _build_result_payload(
@@ -110,10 +114,10 @@ def _build_governor():
 
 
 def processar(pdfs_dir: Path, xmls_dir: Path, output_xlsx: Path, output_json: Path) -> dict:
-    progress(2)
+    progress(2, stage="xml", stageDone=0, stageTotal=0)
 
     xml_entries, xml_ignorados = parse_nfse_directory(xmls_dir)
-    progress(20)
+    progress(20, stage="xml", stageDone=len(xml_entries), stageTotal=len(xml_entries))
 
     pdf_entries: list = []
     pdf_failed: list[dict] = []
@@ -142,10 +146,21 @@ def processar(pdfs_dir: Path, xmls_dir: Path, output_xlsx: Path, output_json: Pa
     if pdfs_presentes:
         api_key = os.environ.get("GEMINI_API_KEY", "").strip() or None
 
-        def on_prog(i: int, n: int):
+        def on_prog(
+            i: int,
+            n: int,
+            stage: str = "",
+            stage_done: int = 0,
+            stage_total: int = 0,
+        ):
             base = 20
             span = 65
-            progress(base + int((i / max(1, n)) * span))
+            etapa = (
+                {"stage": stage, "stageDone": stage_done, "stageTotal": stage_total}
+                if stage
+                else {}
+            )
+            progress(base + int((i / max(1, n)) * span), **etapa)
 
         pdf_entries, pdf_failed, extract_stats = extract_from_directory(
             pdfs_dir,
@@ -154,10 +169,10 @@ def processar(pdfs_dir: Path, xmls_dir: Path, output_xlsx: Path, output_json: Pa
             governor=governor,
         )
     else:
-        progress(85)
+        progress(85, stage="texto", stageDone=0, stageTotal=0)
 
     res = comparar(pdf_entries, xml_entries)
-    progress(90)
+    progress(90, stage="comparando", stageDone=0, stageTotal=0)
 
     # Invariante de fechamento (rede de seguranca contra refactors).
     # Por construcao do comparador, ambos sao verdadeiros — emitimos warn
@@ -223,8 +238,9 @@ def processar(pdfs_dir: Path, xmls_dir: Path, output_xlsx: Path, output_json: Pa
         {"file": nome, "reason": "XML invalido ou sem dados de NFS-e reconheciveis"}
         for nome in xml_ignorados
     ]
+    progress(95, stage="planilha", stageDone=0, stageTotal=0)
     gerar_xlsx(output_xlsx, res.so_pdf, res.so_xml, nao_lidos)
-    progress(100)
+    progress(100, stage="planilha", stageDone=1, stageTotal=1)
     return payload
 
 

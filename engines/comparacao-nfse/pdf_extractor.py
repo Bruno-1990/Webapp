@@ -278,7 +278,7 @@ def extract_from_directory(
     api_key: str | None = None,
     *,
     model: str = DEFAULT_MODEL,
-    on_progress: Callable[[int, int], None] | None = None,
+    on_progress: Callable[..., None] | None = None,
     governor=None,
 ) -> tuple[list[NfseEntry], list[dict], dict]:
     """Extrai entries de PDFs/imagens em `directory`.
@@ -319,16 +319,36 @@ def extract_from_directory(
     # so — um arquivo que atravessa os tres passes nao pode contar tres vezes.
     done = 0
 
+    # Etapa corrente: o passe 1 varre 88% dos arquivos em segundos, o passe 2
+    # leva ~20s por arquivo. Sem dizer em qual passe estamos, a barra (linear
+    # em contagem de arquivo) parece congelada durante todo o OCR.
+    stage = {"name": "texto", "done": 0, "total": 0}
+
+    def set_stage(name: str, total_da_etapa: int) -> None:
+        """Anuncia a etapa AO ENTRAR nela, nao no primeiro arquivo concluido.
+
+        O passe de OCR leva ~20s por arquivo: se esperassemos o primeiro bump,
+        a tela seguiria dizendo "lendo texto" durante todo o inicio do OCR —
+        exatamente a confusao que este feedback existe para eliminar.
+        """
+        stage["name"] = name
+        stage["done"] = 0
+        stage["total"] = total_da_etapa
+        if on_progress and total_da_etapa > 0:
+            on_progress(done, total, name, 0, total_da_etapa)
+
     def bump() -> None:
         nonlocal done
         done += 1
+        stage["done"] += 1
         if on_progress:
-            on_progress(done, total)
+            on_progress(done, total, stage["name"], stage["done"], stage["total"])
 
     # ── Pass 1: texto nativo (pdfplumber) ────────────────────────────────
     pdf_items = [(i, f) for i, f in enumerate(files) if f.suffix.lower() == ".pdf"]
     non_pdf_items = [(i, f) for i, f in enumerate(files) if f.suffix.lower() != ".pdf"]
 
+    set_stage("texto", len(pdf_items))
     if pdf_items:
         workers = min(_local_concurrency(), len(pdf_items))
         with ThreadPoolExecutor(max_workers=workers) as ex:
@@ -356,6 +376,7 @@ def extract_from_directory(
     # `restantes` guarda (indice, path, motivo_do_ocr_local) para o passe 3.
     restantes: list[tuple[int, Path, str | None]] = []
 
+    set_stage("ocr_local", len(needs_ocr))
     if needs_ocr and stats["ocr_local_disponivel"]:
         workers = min(ocr_local.concurrency(), len(needs_ocr))
         with ThreadPoolExecutor(max_workers=workers) as ex:
@@ -383,6 +404,7 @@ def extract_from_directory(
         restantes = [(i, f, motivo) for i, f in needs_ocr]
 
     # ── Pass 3: OCR Gemini (fallback opcional) ───────────────────────────
+    set_stage("ocr_gemini", len(restantes))
     if restantes:
         if not api_key:
             for _i, f, motivo in restantes:

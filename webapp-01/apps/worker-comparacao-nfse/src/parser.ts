@@ -1,7 +1,25 @@
 import type { ComparacaoNfseResult, NfseFailureKind } from "@webapp/contracts";
 
+/** Passe atual do motor Python. O passe 1 (texto) resolve ~88% dos arquivos em
+ * segundos; o passe 2 (OCR) leva ~20s por arquivo. A barra e linear em
+ * contagem, entao sem o passe o usuario ve os ultimos pontos "congelarem". */
+export type NfseStage =
+  | "xml"
+  | "texto"
+  | "ocr_local"
+  | "ocr_gemini"
+  | "comparando"
+  | "planilha";
+
+export type ProgressDetail = {
+  value: number;
+  stage?: NfseStage;
+  stageDone?: number;
+  stageTotal?: number;
+};
+
 export type StdoutEvent =
-  | { kind: "progress"; value: number }
+  | { kind: "progress"; value: number; stage?: NfseStage; stageDone?: number; stageTotal?: number }
   | { kind: "error"; message: string }
   | { kind: "warn"; message: string }
   | { kind: "failed_quota"; message: string; retryAfterSec: number }
@@ -17,7 +35,19 @@ export function parseStdoutLine(line: string): StdoutEvent | null {
   try {
     const o = JSON.parse(trimmed) as Partial<StdoutEvent> & { kind?: string };
     if (o.kind === "progress" && typeof (o as { value?: unknown }).value === "number") {
-      return { kind: "progress", value: (o as { value: number }).value };
+      const p = o as {
+        value: number;
+        stage?: unknown;
+        stageDone?: unknown;
+        stageTotal?: unknown;
+      };
+      return {
+        kind: "progress",
+        value: p.value,
+        stage: typeof p.stage === "string" ? (p.stage as NfseStage) : undefined,
+        stageDone: typeof p.stageDone === "number" ? p.stageDone : undefined,
+        stageTotal: typeof p.stageTotal === "number" ? p.stageTotal : undefined,
+      };
     }
     if (o.kind === "error" && typeof o.message === "string") {
       return { kind: "error", message: o.message };
@@ -64,11 +94,16 @@ export function emptyRunState(): CollectedRunState {
 export function applyEvent(
   state: CollectedRunState,
   event: StdoutEvent,
-  onProgress: (value: number) => void,
+  onProgress: (detail: ProgressDetail) => void,
 ): void {
   switch (event.kind) {
     case "progress":
-      onProgress(event.value);
+      onProgress({
+        value: event.value,
+        stage: event.stage,
+        stageDone: event.stageDone,
+        stageTotal: event.stageTotal,
+      });
       break;
     case "error":
       state.jsonError = event.message;

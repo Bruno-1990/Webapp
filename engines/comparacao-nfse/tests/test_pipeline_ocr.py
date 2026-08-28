@@ -179,8 +179,89 @@ def test_progresso_conta_cada_arquivo_uma_vez(tmp_path, monkeypatch, sem_texto_n
 
     progresso = []
     pdf_extractor.extract_from_directory(
-        tmp_path, api_key="fake", on_progress=lambda i, n: progresso.append((i, n))
+        tmp_path, api_key="fake", on_progress=lambda i, n, *a: progresso.append((i, n))
     )
 
     assert progresso[-1] == (4, 4)
     assert all(i <= n for i, n in progresso)
+
+
+def test_progresso_informa_o_passe_atual(tmp_path, monkeypatch, sem_texto_nativo):
+    """A barra e linear em contagem de arquivo, mas o passe de texto resolve a
+    maioria em segundos e o de OCR leva ~20s cada. Sem saber o passe, o usuario
+    ve os ultimos pontos congelarem e acha que travou. O progresso precisa
+    dizer em qual passe esta e quantos faltam DENTRO dele.
+    """
+    for i in range(3):
+        _fake_pdf(tmp_path / f"f{i}.pdf")
+
+    monkeypatch.setattr(ocr_local, "available", lambda: True)
+    monkeypatch.setattr(
+        ocr_local,
+        "extract_local_ocr",
+        lambda p: (None, "ilegivel"),
+    )
+    monkeypatch.setattr(
+        pdf_extractor,
+        "_call_gemini",
+        lambda *a, **kw: '{"cnpj_tomador": "02184341000270", "numero_nf": "9", "chave_nf": null}',
+    )
+
+    eventos = []
+    pdf_extractor.extract_from_directory(
+        tmp_path,
+        api_key="fake",
+        on_progress=lambda i, n, stage, sd, st: eventos.append((stage, sd, st)),
+    )
+
+    # Os 3 arquivos falham no texto e no OCR local, entao so o Gemini resolve.
+    # A jornada que o usuario ve, na ordem: cada etapa se anuncia ao ENTRAR
+    # (contador 0), mesmo quando nao resolve nada, e so a que resolve conta
+    # 1..N. Sem o anuncio, a tela ficaria parada no rotulo da etapa anterior
+    # durante todo o OCR — a confusao que este feedback existe para eliminar.
+    assert eventos == [
+        ("texto", 0, 3),
+        ("ocr_local", 0, 3),
+        ("ocr_gemini", 0, 3),
+        ("ocr_gemini", 1, 3),
+        ("ocr_gemini", 2, 3),
+        ("ocr_gemini", 3, 3),
+    ]
+    assert all(sd <= st for _, sd, st in eventos)
+
+
+def test_passe_de_texto_reporta_seu_proprio_passe(tmp_path, monkeypatch):
+    """Quando o PDF tem texto nativo, o passe reportado e `texto` — e o total da
+    etapa e o numero de PDFs, nao o do lote inteiro."""
+    for i in range(2):
+        _fake_pdf(tmp_path / f"f{i}.pdf")
+
+    monkeypatch.setattr(
+        pdf_extractor,
+        "extract_from_pdf_local",
+        lambda p: None,
+        raising=False,
+    )
+
+    import pdf_text_extractor
+
+    entry_falsa = NfseEntry(
+        cnpj_tomador="02184341000270",
+        numero_nf="1",
+        chave_nf=None,
+        source_file="f.pdf",
+        method="local",
+    )
+    monkeypatch.setattr(pdf_text_extractor, "extract_from_pdf_local", lambda p: entry_falsa)
+
+    eventos = []
+    pdf_extractor.extract_from_directory(
+        tmp_path,
+        api_key=None,
+        on_progress=lambda i, n, stage, sd, st: eventos.append((stage, sd, st)),
+    )
+
+    # anuncio (0) + um evento por arquivo concluido
+    assert [e[0] for e in eventos] == ["texto", "texto", "texto"]
+    assert [e[1] for e in eventos] == [0, 1, 2]
+    assert [e[2] for e in eventos] == [2, 2, 2]
