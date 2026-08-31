@@ -48,11 +48,33 @@ class DuplicateGroup:
 
 
 @dataclass(frozen=True)
+class Match:
+    """Par XML x PDF que casou, e por qual criterio.
+
+    `criterio` distingue as duas passagens: "chave" e prova forte (50 digitos
+    conferem); "cnpj+numero" e mais fraco — dois prestadores diferentes podem
+    repetir numeracao no mesmo mes. Quem confere precisa saber quais casaram
+    pelo criterio fraco para dar uma segunda olhada.
+    """
+    xml: NfseEntry
+    pdf: NfseEntry
+    criterio: str
+
+    def to_dict(self) -> dict:
+        return {
+            "xml": self.xml.to_dict(),
+            "pdf": self.pdf.to_dict(),
+            "criterio": self.criterio,
+        }
+
+
+@dataclass(frozen=True)
 class Resultado:
     so_pdf: list[NfseEntry]
     so_xml: list[NfseEntry]
     matched_count: int
     duplicados_pdf: list[DuplicateGroup] = field(default_factory=list)
+    matches: list[Match] = field(default_factory=list)
 
 
 def _detectar_duplicados_pdf(pdfs: list[NfseEntry]) -> list[DuplicateGroup]:
@@ -102,6 +124,9 @@ def _detectar_duplicados_pdf(pdfs: list[NfseEntry]) -> list[DuplicateGroup]:
 def comparar(pdfs: list[NfseEntry], xmls: list[NfseEntry]) -> Resultado:
     matched_pdf: set[int] = set()
     matched_xml: set[int] = set()
+    # (indice_xml, indice_pdf, criterio) — o par em si, que antes se perdia:
+    # so restava a contagem, e nao dava para listar o que casou com o que.
+    pares: list[tuple[int, int, str]] = []
 
     # Indices reversos. Se um XML aparece duplicado, mantemos a primeira ocorrencia
     # — segundo match pelo mesmo XML nao acontece pois o set guarda o indice.
@@ -127,8 +152,11 @@ def comparar(pdfs: list[NfseEntry], xmls: list[NfseEntry]) -> Resultado:
         if not p.chave_nf:
             continue
         candidatos = xml_por_chave.get(p.chave_nf)
-        if candidatos and _claim(candidatos) is not None:
-            matched_pdf.add(i)
+        if candidatos:
+            j = _claim(candidatos)
+            if j is not None:
+                matched_pdf.add(i)
+                pares.append((j, i, "chave"))
 
     # Passagem 2 — PDFs SEM chave: tentam (cnpj, numero) em XMLs nao consumidos
     for i, p in enumerate(pdfs):
@@ -140,15 +168,25 @@ def comparar(pdfs: list[NfseEntry], xmls: list[NfseEntry]) -> Resultado:
         if not (p.cnpj_tomador and p.numero_nf):
             continue
         candidatos = xml_por_cnpj_num.get((p.cnpj_tomador, p.numero_nf))
-        if candidatos and _claim(candidatos) is not None:
-            matched_pdf.add(i)
+        if candidatos:
+            j = _claim(candidatos)
+            if j is not None:
+                matched_pdf.add(i)
+                pares.append((j, i, "cnpj+numero"))
 
     so_pdf = [p for i, p in enumerate(pdfs) if i not in matched_pdf]
     so_xml = [x for j, x in enumerate(xmls) if j not in matched_xml]
+
+    # Ordena pela posicao original do XML para a aba sair estavel entre runs.
+    matches = [
+        Match(xml=xmls[j], pdf=pdfs[i], criterio=c)
+        for j, i, c in sorted(pares, key=lambda t: t[0])
+    ]
 
     return Resultado(
         so_pdf=so_pdf,
         so_xml=so_xml,
         matched_count=len(matched_pdf),
         duplicados_pdf=_detectar_duplicados_pdf(pdfs),
+        matches=matches,
     )

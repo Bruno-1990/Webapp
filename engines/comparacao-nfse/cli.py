@@ -50,6 +50,7 @@ def _build_result_payload(
         "xmlIgnorados": xml_ignorados,
         "pdfFalhos": pdf_failed,
         "duplicadosPdf": [g.to_dict() for g in res.duplicados_pdf],
+        "matches": [m.to_dict() for m in res.matches],
         "totals": {
             "pdfEnviados": pdf_lidos + len(pdf_failed),
             "pdfLidos": pdf_lidos,
@@ -239,7 +240,7 @@ def processar(pdfs_dir: Path, xmls_dir: Path, output_xlsx: Path, output_json: Pa
         for nome in xml_ignorados
     ]
     progress(95, stage="planilha", stageDone=0, stageTotal=0)
-    gerar_xlsx(output_xlsx, res.so_pdf, res.so_xml, nao_lidos)
+    gerar_xlsx(output_xlsx, res.so_pdf, res.so_xml, nao_lidos, res.matches)
     progress(100, stage="planilha", stageDone=1, stageTotal=1)
     return payload
 

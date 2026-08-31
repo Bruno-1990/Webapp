@@ -164,3 +164,58 @@ def test_xlsx_formatacao_visual(tmp_path):
     # Data tambem com bordas
     db = data_cell.border
     assert db.left.style == "thin"
+
+
+#  Aba "Match" 
+# As outras abas listam ausencias. Esta lista as conferencias que fecharam, com
+# o par XML x PDF e o criterio, para quem confere saber o que ja esta resolvido.
+
+
+def test_aba_match_lista_o_par_e_o_criterio(tmp_path):
+    openpyxl = pytest.importorskip("openpyxl")
+    from comparator import comparar
+
+    pdfs = [
+        NfseEntry(cnpj_tomador="T", numero_nf="1", chave_nf="C1", source_file="a.pdf"),
+        NfseEntry(cnpj_tomador="T", numero_nf="2", chave_nf=None, source_file="b.pdf"),
+    ]
+    xmls = [
+        NfseEntry(cnpj_tomador="T", numero_nf="1", chave_nf="C1", source_file="a.xml"),
+        NfseEntry(cnpj_tomador="T", numero_nf="2", chave_nf=None, source_file="b.xml"),
+    ]
+    r = comparar(pdfs, xmls)
+
+    out = tmp_path / "com_match.xlsx"
+    gerar_xlsx(out, r.so_pdf, r.so_xml, None, r.matches)
+
+    wb = openpyxl.load_workbook(out)
+    assert "Match" in wb.sheetnames
+
+    ws = wb["Match"]
+    cabecalho = [c.value for c in ws[1]]
+    assert cabecalho[-3:] == ["Arquivo XML", "Arquivo PDF", "Casou por"]
+
+    linhas = {
+        ws.cell(row=i, column=6).value: (
+            ws.cell(row=i, column=7).value,
+            ws.cell(row=i, column=8).value,
+        )
+        for i in range(2, ws.max_row + 1)
+    }
+    assert linhas == {
+        "a.xml": ("a.pdf", "chave"),
+        "b.xml": ("b.pdf", "cnpj+numero"),
+    }
+
+
+def test_sem_match_a_aba_nao_aparece(tmp_path):
+    """Lote em que nada casou nao ganha aba vazia — mesma regra de 'Nao lidos'."""
+    openpyxl = pytest.importorskip("openpyxl")
+
+    so_pdf = [NfseEntry(cnpj_tomador="T", numero_nf="1", chave_nf="C1", source_file="a.pdf")]
+    out = tmp_path / "sem_match.xlsx"
+    gerar_xlsx(out, so_pdf, [], None, [])
+
+    wb = openpyxl.load_workbook(out)
+    assert "Match" not in wb.sheetnames
+    assert "So em PDFs" in wb.sheetnames

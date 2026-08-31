@@ -195,3 +195,64 @@ def test_duplicados_invariante_de_fechamento():
     r = comparar(pdfs, xmls)
     assert r.matched_count + len(r.so_pdf) == len(pdfs)
     assert r.matched_count + len(r.so_xml) == len(xmls)
+
+
+def test_matches_guardam_o_par_e_o_criterio():
+    """A contagem nao basta: a aba 'Match' precisa saber QUAL PDF casou com
+    QUAL XML, e por qual criterio — "chave" e prova forte, "cnpj+numero" e
+    fallback e merece segunda olhada de quem confere."""
+    pdfs = [
+        e(num="1", cnpj="A", chave="CHV1", source="forte.pdf"),
+        e(num="77", cnpj="B", source="fraco.pdf"),
+    ]
+    xmls = [
+        e(num="1", cnpj="A", chave="CHV1", source="forte.xml"),
+        e(num="77", cnpj="B", source="fraco.xml"),
+    ]
+    r = comparar(pdfs, xmls)
+
+    assert r.matched_count == 2
+    assert len(r.matches) == 2
+
+    por_pdf = {m.pdf.source_file: m for m in r.matches}
+    assert por_pdf["forte.pdf"].xml.source_file == "forte.xml"
+    assert por_pdf["forte.pdf"].criterio == "chave"
+    assert por_pdf["fraco.pdf"].xml.source_file == "fraco.xml"
+    assert por_pdf["fraco.pdf"].criterio == "cnpj+numero"
+
+
+def test_matches_batem_com_a_contagem_e_nao_incluem_divergencias():
+    """Invariante de fechamento: cada XML aparece OU em `matches` OU em
+    `so_xml`, nunca nos dois nem em nenhum."""
+    pdfs = [
+        e(num="1", cnpj="A", chave="C1", source="p1.pdf"),
+        e(num="2", cnpj="A", chave="C2", source="p2.pdf"),
+    ]
+    xmls = [
+        e(num="1", cnpj="A", chave="C1", source="x1.xml"),
+        e(num="9", cnpj="A", chave="C9", source="orfao.xml"),
+    ]
+    r = comparar(pdfs, xmls)
+
+    assert len(r.matches) == r.matched_count
+    casados = {m.xml.source_file for m in r.matches}
+    sozinhos = {x.source_file for x in r.so_xml}
+    assert casados == {"x1.xml"}
+    assert sozinhos == {"orfao.xml"}
+    assert casados & sozinhos == set()
+    assert len(casados) + len(sozinhos) == len(xmls)
+
+
+def test_um_xml_nao_casa_duas_vezes():
+    """Dois PDFs com a mesma chave nao podem gerar dois matches para o mesmo
+    XML — senao a aba 'Match' inflaria a conferencia."""
+    pdfs = [
+        e(num="1", cnpj="A", chave="C1", source="a.pdf"),
+        e(num="1", cnpj="A", chave="C1", source="duplicado.pdf"),
+    ]
+    xmls = [e(num="1", cnpj="A", chave="C1", source="x.xml")]
+    r = comparar(pdfs, xmls)
+
+    assert len(r.matches) == 1
+    assert r.matches[0].xml.source_file == "x.xml"
+    assert len(r.so_pdf) == 1

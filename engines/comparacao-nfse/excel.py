@@ -1,4 +1,4 @@
-"""Gera XLSX com ate 3 abas: 'So em PDFs', 'So em XMLs' e 'Nao lidos'.
+"""Gera XLSX com ate 4 abas: 'So em PDFs', 'So em XMLs', 'Nao lidos' e 'Match'.
 
 A aba 'Nao lidos' so aparece quando houve falha de extracao. Ela existe porque
 a tela lista apenas os 10 primeiros arquivos que falharam — quem precisa
@@ -92,6 +92,47 @@ def _write_sheet(ws, entries: list[NfseEntry], header_fmt, body_fmt, mono_fmt):
     ws.freeze_panes(1, 0)
 
 
+HEADERS_MATCH = (
+    "Razao Social",
+    "CNPJ Prestador",
+    "CNPJ Tomador",
+    "Numero NF",
+    "Chave NF",
+    "Arquivo XML",
+    "Arquivo PDF",
+    "Casou por",
+)
+
+_LARGURAS_MATCH = (32, 20, 20, 14, 52, 40, 40, 16)
+
+
+def _write_match(ws, matches, header_fmt, body_fmt, mono_fmt):
+    """Aba 'Match': o que casou, e com quem.
+
+    As outras abas listam ausencias; esta lista as conferencias que fecharam.
+    A coluna "Casou por" existe porque os dois criterios nao valem o mesmo:
+    "chave" confere 50 digitos e e prova forte; "cnpj+numero" e fallback para
+    PDF sem chave legivel, e merece uma segunda olhada.
+    """
+    ws.set_row(0, _HEADER_HEIGHT)
+    for col, h in enumerate(HEADERS_MATCH):
+        ws.write(0, col, h, header_fmt)
+    for row_idx, m in enumerate(matches, start=1):
+        x = m.xml
+        ws.set_row(row_idx, _ROW_HEIGHT)
+        ws.write(row_idx, 0, x.razao_social_prestador or "", body_fmt)
+        ws.write(row_idx, 1, x.cnpj_prestador or "", body_fmt)
+        ws.write(row_idx, 2, x.cnpj_tomador or "", body_fmt)
+        ws.write(row_idx, 3, x.numero_nf or "", body_fmt)
+        ws.write(row_idx, 4, x.chave_nf or "", mono_fmt)
+        ws.write(row_idx, 5, x.source_file, body_fmt)
+        ws.write(row_idx, 6, m.pdf.source_file, body_fmt)
+        ws.write(row_idx, 7, m.criterio, body_fmt)
+    for col, w in enumerate(_LARGURAS_MATCH):
+        ws.set_column(col, col, w)
+    ws.freeze_panes(1, 0)
+
+
 HEADERS_NAO_LIDOS = ("Arquivo", "Motivo")
 _LARGURAS_NAO_LIDOS = (46, 90)
 
@@ -119,6 +160,7 @@ def gerar_xlsx(
     so_pdf: list[NfseEntry],
     so_xml: list[NfseEntry],
     nao_lidos: list[dict] | None = None,
+    matches: list | None = None,
 ) -> Path:
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -137,6 +179,8 @@ def gerar_xlsx(
                 "border_color": _BORDER_COLOR,
             })
             _write_nao_lidos(wb.add_worksheet("Nao lidos"), nao_lidos, header_fmt, left_fmt)
+        if matches:
+            _write_match(wb.add_worksheet("Match"), matches, header_fmt, body_fmt, mono_fmt)
     finally:
         wb.close()
     return out
