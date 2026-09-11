@@ -1,5 +1,5 @@
 import { DOMParser } from "@xmldom/xmldom";
-import { COLS, emptyRow, type NfeRow } from "./cols.js";
+import { COLS, TOT_COLS, emptyRow, type NfeRow } from "./cols.js";
 import { formatDhEmiBr } from "./datetime.js";
 import {
   digits,
@@ -109,6 +109,8 @@ export function parseNfeXml(xml: string, fileName: string): NfeRow[] {
   const emit = infNFe ? findFirstLocal(infNFe, "emit") : null;
   const dest = infNFe ? findFirstLocal(infNFe, "dest") : null;
 
+  const icmsTot = infNFe ? findFirstLocal(infNFe, "total/ICMSTot") : null;
+
   const indPresRaw = ide ? text(findFirstLocal(ide, "indPres")) : "";
   const finNFeRaw = ide ? text(findFirstLocal(ide, "finNFe")) : "";
   const base: Partial<NfeRow> = {
@@ -117,16 +119,27 @@ export function parseNfeXml(xml: string, fileName: string): NfeRow[] {
     finNFe: codeWithLabel(finNFeRaw, FIN_NFE_LABEL),
     finNFe_raw: finNFeRaw,
     chNFe: ch,
+    serie: text(findFirstLocal(ide, "serie")),
     nNF: ide ? text(findFirstLocal(ide, "nNF")) : "",
+    natOp: text(findFirstLocal(ide, "natOp")),
     dhEmi: ide
       ? formatDhEmiBr(text(findFirstLocal(ide, "dhEmi")) || text(findFirstLocal(ide, "dEmi")))
       : "",
+    tpEmis: text(findFirstLocal(ide, "tpEmis")),
     tpNF: ide ? text(findFirstLocal(ide, "tpNF")) : "",
     emit_CNPJ: emit ? digits(text(findFirstLocal(emit, "CNPJ"))) : "",
     emit_xNome: emit ? text(findFirstLocal(emit, "xNome")) : "",
+    emit_UF: text(findFirstLocal(emit, "enderEmit/UF")),
+    emit_IE: text(findFirstLocal(emit, "IE")),
+    emit_IEST: text(findFirstLocal(emit, "IEST")),
     dest_CNPJ: dest ? digits(text(findFirstLocal(dest, "CNPJ"))) : "",
     dest_xNome: dest ? text(findFirstLocal(dest, "xNome")) : "",
+    dest_UF: text(findFirstLocal(dest, "enderDest/UF")),
+    dest_IE: text(findFirstLocal(dest, "IE")),
   };
+  for (const k of TOT_COLS) {
+    base[k] = text(findFirstLocal(icmsTot, k.slice("tot_".length)));
+  }
   const indIntermedRaw = ide ? text(findFirstLocal(ide, "indIntermed")) : "";
   const alertaFiscal =
     ["2", "9"].includes(indPresRaw) && indIntermedRaw === "1"
@@ -162,6 +175,7 @@ export function parseNfeXml(xml: string, fileName: string): NfeRow[] {
     const row = rowWithKeys({
       ...base,
       cProd: text(findFirstLocal(prod, "cProd")),
+      cEAN: text(findFirstLocal(prod, "cEAN")),
       xProd: text(findFirstLocal(prod, "xProd")),
       NCM: text(findFirstLocal(prod, "NCM")),
       CFOP: text(findFirstLocal(prod, "CFOP")),
@@ -169,12 +183,16 @@ export function parseNfeXml(xml: string, fileName: string): NfeRow[] {
       qCom: text(findFirstLocal(prod, "qCom")),
       vUnCom: text(findFirstLocal(prod, "vUnCom")),
       vProd: text(findFirstLocal(prod, "vProd")),
+      vOutro: text(findFirstLocal(prod, "vOutro")),
       "CSOSN/CST":
         (icmsAny ? text(findFirstLocal(icmsAny, "CSOSN")) : "") ||
         (icmsAny ? text(findFirstLocal(icmsAny, "CST")) : ""),
       orig: icmsAny ? text(findFirstLocal(icmsAny, "orig")) : "",
+      modBC: text(findFirstLocal(icmsAny, "modBC")),
+      vBC: text(findFirstLocal(icmsAny, "vBC")),
       pICMS: icmsAny ? text(findFirstLocal(icmsAny, "pICMS")) : "",
       vICMS: icmsAny ? text(findFirstLocal(icmsAny, "vICMS")) : "",
+      vBC_IPI: text(findFirstLocal(ipiAny, "vBC")),
       pIPI: ipiAny ? text(findFirstLocal(ipiAny, "pIPI")) : "",
       vIPI: ipiAny ? text(findFirstLocal(ipiAny, "vIPI")) : "",
       pPIS: pisAny ? text(findFirstLocal(pisAny, "pPIS")) : "",

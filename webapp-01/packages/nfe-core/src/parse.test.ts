@@ -73,6 +73,54 @@ describe("parseNfeXml", () => {
     expect(rows[0]!["Alerta Fiscal"]).toBe("");
   });
 
+  it("extrai série, IE/UF, base de cálculo e totais da nota", () => {
+    const xml = minimalNfe
+      .replace("<nNF>1</nNF>", "<natOp>Venda de Mercadoria</natOp><serie>1</serie><nNF>1</nNF><tpEmis>1</tpEmis>")
+      .replace(
+        "<xNome>Emitente Teste</xNome>",
+        "<xNome>Emitente Teste</xNome><enderEmit><UF>ES</UF></enderEmit><IE>083540652</IE><IEST>123</IEST>"
+      )
+      .replace(
+        "<xNome>Destinatário</xNome>",
+        "<xNome>Destinatário</xNome><enderDest><UF>SP</UF></enderDest><IE>082338019</IE>"
+      )
+      .replace("<xProd>", "<cEAN>SEM GTIN</cEAN><xProd>")
+      .replace("<vProd>20.00</vProd>", "<vProd>20.00</vProd><vOutro>1.50</vOutro>")
+      .replace("<pICMS>", "<modBC>3</modBC><vBC>20.00</vBC><pICMS>")
+      .replace(
+        "<PIS>",
+        "<IPI><cEnq>999</cEnq><IPITrib><CST>50</CST><vBC>20.00</vBC><pIPI>5.00</pIPI><vIPI>1.00</vIPI></IPITrib></IPI><PIS>"
+      )
+      .replace(
+        "</det>",
+        `</det><total><ICMSTot><vBC>20.00</vBC><vICMS>3.60</vICMS><vICMSDeson>0.50</vICMSDeson>
+        <vICMSUFDest>0.00</vICMSUFDest><vFCP>0</vFCP><vBCST>0.00</vBCST><vST>0.00</vST>
+        <vFCPST>0</vFCPST><vFCPSTRet>0</vFCPSTRet><vProd>20.00</vProd><vFrete>2.00</vFrete>
+        <vSeg>0.00</vSeg><vDesc>0.00</vDesc><vII>0.00</vII><vIPI>1.00</vIPI><vIPIDevol>0.00</vIPIDevol>
+        <vPIS>0.33</vPIS><vCOFINS>1.52</vCOFINS><vOutro>1.50</vOutro><vNF>24.50</vNF></ICMSTot></total>`
+      );
+    const r = parseNfeXml(xml, "completa.xml")[0]!;
+    expect(r.serie).toBe("1");
+    expect(r.natOp).toBe("Venda de Mercadoria");
+    expect(r.tpEmis).toBe("1");
+    expect(r.emit_UF).toBe("ES");
+    expect(r.emit_IE).toBe("083540652");
+    expect(r.emit_IEST).toBe("123");
+    expect(r.dest_UF).toBe("SP");
+    expect(r.dest_IE).toBe("082338019");
+    expect(r.cEAN).toBe("SEM GTIN");
+    expect(r.vOutro).toBe("1.50");
+    expect(r.modBC).toBe("3");
+    expect(r.vBC).toBe("20.00");
+    expect(r.vBC_IPI).toBe("20.00");
+    expect(r.tot_vBC).toBe("20.00");
+    expect(r.tot_vICMSDeson).toBe("0.50");
+    expect(r.tot_vICMSUFRemet).toBe("");
+    expect(r.tot_vFrete).toBe("2.00");
+    expect(r.tot_vOutro).toBe("1.50");
+    expect(r.tot_vNF).toBe("24.50");
+  });
+
   it("marca alerta para operação intermediada (marketplace)", () => {
     const xml = minimalNfe.replace("</ide>", "<indIntermed>1</indIntermed></ide>");
     const rows = parseNfeXml(xml, "marketplace.xml");

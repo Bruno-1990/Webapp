@@ -9,6 +9,11 @@ só "onde clicar" para cada ferramenta. Caminhos relativos à raiz `webapp/`.
 - Página: [`webapp-01/frontend/src/pages/HomePage.tsx`](../webapp-01/frontend/src/pages/HomePage.tsx)
 - Worker: [`webapp-01/apps/worker`](../webapp-01/apps/worker) · core (lógica em [`packages/nfe-core`](../webapp-01/packages/nfe-core))
 - API: rotas `/api/v1/jobs*` em [`server.ts`](../webapp-01/apps/api/src/server.ts)
+- **Colunas da `PRODUTOS`** — ordem e cabeçalhos em [`cols.ts`](../webapp-01/packages/nfe-core/src/cols.ts),
+  formato numérico por cabeçalho em `NUMERIC_HEADERS` ([`format-sheet.ts`](../webapp-01/packages/excel-export/src/format-sheet.ts)).
+  Os **totais da nota** (`total/ICMSTot`: Tot ICMS, ICMS Deson., Frete, Valor NF…) valem
+  para a NF-e inteira e **se repetem em cada item** — somar a coluna numa nota com
+  vários itens multiplica o valor.
 - **Eventos** — XMLs de `procEventoNFe` (cancelamento, carta de correção,
   manifestação) não entram na aba `PRODUTOS`: vão para a aba `Cancelamentos`,
   cruzados com a NF-e recíproca pela chave de 44 dígitos

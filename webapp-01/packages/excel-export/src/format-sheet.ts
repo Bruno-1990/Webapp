@@ -49,14 +49,36 @@ const NUMERIC_HEADERS: Record<string, string> = {
   Qtde: "#,##0.####",
   "Vlr Unit.": "#,##0.####",
   "Vlr Total": "#,##0.00",
+  "Outros Vlr": "#,##0.00",
+  "BC ICMS": "#,##0.00",
   "Aliq ICMS": "0.00",
   "Vlr ICMS": "#,##0.00",
+  "BC IPI": "#,##0.00",
   "Aliq IPI": "0.00",
   "Vlr IPI": "#,##0.00",
   "Aliq PIS": "0.00",
   "Vlr PIS": "#,##0.00",
   "Aliq COFINS": "0.00",
   "Vlr COFINS": "#,##0.00",
+  "Tot Base Calc ICMS": "#,##0.00",
+  "Tot ICMS": "#,##0.00",
+  "ICMS Deson.": "#,##0.00",
+  "FCP Dest.": "#,##0.00",
+  "ICMS UF Dest.": "#,##0.00",
+  "ICMS UF Remet.": "#,##0.00",
+  FCP: "#,##0.00",
+  "BC ST": "#,##0.00",
+  "Vlr ST": "#,##0.00",
+  "FCP ST": "#,##0.00",
+  "FCP ST Ret": "#,##0.00",
+  "Tot Prod ICMS": "#,##0.00",
+  Frete: "#,##0.00",
+  Seguro: "#,##0.00",
+  Desconto: "#,##0.00",
+  IPI: "#,##0.00",
+  "IPI Devol.": "#,##0.00",
+  Outros: "#,##0.00",
+  "Valor NF": "#,##0.00",
 };
 
 function applyNumericFormats(ws: Worksheet, headerToCol: Map<string, number>, maxRow: number): void {
@@ -149,6 +171,8 @@ function formatProductsSheetLarge(ws: Worksheet): void {
     col.alignment = LEFT_ALIGNED_HEADERS.has(h) ? ALIGN_LEFT : ALIGN_CENTER;
     let w = Math.min(72, Math.max(10, Math.ceil(h.length * 1.05) + 3));
     if (h.includes("Chave")) w = 50;
+    else if (/^(UF|IE|IEST) /.test(h)) w = 14;
+    else if (NUMERIC_HEADERS[h]) w = Math.max(14, w);
     else if (h.includes("Nome") || h.includes("Emit") || h.includes("Dest")) w = 38;
     else if (h.includes("Descrição") || h.includes("Descricao") || h === "Desc. Prod.")
       w = 44;
