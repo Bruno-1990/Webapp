@@ -226,6 +226,9 @@ await app.register(multipart, {
   limits: {
     fileSize: globalBodyLimitMb * 1024 * 1024,
     files: maxMultipartFileParts,
+    /** Default do busboy é 1000; sem isso, uploads grandes batem no limite de partes
+     * antes do limite de arquivos (FST_PARTS_LIMIT em vez de FST_FILES_LIMIT). */
+    parts: maxMultipartFileParts,
   },
 });
 await app.register(rateLimit, {
@@ -237,7 +240,7 @@ await app.register(rateLimit, {
 
 app.setErrorHandler((err, req, reply) => {
   const code = (err as { code?: string }).code;
-  if (code === "FST_FILES_LIMIT") {
+  if (code === "FST_FILES_LIMIT" || code === "FST_PARTS_LIMIT") {
     req.log.warn({ err }, "limite de partes multipart");
     return reply.code(413).send({
       error: `Envio com partes demais no formulário (máx. ${maxMultipartFileParts} arquivos por requisição). Envie em lotes menores ou use ZIP. Limite de XMLs após processar: ${env.MAX_XML_FILES}.`,
