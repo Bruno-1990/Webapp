@@ -190,6 +190,7 @@ def merge_sped_from_xlsx(sped_path: Path | None, xlsx_path: Path, output_path: P
             lines[n - 1] = build_sped_line(inner)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    trailing = "\n" if (from_original and text.endswith("\n")) else "\n"
+    # Mesma quebra de linha do original (o PVA gera CRLF); sem original, LF.
+    eol = "\r\n" if (from_original and "\r\n" in text) else "\n"
     output_encoding = source_encoding if from_original else "utf-8"
-    output_path.write_text("\n".join(lines) + trailing, encoding=output_encoding, newline="\n")
+    output_path.write_bytes((eol.join(lines) + eol).encode(output_encoding))

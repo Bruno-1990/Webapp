@@ -549,3 +549,111 @@ def test_core_sheets_derivam_do_exportador() -> None:
 
     assert list(CORE_SHEETS) == list(SHEET_ORDER)
     assert set(CORE_SHEETS_OPCIONAIS) <= set(CORE_SHEETS)
+
+
+# --- Ida e volta sem edição tem que devolver o arquivo idêntico -----------------------------
+
+_SPED_IDA_VOLTA = (
+    "|0000|017|0|01012024|31012024|EMPRESA TESTE|12345678000199|MG|||0|\n"
+    # NCMs de 8 dígitos que também "parecem" data (capítulos 19 e 20: alimentos)
+    "|0200|P1|SUCO DE UVA|||UN|00|20098900||20||18,00||\n"
+    "|0200|P2|FEIJAO|||UN|00|20011010||20||18,00||\n"
+    "|0200|P3|BISCOITO|||UN|00|19059090||19||18,00||\n"
+    # VL_* vazios (ST, IPI, PIS/COFINS ST) e cedilha/til em texto não editado
+    "|C100|0|1|F1|55|00|1|123|35240112345678000199550010000001231000001230|20012024|20012024"
+    "|100,00|0|0,00|0,00|100,00|9|0,00|0,00|0,00|100,00|18,00|||0,00|0,00|0,00|||\n"
+    "|C170|1|P1|SUCO DE AÇAÍ|1|UN|100,00|0,00|0|000|1102|1102|100,00|18,00|18,00"
+    "|||||||||||||||||||||||\n"
+)
+
+
+def _exportar(sped: Path, xlsx: Path, sheets: str) -> None:
+    subprocess.run(
+        [sys.executable, str(_CLI_EXPORT), "--input", str(sped), "--output", str(xlsx), "--sheets", sheets],
+        cwd=str(_ENGINE), check=True, capture_output=True, text=True,
+    )
+
+
+@pytest.mark.parametrize("encoding", ["utf-8", "cp1252"])
+def test_ida_e_volta_sem_edicao_devolve_o_arquivo_identico(tmp_path: Path, encoding: str) -> None:
+    sped = tmp_path / "orig.txt"
+    sped.write_bytes(_SPED_IDA_VOLTA.encode(encoding))
+    xlsx = tmp_path / "exp.xlsx"
+    out = tmp_path / "merged.txt"
+    _exportar(sped, xlsx, "0200,C100,C170")
+
+    merge_sped_from_xlsx(sped, xlsx, out)
+
+    assert out.read_bytes() == sped.read_bytes()
+
+
+def test_export_deixa_vl_vazio_vazio_na_planilha(tmp_path: Path) -> None:
+    sped = tmp_path / "orig.txt"
+    sped.write_text(_SPED_IDA_VOLTA, encoding="utf-8")
+    xlsx = tmp_path / "exp.xlsx"
+    _exportar(sped, xlsx, "C100")
+
+    ws = load_workbook(xlsx)["C100"]
+    headers = [c.value for c in ws[1]]
+    row = {h: c.value for h, c in zip(headers, ws[2])}
+    assert row["VL_BC_ICMS_ST"] in (None, "")
+    assert row["VL_DOC"] == "100,00"
+
+
+def test_ncm_que_parece_data_nao_vira_data() -> None:
+    from line_builders import normalize_sped_field
+
+    # não editado: volta igual
+    assert normalize_sped_field("COD_NCM", "20011010", "20011010") == "20011010"
+    # editado para outro NCM "com cara de data": fica como digitado, sem erro
+    assert normalize_sped_field("COD_NCM", "20098900", "20011010") == "20098900"
+    assert normalize_sped_field("COD_NCM", 19059090, "20011010") == "19059090"
+    # aba genérica: data real editada continua sendo convertida
+    assert normalize_sped_field("COL_02", datetime(2026, 2, 2), "01022026") == "02022026"
+
+
+def test_data_ddmmaaaa_que_comeca_com_19_ou_20_nao_derruba_o_merge() -> None:
+    from line_builders import normalize_sped_field
+
+    assert normalize_sped_field("DT_DOC", "20012024", "15012024") == "20012024"
+    assert normalize_sped_field("DT_DOC", "19122024", None) == "19122024"
+    assert normalize_sped_field("DT_DOC", "20240115", None) == "15012024"
+
+
+def test_planilha_antiga_com_zero_em_vl_vazio_nao_preenche_o_campo() -> None:
+    """Exportações antigas gravavam VL_* vazio como '0,00'; isso não é edição."""
+    from line_builders import normalize_sped_field
+
+    assert normalize_sped_field("VL_BC_ICMS_ST", "0,00", "") == ""
+    assert normalize_sped_field("VL_BC_ICMS_ST", "15,00", "") == "15,00"
+
+
+def test_cedilha_e_til_so_saem_do_campo_editado() -> None:
+    from line_builders import normalize_sped_field
+
+    assert normalize_sped_field("DESCR_COMPL", "SUCO DE AÇAÍ", "SUCO DE AÇAÍ") == "SUCO DE AÇAÍ"
+    assert normalize_sped_field("DESCR_COMPL", "SUCO DE MAÇÃ", "SUCO DE AÇAÍ") == "SUCO DE MACA"
+
+
+def test_quantidade_numerica_do_excel_nao_vira_milhar() -> None:
+    """O Excel devolve QTD como número: 233.415 é 233,415 — não 233415."""
+    from line_builders import normalize_sped_field
+
+    assert normalize_sped_field("QTD", 233.415, "233,41500") == "233,41500"  # não editado
+    assert normalize_sped_field("QTD", 2.936, "2,936") == "2,936"
+    assert normalize_sped_field("QTD", 0.842, "0,842") == "0,842"
+    assert normalize_sped_field("QTD", 2.937, "2,936") == "2,937"  # editado
+    # texto digitado continua com a leitura de milhar
+    assert normalize_sped_field("VL_ITEM", "1.234", "10,00") == "1234"
+
+
+def test_merge_preserva_crlf_do_original(tmp_path: Path) -> None:
+    sped = tmp_path / "orig_crlf.txt"
+    sped.write_bytes(_SPED_IDA_VOLTA.replace("\n", "\r\n").encode("cp1252"))
+    xlsx = tmp_path / "exp.xlsx"
+    out = tmp_path / "merged.txt"
+    _exportar(sped, xlsx, "0200,C100,C170")
+
+    merge_sped_from_xlsx(sped, xlsx, out)
+
+    assert out.read_bytes() == sped.read_bytes()

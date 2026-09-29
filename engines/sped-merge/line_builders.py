@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import numbers
 import re
 import unicodedata
 from decimal import Decimal, InvalidOperation
@@ -72,20 +73,44 @@ def _normalize_date_ddmmaaaa(value: Any) -> str:
         return date(yy, mm, dd).strftime("%d%m%Y")
 
     if re.fullmatch(r"\d{8}", s):
-        # Já no formato de 8 dígitos (ddmmaaaa ou yyyymmdd).
-        # Se começar por ano 19xx/20xx, converte para ddmmaaaa.
-        if s.startswith(("19", "20")):
-            yy, mm, dd = int(s[:4]), int(s[4:6]), int(s[6:8])
-            return date(yy, mm, dd).strftime("%d%m%Y")
+        # 8 dígitos: o SPED usa ddmmaaaa, então essa leitura vem primeiro ("20012024" é
+        # 20/01/2024). Só se não for data válida assim tenta aaaammdd; nenhum dos dois
+        # → devolve como veio, sem derrubar o merge.
+        if _data_valida(int(s[4:8]), int(s[2:4]), int(s[:2])):
+            return s
+        if _data_valida(int(s[:4]), int(s[4:6]), int(s[6:8])):
+            return date(int(s[:4]), int(s[4:6]), int(s[6:8])).strftime("%d%m%Y")
         return s
 
     return s
+
+
+def _data_valida(yy: int, mm: int, dd: int) -> bool:
+    try:
+        date(yy, mm, dd)
+    except ValueError:
+        return False
+    return True
+
+
+# Valor que o Excel/openpyxl devolve para uma célula de data, ou texto digitado como data.
+_DATE_TEXT_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}|\d{2}[/-]\d{2}[/-]\d{4})")
+
+
+def _parece_data(value: Any) -> bool:
+    if isinstance(value, (datetime, date)):
+        return True
+    return bool(_DATE_TEXT_RE.match(cell_str(value)))
 
 
 def _normalize_numeric(value: Any) -> str:
     s = cell_str(value)
     if not s:
         return ""
+    # Célula numérica do Excel: o ponto é sempre decimal. As heurísticas de milhar abaixo
+    # são só para texto digitado — aplicadas a 233.415 (QTD 233,41500) davam 233415.
+    if isinstance(value, numbers.Real) and not isinstance(value, bool):
+        return s.replace(".", ",")
     # Remove espaços e normaliza para padrão SPED esperado aqui: vírgula decimal sem milhar.
     s = s.replace(" ", "")
     if "," in s and "." in s:
@@ -120,12 +145,24 @@ def _numeros_iguais(valor: str, template: str) -> bool:
         return False
 
 
+def _eh_zero(valor: str) -> bool:
+    try:
+        return Decimal(valor.replace(",", ".")) == 0
+    except (InvalidOperation, ValueError):
+        return False
+
+
 def _normalize_with_template(value: Any, template_value: str) -> str:
     t = template_value.strip()
     if not t:
         return cell_str(value)
     if re.fullmatch(r"\d{8}", t):
-        return _normalize_date_ddmmaaaa(value)
+        # Template de 8 dígitos pode ser data (abas genéricas COL_xx) ou código: NCM,
+        # NUM_DOC, COD_ITEM. Só converte se o valor novo tem cara de data; código fica
+        # como o usuário digitou (NCM 20011010 não pode virar 10102001).
+        if _parece_data(value):
+            return _normalize_date_ddmmaaaa(value)
+        return cell_str(value)
     if _TEMPLATE_NUMERIC_RE.fullmatch(t):
         # Quando o template fiscal usa vírgula decimal, preservamos esse padrão.
         v = _normalize_numeric(value)
@@ -147,11 +184,19 @@ def normalize_sped_field(field_name: str, value: Any, template_value: str | None
     # deve manter o valor original para evitar perda estrutural.
     if template_value is not None and cell_str(value) == "":
         return template_value
+    # Célula igual ao original = campo não editado: volta byte a byte, sem passar pela
+    # limpeza de cedilha/til nem por conversão nenhuma. A limpeza vale só para texto novo.
+    if template_value is not None and cell_str(value) == template_value.strip():
+        return template_value
     name = (field_name or "").upper()
     if name.startswith("DT_"):
         return _normalize_date_ddmmaaaa(value)
     if _NUMERIC_FIELD_RE.match(name):
         v = _normalize_numeric(value)
+        # Campo vazio no .txt que a planilha mostra como zero: planilhas exportadas antes
+        # da correção gravavam VL_* vazio como "0,00". Zero sobre vazio não é edição.
+        if template_value is not None and template_value.strip() == "" and _eh_zero(v):
+            return template_value
         if template_value:
             t = template_value.strip()
             # Campo não editado: devolve o texto original. O Excel guarda ALIQ_*/QTD como

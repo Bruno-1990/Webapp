@@ -1,5 +1,3 @@
-import re
-
 class DefaultSpedParser:
     def parse(self, text: str, target_regs):
         data = {r: [] for r in target_regs}
@@ -17,7 +15,7 @@ class DefaultSpedParser:
             if "|" not in raw:
                 continue
 
-            fields = raw.rstrip("").split("|")
+            fields = raw.split("|")
             if len(fields) < 3:
                 continue
 
@@ -88,20 +86,3 @@ class DefaultSpedParser:
                 data[reg].append((line_no, parts))
 
         return data
-
-
-    def extract_razao_cnpj(self, text: str):
-        """
-        Método antigo: pega Razão Social e CNPJ do |0000|
-        """
-        razao, cnpj = "RAZAO_DESCONHECIDA", "CNPJ_DESCONHECIDO"
-        for raw in text.splitlines():
-            if raw.startswith("|0000|"):
-                parts = raw.split("|")
-                if len(parts) >= 8:
-                    razao = (parts[6] or "").strip() or razao
-                    cnpj_raw = (parts[7] or "").strip()
-                    if cnpj_raw:
-                        cnpj = re.sub(r"\D", "", cnpj_raw) or cnpj
-                break
-        return razao, cnpj

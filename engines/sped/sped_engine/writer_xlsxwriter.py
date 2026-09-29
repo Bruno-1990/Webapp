@@ -200,7 +200,8 @@ class XlsxWriterExcelWriter:
                     if col == "_LINHA":
                         continue
                     if isinstance(col, str) and col.upper().startswith("VL_"):
-                        df[col] = df[col].map(_to_number).fillna(0.0)
+                        # Vazio continua vazio: "0,00" aqui voltaria para o .txt como zero.
+                        df[col] = df[col].map(_to_number)
                     elif _is_dt_col(col):
                         df[col] = df[col].map(_parse_sped_date_ddmmaaaa)
                     elif _is_qty_col(col) or _is_aliq_col(col):
@@ -225,8 +226,7 @@ class XlsxWriterExcelWriter:
                         elif isinstance(value, str) and value.upper().startswith("VL_"):
                             for r in range(len(df)):
                                 v = df.iat[r, col_num]
-                                fv = float(v) if pd.notna(v) else 0.0
-                                txt = _format_br_money_text(fv)
+                                txt = _format_br_money_text(float(v)) if pd.notna(v) else ""
                                 ws.write(r + 1, col_num, txt, money_text_fmt)
                         else:
                             # Demais colunas: regravar com alinhamento central (to_excel do pandas costuma alinhar à esquerda)
@@ -251,7 +251,7 @@ class XlsxWriterExcelWriter:
                     if not df.empty:
                         if isinstance(value, str) and value.upper().startswith("VL_"):
                             col_lens = df[value].map(
-                                lambda x: len(_format_br_money_text(x if pd.notna(x) else 0.0))
+                                lambda x: len(_format_br_money_text(x)) if pd.notna(x) else 0
                             )
                         else:
                             col_lens = df[value].map(lambda x: len(str(x)))

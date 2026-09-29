@@ -43,8 +43,6 @@ def main() -> int:
             parser=DefaultSpedParser(),
             df_builder=DefaultDataFrameBuilder(merged_headers),
             writer=XlsxWriterExcelWriter(),
-            formatter=None,
-            reporter=None,
             progress=prog,
         )
         export_regs = None

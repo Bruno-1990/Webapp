@@ -39,13 +39,25 @@ que planilhas já circulavam: a ausência **não** invalida a planilha, porque s
 Ao acrescentar uma aba core nova, coloque-a aqui também — senão toda planilha
 exportada antes passa a exigir o `.txt` original.
 
-## Normalização numérica
+## Campo não editado volta idêntico
 
-Campo cujo valor **não mudou** volta com o texto exato do `.txt` original. Isso
-importa porque o Excel guarda `ALIQ_*`/`QTD` como número: `7,60` é lido como
-`7.6` e, sem essa regra, o arquivo remontado teria diferenças puramente de
-formatação. Campo editado usa o valor novo, ajustado ao separador decimal do
-original (`_numeros_iguais` / `normalize_sped_field` em `line_builders.py`).
+Com o `.txt` original, a regra é: **célula igual ao original = campo não editado =
+texto original, byte a byte**. Exportar e mesclar sem editar nada devolve o
+arquivo idêntico, inclusive encoding e quebra de linha (CRLF do PVA). Detalhes:
+
+- **Números**: o Excel guarda `ALIQ_*`/`QTD` como número (`7,60` volta `7.6`);
+  se o valor é o mesmo, devolve o texto original. Célula numérica nunca passa
+  pela leitura de milhar (`233.415` é `233,415`, não `233415`). Campo editado usa
+  o valor novo com o separador decimal do original.
+- **Zero sobre vazio**: `VL_*` vazio no `.txt` com `0,00` na planilha (formato de
+  exportações antigas) continua vazio.
+- **Datas** só nas colunas `DT_*` ou quando o valor novo tem cara de data. Código
+  de 8 dígitos (NCM `20011010`, `NUM_DOC`) nunca é convertido.
+- **Cedilha e til** saem só do texto **editado** (regra operacional). No modo sem
+  o original não há como saber o que foi editado: sai de tudo.
+
+Sem o original, `ALIQ_*`/`QTD` saem sem os zeros à direita (`12,00` → `12`) —
+mesmo valor, formatação diferente. O arquivo sai em UTF-8.
 
 ## Uso (CLI)
 
@@ -62,6 +74,7 @@ pip install -r requirements.txt pytest
 pytest tests/ -v          # ou, de webapp-01/: npm run test:sped-merge-py
 ```
 
-Cobre round-trip byte a byte do `sped_minimo.txt` e do `sped_bloco_d.txt` (bloco
-D com D101/D105), edição de célula, normalização numérica, descarte das colunas
+Cobre round-trip byte a byte (`sped_minimo.txt`, `sped_bloco_d.txt` — bloco D
+com D101/D105 — e um SPED com NCM "de data", `VL_*` vazio, acento, CRLF e
+cp1252), edição de célula, normalização numérica, descarte das colunas
 injetadas e o inspetor (planilha antiga sem D101/D105 segue completa).

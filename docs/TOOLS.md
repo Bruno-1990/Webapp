@@ -29,7 +29,7 @@ só "onde clicar" para cada ferramenta. Caminhos relativos à raiz `webapp/`.
 - Página: [`SpedHomePage.tsx`](../webapp-01/frontend/src/pages/SpedHomePage.tsx)
 - Worker: [`worker-sped-bridge`](../webapp-01/apps/worker-sped-bridge) → Engine: [`engines/sped/sped_engine`](../engines/sped/sped_engine)
 - Dockerfile: [`Dockerfile.worker-sped`](../webapp-01/docker/Dockerfile.worker-sped) · env `SPED_ENGINE_DIR`
-- Abas exportadas: `SHEET_ORDER` + `HEADERS` em [`config.py`](../engines/sped/sped_engine/config.py), espelhados em `SPED_EXPORT_SHEET_KEYS` nos [contracts](../webapp-01/packages/contracts/src/index.ts). Para acrescentar um REG, siga o checklist do [README do engine](../engines/sped/README.md#checklist--adicionar-um-reg-às-abas-core) — são 10 pontos, incluindo o rebuild da imagem.
+- Abas exportadas: `SHEET_ORDER` + `HEADERS` em [`config.py`](../engines/sped/sped_engine/config.py), espelhados em `SPED_EXPORT_SHEET_KEYS` nos [contracts](../webapp-01/packages/contracts/src/index.ts). Para acrescentar um REG, siga o checklist do [README do engine](../engines/sped/README.md#checklist--adicionar-um-reg-às-abas-core) — são 9 pontos, incluindo o rebuild da imagem.
 - Testes: `npm run test:sped-py`, `npm run test:sped-merge-py`, `npm run test:sped-smoke`, `npm run check:sync` (de `webapp-01/`; o `lint` e o CI já chamam o `check:sync`)
 
 ### XLSX → SPED (merge) — `id: sped-merge`

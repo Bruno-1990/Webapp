@@ -59,14 +59,14 @@ def test_parser_injeta_num_doc_e_chave_do_d100_pai(dados, reg):
 
 
 def test_valores_d101_d105_preservam_ordem_do_layout(dados):
-    d101 = DefaultDataFrameBuilder(merge_headers(HEADERS)).build("D101", dados["D101"])[0]
+    d101 = DefaultDataFrameBuilder(merge_headers(HEADERS)).build("D101", dados["D101"])
     assert d101.loc[0, "VL_ITEM"] == "1000,00"
     assert d101.loc[0, "CST_PIS"] == "50"
     assert d101.loc[0, "ALIQ_PIS"] == "1,65"
     assert d101.loc[0, "VL_PIS"] == "16,50"
     assert d101.loc[0, "COD_CCUS"] == "CC01"
 
-    d105 = DefaultDataFrameBuilder(merge_headers(HEADERS)).build("D105", dados["D105"])[0]
+    d105 = DefaultDataFrameBuilder(merge_headers(HEADERS)).build("D105", dados["D105"])
     assert d105.loc[1, "VL_BC_COFINS"] == "2000,00"
     assert d105.loc[1, "ALIQ_COFINS"] == "7,60"
     assert d105.loc[1, "VL_COFINS"] == "152,00"

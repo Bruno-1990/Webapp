@@ -1,5 +1,3 @@
-from openpyxl.styles import PatternFill, Font
-
 # SHEET_ORDER: manter igual a SPED_EXPORT_SHEET_KEYS em webapp-01/packages/contracts/src/index.ts
 
 HEADERS = {
@@ -52,7 +50,3 @@ SHEET_ORDER = [
     "D500",
     "D590",
 ]
-
-HEADER_FILL  = PatternFill(start_color="FF4169E1", end_color="FF4169E1", fill_type="solid")
-ALT_FILL     = PatternFill(start_color="FFDDEBF7", end_color="FFDDEBF7", fill_type="solid")
-HEADER_FONT  = Font(color="FFFFFFFF", bold=True)

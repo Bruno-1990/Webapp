@@ -53,22 +53,21 @@ precisa removê-las (ver `inner_payload_for_register` em `engines/sped-merge`).
 1. `sped_engine/config.py` — entrada em `HEADERS` + posição em `SHEET_ORDER`.
 2. `sped_engine/parser.py` — se for filho, injetar o vínculo do pai.
 3. `sped_engine/processor.py` — `minimal_context_regs` (puxa o pai no parse
-   quando só o filho é exportado) e a tupla de `link_checks`.
-4. `sped_engine/report.py` — as duas tuplas da validação de vínculos.
-5. `sped_engine/cabecalhos_sped.py` — `_INJECT_REGS` se tiver coluna injetada
+   quando só o filho é exportado).
+4. `sped_engine/cabecalhos_sped.py` — `_INJECT_REGS` se tiver coluna injetada
    (senão o guia sobrescreve os cabeçalhos e as colunas do pai somem).
-6. `sped_engine/cabecalhos_sped.txt` — título + linha `REG | CAMPO | …`;
+5. `sped_engine/cabecalhos_sped.txt` — título + linha `REG | CAMPO | …`;
    **copiar** para `webapp-01/apps/api/src/data/cabecalhos-sped.txt`.
-7. `packages/contracts/src/index.ts` — `SPED_EXPORT_SHEET_KEYS` +
+6. `packages/contracts/src/index.ts` — `SPED_EXPORT_SHEET_KEYS` +
    `SPED_EXPORT_SHEET_LABELS` (frontend e API herdam daqui).
-8. `engines/sped-merge` — `line_builders.py` (`inner_payload_for_register`, se
+7. `engines/sped-merge` — `line_builders.py` (`inner_payload_for_register`, se
    houver coluna injetada) e `CORE_SHEETS_OPCIONAIS` em `inspect_xlsx.py`, se a
    aba for nova (senão planilhas já exportadas passam a exigir o `.txt`).
-9. `npm run check:sync` (de `webapp-01/`) — confere os passos 1, 6 e 7. Já roda
+8. `npm run check:sync` (de `webapp-01/`) — confere os passos 1, 5 e 6. Já roda
    dentro do `npm run lint` e no CI.
-10. **Rebuild da imagem Docker** — o `sped_engine/` é copiado para dentro do
-    container; editar o arquivo no host não muda nada até o rebuild
-    (`docker compose --profile sped up -d --build api worker-sped worker-sped-merge`).
+9. **Rebuild da imagem Docker** — o `sped_engine/` é copiado para dentro do
+   container; editar o arquivo no host não muda nada até o rebuild
+   (`docker compose --profile sped up -d --build api worker-sped worker-sped-merge`).
 
 Não precisam de edição manual (derivam da fonte): `CORE_SHEETS` em
 `inspect_xlsx.py` (vem de `SHEET_ORDER`) e a lista do
@@ -110,6 +109,8 @@ Fixtures: `tests/fixtures/sped_bloco_d.txt` (bloco D completo, com D101/D105) e
 `webapp-01/tests/fixtures/sped_minimo.txt` (só o `0000`).
 
 `VL_*` é gravado no Excel como **texto** (`1.000,00`) para o Excel não trocar
-vírgula por ponto conforme o idioma; `ALIQ_*` e `QTD`/`QUANT_*` vão como
-**número**, então `7,60` é lido de volta como `7.6` — o merge reconhece que o
-valor não mudou e devolve o texto original (ver `engines/sped-merge`).
+vírgula por ponto conforme o idioma; `VL_*` vazio no `.txt` fica **vazio** na
+planilha (não `0,00`), senão a volta gravaria zero onde não havia nada.
+`ALIQ_*` e `QTD`/`QUANT_*` vão como **número**, então `7,60` é lido de volta como
+`7.6` — o merge reconhece que o valor não mudou e devolve o texto original (ver
+`engines/sped-merge`).

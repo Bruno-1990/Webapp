@@ -23,15 +23,3 @@ class CliProgress:
         self._current_global += 1
         pct = 2 + min(90, int((self._current_global / self._total_global) * 88))
         self._emit(pct, step_label or "")
-
-    def tick_local(self, current, total, step_label=None):
-        pass
-
-    def reset_local(self):
-        pass
-
-    def animate_local(self, step_label="Processando", duration_ms=2000, steps=50):
-        self._emit(min(94, 70 + (hash(step_label) % 20)), step_label or "etapa")
-
-    def close(self):
-        pass

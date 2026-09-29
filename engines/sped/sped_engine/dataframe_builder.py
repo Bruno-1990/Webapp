@@ -12,16 +12,14 @@ class DefaultDataFrameBuilder:
             return self._build_generic(rec, rows)
         base = len(self.headers[rec])
         if not rows:
-            return pd.DataFrame(columns=["_LINHA"] + self.headers[rec]), 0, 0
+            return pd.DataFrame(columns=["_LINHA"] + self.headers[rec])
 
         adjusted = []
-        mism, max_extra = 0, 0
+        max_extra = 0
 
         for item in rows:
             line_no, r = item
             r = list(r)
-            if r and str(r[0]).upper() != rec:
-                mism += 1
             if len(r) < base:
                 r += [""] * (base - len(r))
             row_out = [line_no] + r
@@ -32,25 +30,21 @@ class DefaultDataFrameBuilder:
 
         extra_cols = [f"EXTRA_{i:02d}" for i in range(1, max_extra + 1)]
         cols = ["_LINHA"] + self.headers[rec] + extra_cols
-        df = pd.DataFrame(adjusted, columns=cols)
-        return df, max_extra, mism
+        return pd.DataFrame(adjusted, columns=cols)
 
     def _build_generic(self, rec: str, rows):
         if not rows:
-            return pd.DataFrame(columns=["_LINHA", "COL_01"]), 0, 0
+            return pd.DataFrame(columns=["_LINHA", "COL_01"])
 
         max_payload = max(len(r) for _ln, r in rows)
         cap = min(max_payload, MAX_GENERIC_COLS)
         truncated = max_payload > cap
 
         adjusted = []
-        mism = 0
 
         for item in rows:
             line_no, r = item
             r = list(r)
-            if r and str(r[0]).upper() != rec:
-                mism += 1
             rest = r[cap:] if len(r) > cap else []
             r = r[:cap] if len(r) > cap else r[:]
             if len(r) < cap:
@@ -65,7 +59,5 @@ class DefaultDataFrameBuilder:
             extra_cols = ["EXTRA_NOTA"]
             for i, row in enumerate(adjusted):
                 adjusted[i] = row + ["Colunas truncadas a %d" % MAX_GENERIC_COLS]
-            max_extra = 1
         cols = col_names + extra_cols
-        df = pd.DataFrame(adjusted, columns=cols)
-        return df, max_extra, mism
+        return pd.DataFrame(adjusted, columns=cols)
