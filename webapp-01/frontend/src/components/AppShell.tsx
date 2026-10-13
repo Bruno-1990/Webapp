@@ -4,6 +4,7 @@ import { Link, Outlet, useLocation, useSearchParams } from "react-router-dom";
 const CATEGORY_TABS = [
   { id: "fiscal", label: "Fiscal" },
   { id: "contabil", label: "Contábil" },
+  { id: "tutorial", label: "Tutorial" },
 ] as const;
 
 type TabId = (typeof CATEGORY_TABS)[number]["id"];

@@ -20,6 +20,7 @@ const ConcatenadorPlanilhasHomePage = lazy(
 const ConferenciaSequenciaHomePage = lazy(
   () => import("./pages/ConferenciaSequenciaHomePage.js")
 );
+const TutorialPage = lazy(() => import("./pages/TutorialPage.js"));
 const LegacyDownloadRedirect = lazy(() => import("./pages/LegacyDownloadRedirect.js"));
 
 function LegacyFallback() {
@@ -41,6 +42,7 @@ export default function App() {
 
         <Route element={<AppShell />}>
           <Route path="/" element={<ToolsHubPage />} />
+          <Route path="/tutoriais/:slug" element={<TutorialPage />} />
           <Route path="/tools/nfe" element={<HomePage />} />
           <Route path="/tools/nfe/download/:jobId" element={<DownloadPage />} />
           <Route path="/tools/sped" element={<SpedHomePage />} />

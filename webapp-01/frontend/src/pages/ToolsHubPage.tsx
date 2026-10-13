@@ -1,5 +1,6 @@
 import {
   ArrowRight,
+  BookOpen,
   Calculator,
   CircleHelp,
   ClipboardCheck,
@@ -26,7 +27,9 @@ import {
   type ToolManifestEntry,
   type ToolTagTone,
 } from "../api.js";
+import { CopiarLinkButton } from "../components/CopiarLinkButton.js";
 import { Modal } from "../components/Modal.js";
+import { TUTORIAIS } from "../tutoriais.js";
 
 const TOOL_ICONS: Record<string, LucideIcon> = {
   nfe: FileSpreadsheet,
@@ -115,8 +118,41 @@ function categoryOf(tool: ToolManifestEntry): ToolCategory {
   return tool.category ?? "fiscal";
 }
 
-function parseCategory(value: string | null): ToolCategory {
-  return value === "contabil" ? "contabil" : "fiscal";
+type HubTab = ToolCategory | "tutorial";
+
+function parseCategory(value: string | null): HubTab {
+  if (value === "contabil" || value === "tutorial") return value;
+  return "fiscal";
+}
+
+function TutorialView() {
+  return (
+    <ul className="mx-auto grid w-full max-w-3xl gap-4 sm:grid-cols-2">
+      {TUTORIAIS.map((t) => (
+        <li key={t.slug} className="flex">
+          <div className="flex w-full flex-col gap-2 rounded-2xl border border-[#d4e4eb]/95 bg-[linear-gradient(180deg,#ffffff_0%,#fbfdff_100%)] p-4 shadow-[0_8px_24px_-16px_rgb(41_85_104/0.55)]">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#447f98] via-[#4f8aa3] to-[#629bb5] text-white">
+              <BookOpen className="h-5 w-5" strokeWidth={2.1} />
+            </span>
+            <h2 className="font-display text-base font-bold text-[#183844] sm:text-lg">
+              {t.titulo}
+            </h2>
+            <p className="text-sm leading-relaxed text-[#1e3d4d]">{t.resumo}</p>
+            <div className="mt-auto flex flex-wrap items-center gap-2">
+            <Link
+              to={`/tutoriais/${t.slug}`}
+              className="inline-flex w-fit items-center gap-1 rounded-full border border-[#c5dfe8] bg-[#f2fafd] px-2.5 py-1 text-[12px] font-semibold text-[#2d6a82] transition hover:border-[#9ec8d8] hover:bg-[#e8f5fa]"
+            >
+              Ver tutorial · {t.passos.length} passos
+              <ArrowRight className="h-3 w-3" />
+            </Link>
+              <CopiarLinkButton path={`/tutoriais/${t.slug}`} />
+            </div>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 export default function ToolsHubPage() {
@@ -137,12 +173,14 @@ export default function ToolsHubPage() {
 
   const list = tools ?? [];
 
+  const isTutorial = activeCategory === "tutorial";
+
   const filtered = useMemo(
     () => list.filter((t) => categoryOf(t) === activeCategory),
     [list, activeCategory],
   );
 
-  const activeDef = CATEGORIES[activeCategory];
+  const activeDef = isTutorial ? null : CATEGORIES[activeCategory];
 
   /** Mesma lógica antiga: 4 ferramentas viram 3 + 1 centralizada. */
   const hubThreePlusOne = filtered.length === 4;
@@ -157,14 +195,27 @@ export default function ToolsHubPage() {
     <div className="space-y-8 sm:space-y-10">
       <div className="text-center">
         <h1 className="font-display text-2xl font-bold tracking-tight text-[#183844] sm:text-3xl md:text-4xl">
-          {activeDef.title} <span className="text-[#347891]">{activeDef.highlight}</span>
+          {activeDef ? (
+            <>
+              {activeDef.title}{" "}
+              <span className="text-[#347891]">{activeDef.highlight}</span>
+            </>
+          ) : (
+            <>
+              <span className="text-[#347891]">Tutoriais</span> da central
+            </>
+          )}
         </h1>
         <p className="mx-auto mt-3 max-w-lg font-sans text-sm leading-relaxed text-[#1e3d4d] sm:mt-3.5 sm:max-w-xl sm:text-[15px]">
-          {activeDef.subtitle}
+          {activeDef
+            ? activeDef.subtitle
+            : "Guias passo a passo com imagens, com link para compartilhar."}
         </p>
       </div>
 
-      {filtered.length === 0 ? (
+      {isTutorial ? (
+        <TutorialView />
+      ) : filtered.length === 0 && activeDef ? (
         <EmptyCategoryState category={activeDef} />
       ) : (
         <ul className={hubGridClass}>
