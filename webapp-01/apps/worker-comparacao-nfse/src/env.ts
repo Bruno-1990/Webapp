@@ -26,6 +26,8 @@ const EnvSchema = z.object({
   PYTHON_CMD: z.string().default(process.platform === "win32" ? "py" : "python3"),
   /** Chave do Google Generative AI — necessaria para OCR de PDFs. */
   GEMINI_API_KEY: z.string().optional().default(""),
+  /** Chave do Vertex AI (modo express, pago) — fallback da GEMINI_API_KEY no OCR. */
+  API_KEY_VERTEX: z.string().optional().default(""),
   /** Quantos jobs em paralelo este worker processa. */
   NFSE_WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(16).default(4),
   /** Limite de chamadas Gemini por minuto (token bucket compartilhado). */

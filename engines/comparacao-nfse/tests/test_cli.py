@@ -92,6 +92,7 @@ def test_cli_emits_failed_quota_when_circuit_pre_opened(tmp_path):
     env = os.environ.copy()
     env["NFSE_FORCE_CIRCUIT_OPEN"] = "1"
     env["GEMINI_API_KEY"] = "fake-key-for-test"
+    env.pop("API_KEY_VERTEX", None)  # com Vertex o circuito aberto nao barra o job
 
     out_json = tmp_path / "result.json"
     out_xlsx = tmp_path / "out.xlsx"

@@ -119,6 +119,7 @@ def test_batch_processamento(tmp_path, monkeypatch):
         "ocr_local": 0,
         "ocr": 3,
         "imagens": 0,
+        "ocr_vertex": 0,
         "ocr_disponivel": True,
         "ocr_local_disponivel": False,
     }
@@ -211,6 +212,7 @@ def test_sem_nenhum_ocr_pdf_scan_vai_pra_failed(tmp_path, monkeypatch):
         "ocr_local": 0,
         "ocr": 0,
         "imagens": 0,
+        "ocr_vertex": 0,
         "ocr_disponivel": False,
         "ocr_local_disponivel": False,
     }

@@ -37,6 +37,8 @@ const EnvSchema = z.object({
   MAX_UPLOAD_NFSE_MB: z.coerce.number().default(300),
   /** Chave Google Generative AI — repassada ao worker de NFS-e (OCR). */
   GEMINI_API_KEY: z.string().optional().default(""),
+  /** Chave do Vertex AI (modo express, pago) — fallback da GEMINI_API_KEY no OCR. */
+  API_KEY_VERTEX: z.string().optional().default(""),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

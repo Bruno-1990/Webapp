@@ -79,8 +79,65 @@ def _extract_json_object(raw: str) -> dict | None:
 _INLINE_LIMIT_BYTES = 20 * 1024 * 1024
 
 
+VERTEX_ENDPOINT = (
+    "https://aiplatform.googleapis.com/v1/publishers/google/models/{model}:generateContent"
+)
+
+
+def _call_vertex(pdf_path: Path, api_key: str, model: str) -> str:
+    """Gemini via Vertex AI (modo express, so API key). REST puro: o Vertex nao
+    tem o upload_file do AI Studio, entao o arquivo vai sempre inline."""
+    import base64
+    import urllib.error
+    import urllib.request
+
+    size = pdf_path.stat().st_size
+    if size > _INLINE_LIMIT_BYTES:
+        raise ValueError(
+            f"Arquivo de {size // (1024 * 1024)} MB acima do limite inline do Vertex (20 MB)"
+        )
+    mime = _mime_type_for(pdf_path) or "application/pdf"
+    body = json.dumps({
+        "contents": [{
+            "role": "user",
+            "parts": [
+                {"text": PROMPT},
+                {"inlineData": {
+                    "mimeType": mime,
+                    "data": base64.b64encode(pdf_path.read_bytes()).decode("ascii"),
+                }},
+            ],
+        }],
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        VERTEX_ENDPOINT.format(model=model),
+        data=body,
+        headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        # Mensagem carrega o status do Google (RESOURCE_EXHAUSTED, PERMISSION_DENIED...)
+        # para _summarize_error / circuit breaker classificarem.
+        detail = e.read().decode("utf-8", errors="replace")
+        try:
+            err = json.loads(detail).get("error", {})
+            detail = f"{err.get('status', '')}: {err.get('message', '')}"
+        except (json.JSONDecodeError, AttributeError):
+            detail = detail[:300]
+        raise RuntimeError(f"Vertex HTTP {e.code} {detail}") from None
+
+    candidates = payload.get("candidates") or []
+    if not candidates:
+        return ""
+    parts = (candidates[0].get("content") or {}).get("parts") or []
+    return "".join(p.get("text", "") for p in parts)
+
+
 def _call_gemini(pdf_path: Path, api_key: str, model: str) -> str:
-    """Chamada real ao Gemini. Isolada para permitir mock nos testes.
+    """Chamada real ao Gemini (AI Studio). Isolada para permitir mock nos testes.
 
     Estrategia: bytes inline (rapido — uma round-trip). Se o arquivo passar
     de 20 MB, cai pro upload_file (mais lento mas suporta arquivos grandes).
@@ -147,52 +204,95 @@ def _is_non_retryable(exc: Exception) -> bool:
     return any(k in low for k in _NON_RETRYABLE)
 
 
+def _is_quota_error(exc: Exception) -> bool:
+    low = str(exc).lower()
+    return "quota" in low or "resource_exhausted" in low
+
+
+def _call_with_retries(
+    call: Callable[..., str],
+    p: Path,
+    api_key: str,
+    model: str,
+    max_retries: int,
+    governor=None,
+) -> tuple[str | None, str | None]:
+    """Roda `call` com retry. Retorna (texto, None) ou (None, motivo).
+    Com `governor`, reporta sucesso/falha de quota ao circuit breaker."""
+    last_reason: str | None = None
+    for attempt in range(max_retries + 1):
+        try:
+            raw = call(p, api_key=api_key, model=model)
+            if governor is not None:
+                governor.report_success()
+            return raw, None
+        except Exception as e:
+            last_reason = _summarize_error(e)
+            if governor is not None and _is_quota_error(e):
+                governor.report_failure()
+            if _is_non_retryable(e) or attempt >= max_retries:
+                break
+            time.sleep(1.5 * (attempt + 1))
+    return None, last_reason
+
+
 def _extract_with_reason(
     pdf_path: str | Path,
-    api_key: str,
+    api_key: str | None,
     *,
     model: str = DEFAULT_MODEL,
     max_retries: int = 2,
     governor=None,
-) -> tuple[NfseEntry | None, str | None]:
-    """Retorna (entry, None) em sucesso ou (None, motivo) em falha.
+    vertex_key: str | None = None,
+) -> tuple[NfseEntry | None, str | None, str | None]:
+    """Retorna (entry, None, backend) em sucesso ou (None, motivo, None) em falha.
 
-    Se `governor` for passado, respeita rate limit e circuit breaker.
+    Cadeia de OCR na nuvem, da gratuita para a paga:
+      1. Gemini AI Studio (`api_key`, cota gratuita) — sob o `governor`
+         (rate limit + circuit breaker compartilhados entre jobs).
+      2. Vertex AI (`vertex_key`, pago) — so se a 1 nao existir, estiver com o
+         circuito aberto ou falhar. Fora do governor: a cota e outra.
+    `backend` diz quem respondeu: "gemini" ou "vertex".
     """
     from gemini_governor import QuotaExhaustedError  # lazy: governor opcional
 
     p = Path(pdf_path)
     raw: str | None = None
-    last_reason: str | None = None
+    backend: str | None = None
+    motivos: list[str] = []
 
-    # Pre-check: circuit aberto faz fail-fast sem chamar Gemini
-    if governor is not None:
-        try:
-            governor.guard()
-        except QuotaExhaustedError as e:
-            return None, str(e)
+    if api_key:
+        bloqueado: str | None = None
+        # Pre-check: circuit aberto / sem token faz fail-fast sem chamar Gemini
+        if governor is not None:
+            try:
+                governor.guard()
+            except (QuotaExhaustedError, TimeoutError) as e:
+                bloqueado = str(e)
+        if bloqueado:
+            motivos.append(bloqueado)
+        else:
+            raw, motivo = _call_with_retries(
+                _call_gemini, p, api_key, model, max_retries, governor
+            )
+            if raw is not None:
+                backend = "gemini"
+            elif motivo:
+                motivos.append(motivo)
 
-    for attempt in range(max_retries + 1):
-        try:
-            raw = _call_gemini(p, api_key=api_key, model=model)
-            if governor is not None:
-                governor.report_success()
-            break
-        except Exception as e:
-            last_reason = _summarize_error(e)
-            if governor is not None and "quota" in str(e).lower() or "resource_exhausted" in str(e).lower():
-                governor.report_failure()
-            if _is_non_retryable(e) or attempt >= max_retries:
-                raw = None
-                break
-            time.sleep(1.5 * (attempt + 1))
+    if raw is None and vertex_key:
+        raw, motivo = _call_with_retries(_call_vertex, p, vertex_key, model, max_retries)
+        if raw is not None:
+            backend = "vertex"
+        elif motivo:
+            motivos.append(f"Vertex: {motivo}")
 
     if raw is None:
-        return None, last_reason or "Falha desconhecida ao chamar o Gemini"
+        return None, " | ".join(motivos) or "Falha desconhecida ao chamar o Gemini", None
 
     obj = _extract_json_object(raw)
     if not isinstance(obj, dict):
-        return None, "Gemini retornou texto nao-JSON ou vazio"
+        return None, "Gemini retornou texto nao-JSON ou vazio", None
 
     cnpj = _normalize(obj.get("cnpj_tomador"))
     if cnpj:
@@ -217,23 +317,25 @@ def _extract_with_reason(
         cnpj_prestador=cnpj_pres,
         razao_social_prestador=razao,
         razao_social_tomador=razao_tomador,
-    ), None
+    ), None, backend
 
 
 def extract_from_pdf(
     pdf_path: str | Path,
-    api_key: str,
+    api_key: str | None,
     *,
     model: str = DEFAULT_MODEL,
     max_retries: int = 2,
     governor=None,
+    vertex_key: str | None = None,
 ) -> NfseEntry | None:
-    entry, _ = _extract_with_reason(
+    entry, _, _ = _extract_with_reason(
         pdf_path,
         api_key=api_key,
         model=model,
         max_retries=max_retries,
         governor=governor,
+        vertex_key=vertex_key,
     )
     return entry
 
@@ -280,13 +382,16 @@ def extract_from_directory(
     model: str = DEFAULT_MODEL,
     on_progress: Callable[..., None] | None = None,
     governor=None,
+    vertex_key: str | None = None,
 ) -> tuple[list[NfseEntry], list[dict], dict]:
     """Extrai entries de PDFs/imagens em `directory`.
 
     Tres passes, do mais barato para o mais caro:
       1. pdfplumber — texto nativo do PDF. Resolve ~90% dos lotes reais.
       2. OCR local  — rasteriza e le os pixels. Sem API, sem cota, offline.
-      3. OCR Gemini — fallback opcional, so roda se sobrou algo E ha chave.
+      3. OCR Gemini — fallback opcional, so roda se sobrou algo E ha chave:
+         chave gratuita (`api_key`) primeiro, Vertex pago (`vertex_key`) depois
+         (ver _extract_with_reason).
 
     Todo arquivo que nao for identificado em nenhum passe entra em `failed`
     com o motivo, para ser listado ao usuario no fim do job.
@@ -307,7 +412,9 @@ def extract_from_directory(
         "ocr_local": 0,
         "ocr": 0,
         "imagens": 0,
-        "ocr_disponivel": bool(api_key),
+        # Quantos de ocr+imagens vieram do Vertex (pago) — custo visivel.
+        "ocr_vertex": 0,
+        "ocr_disponivel": bool(api_key or vertex_key),
         "ocr_local_disponivel": ocr_local.available(),
     }
 
@@ -406,7 +513,7 @@ def extract_from_directory(
     # ── Pass 3: OCR Gemini (fallback opcional) ───────────────────────────
     set_stage("ocr_gemini", len(restantes))
     if restantes:
-        if not api_key:
+        if not stats["ocr_disponivel"]:
             for _i, f, motivo in restantes:
                 failed.append({
                     "file": display_name(f.name),
@@ -423,21 +530,24 @@ def extract_from_directory(
                         api_key=api_key,
                         model=model,
                         governor=governor,
+                        vertex_key=vertex_key,
                     ): (i, f, motivo)
                     for i, f, motivo in restantes
                 }
                 for fut in as_completed(future_to_item):
                     i, f, motivo_local = future_to_item[fut]
                     try:
-                        ocr_entry, reason = fut.result()
+                        ocr_entry, reason, backend = fut.result()
                     except Exception as exc:
-                        ocr_entry, reason = None, _summarize_error(exc)
+                        ocr_entry, reason, backend = None, _summarize_error(exc), None
                     if ocr_entry is not None:
                         entries_by_idx[i] = ocr_entry
                         if f.suffix.lower() == ".pdf":
                             stats["ocr"] += 1
                         else:
                             stats["imagens"] += 1
+                        if backend == "vertex":
+                            stats["ocr_vertex"] += 1
                     else:
                         # Mostra os dois motivos: o usuario precisa saber que
                         # ambos os caminhos foram tentados e por que falharam.

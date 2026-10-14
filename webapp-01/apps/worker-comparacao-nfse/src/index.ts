@@ -73,6 +73,7 @@ function runNfseCli(
      * CLI roda em modo single-process (sem coordenacao entre workers). */
     const childEnv = { ...process.env };
     if (env.GEMINI_API_KEY) childEnv.GEMINI_API_KEY = env.GEMINI_API_KEY;
+    if (env.API_KEY_VERTEX) childEnv.API_KEY_VERTEX = env.API_KEY_VERTEX;
     childEnv.REDIS_URL = env.REDIS_URL;
     childEnv.NFSE_GEMINI_RPM = String(env.NFSE_GEMINI_RPM);
     childEnv.NFSE_CIRCUIT_COOLDOWN_SEC = String(env.NFSE_CIRCUIT_COOLDOWN_SEC);
@@ -183,9 +184,13 @@ new Worker<ComparacaoNfseJobPayload>(
   logger.error("job failed", j?.id, err?.message);
 });
 
-if (!env.GEMINI_API_KEY) {
+if (env.API_KEY_VERTEX) {
   logger.info(
-    `Worker Comparacao NFS-e iniciado SEM GEMINI_API_KEY — apenas XMLs serao processados. Defina a variavel para habilitar OCR de PDFs.`,
+    `Worker Comparacao NFS-e: OCR na nuvem = ${env.GEMINI_API_KEY ? "GEMINI_API_KEY (gratuita) -> " : ""}Vertex AI (API_KEY_VERTEX, pago).`,
+  );
+} else if (!env.GEMINI_API_KEY) {
+  logger.info(
+    `Worker Comparacao NFS-e iniciado SEM API_KEY_VERTEX/GEMINI_API_KEY — apenas XMLs serao processados. Defina uma das variaveis para habilitar OCR de PDFs.`,
   );
 }
 logger.info(

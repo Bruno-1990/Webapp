@@ -133,8 +133,12 @@ def processar(pdfs_dir: Path, xmls_dir: Path, output_xlsx: Path, output_json: Pa
 
     governor = _build_governor() if pdfs_presentes else None
 
+    # Vertex (pago) e o fallback da chave gratuita: com ele, circuito aberto
+    # da gratuita nao impede o job — os arquivos so vao direto pro Vertex.
+    vertex_key = os.environ.get("API_KEY_VERTEX", "").strip() or None
+
     # Pre-check: circuit ja aberto -> fail-fast antes de gastar 1 token
-    if governor is not None:
+    if governor is not None and not vertex_key:
         from gemini_governor import CircuitState
 
         if governor.circuit.state() == CircuitState.OPEN:
@@ -168,6 +172,7 @@ def processar(pdfs_dir: Path, xmls_dir: Path, output_xlsx: Path, output_json: Pa
             api_key=api_key,
             on_progress=on_prog,
             governor=governor,
+            vertex_key=vertex_key,
         )
     else:
         progress(85, stage="texto", stageDone=0, stageTotal=0)

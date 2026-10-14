@@ -1801,6 +1801,12 @@ async function readNfseCircuitState(): Promise<NfseCircuitState> {
     const raw = await redis.hmget(NFSE_CIRCUIT_KEY, "state", "open_until");
     const state = (raw[0] as string | null) || "closed";
     const openUntil = parseFloat((raw[1] as string | null) || "0") || 0;
+    /** Cooldown vencido = HALF_OPEN, igual CircuitBreaker.state() do Python. A
+     * transicao la so acontece quando um job roda; se a API barrasse aqui, o
+     * circuito ficaria "open" ate o TTL da chave (1h) com "Tente em ~0s". */
+    if (state === "open" && openUntil <= Date.now() / 1000) {
+      return { state: "half_open", openUntilSec: openUntil };
+    }
     if (state === "open" || state === "half_open") {
       return { state, openUntilSec: openUntil };
     }
@@ -1832,7 +1838,10 @@ app.get(`${API_PREFIX}/tools/comparacao-nfse/health`, async () => {
     /* ignore */
   }
   const geminiAvailable =
-    Boolean(env.GEMINI_API_KEY) && circuit.state !== "open";
+    /* Vertex (pago) e o fallback da chave gratuita: com ele o OCR segue mesmo
+     * com o circuito da gratuita aberto. */
+    Boolean(env.API_KEY_VERTEX) ||
+    (Boolean(env.GEMINI_API_KEY) && circuit.state !== "open");
   const circuitOpenUntil =
     circuit.state === "open" ? new Date(circuit.openUntilSec * 1000).toISOString() : null;
   return {
@@ -1935,8 +1944,9 @@ app.post<{ Params: { id: string } }>(
     }
 
     /** Fail-fast quando o circuit esta aberto E o job tem PDFs (que precisariam
-     * de Gemini). Jobs so com XML nao tocam Gemini, entao podem prosseguir. */
-    if (pdfCount > 0) {
+     * de Gemini). Jobs so com XML nao tocam Gemini, entao podem prosseguir.
+     * Com API_KEY_VERTEX nao barra: o worker manda os PDFs pro Vertex. */
+    if (pdfCount > 0 && !env.API_KEY_VERTEX) {
       const circuit = await readNfseCircuitState();
       if (circuit.state === "open") {
         const retryAfterSec = Math.max(
