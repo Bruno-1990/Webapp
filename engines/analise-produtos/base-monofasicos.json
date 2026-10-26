@@ -1,6 +1,6 @@
 {
-  "versao": "2026-10-23",
-  "origem": "Planilha produtos_monofasicos_pis_cofins (Google Sheets), conferida contra Planalto, DOU, tabelas 4.3.10/4.3.13 da EFD-Contribuicoes e Confaz em 23/10/2026",
+  "versao": "2026-10-26",
+  "origem": "Planilha produtos_monofasicos_pis_cofins (Google Sheets), conferida contra Planalto, DOU, tabelas 4.3.10/4.3.13 da EFD-Contribuicoes e Confaz em 23/10/2026; partes de maquinas do art. 1o revistas em 26/10/2026",
   "vigencia": "Regimes monofasicos de PIS/COFINS validos ate 31/12/2026 (LC 214/2025, art. 542). Revisar a base para fatos geradores de 2027 em diante.",
   "regras": [
     {
@@ -221,6 +221,12 @@
       "base": "Lei 10.485/2002, art. 1o"
     },
     {
+      "ncm": "7310.29.90",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o",
+      "condicao": "Confirmar se o item e implemento de maquina/veiculo; recipiente de uso comum (balde, lata, tambor) nao e maquina, implemento ou veiculo, como exige o art. 1o da Lei 10.485."
+    },
+    {
       "ncm": "7612.90.12",
       "categoria": "Maquinas e veiculos",
       "base": "Lei 10.485/2002, art. 1o"
@@ -251,9 +257,21 @@
       "base": "Lei 10.485/2002, art. 1o"
     },
     {
+      "ncm": "8433.90.10",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o",
+      "condicao": "Codigo de partes (peca avulsa): o art. 1o da Lei 10.485 fala em maquinas, implementos e veiculos, e esta peca nao esta nos Anexos I/II nem na tabela 4.3.10 da EFD. Confirmar se o item e a maquina/implemento completo; peca avulsa, pela leitura literal, nao e monofasica."
+    },
+    {
       "ncm": "84.34",
       "categoria": "Maquinas e veiculos",
       "base": "Lei 10.485/2002, art. 1o"
+    },
+    {
+      "ncm": "8434.90",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o",
+      "condicao": "Codigo de partes (peca avulsa): o art. 1o da Lei 10.485 fala em maquinas, implementos e veiculos, e esta peca nao esta nos Anexos I/II nem na tabela 4.3.10 da EFD. Confirmar se o item e a maquina/implemento completo; peca avulsa, pela leitura literal, nao e monofasica."
     },
     {
       "ncm": "84.35",
@@ -261,14 +279,38 @@
       "base": "Lei 10.485/2002, art. 1o"
     },
     {
+      "ncm": "8435.90",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o",
+      "condicao": "Codigo de partes (peca avulsa): o art. 1o da Lei 10.485 fala em maquinas, implementos e veiculos, e esta peca nao esta nos Anexos I/II nem na tabela 4.3.10 da EFD. Confirmar se o item e a maquina/implemento completo; peca avulsa, pela leitura literal, nao e monofasica."
+    },
+    {
       "ncm": "84.36",
       "categoria": "Maquinas e veiculos",
       "base": "Lei 10.485/2002, art. 1o"
     },
     {
+      "ncm": "8436.91",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o",
+      "condicao": "Codigo de partes (peca avulsa): o art. 1o da Lei 10.485 fala em maquinas, implementos e veiculos, e esta peca nao esta nos Anexos I/II nem na tabela 4.3.10 da EFD. Confirmar se o item e a maquina/implemento completo; peca avulsa, pela leitura literal, nao e monofasica."
+    },
+    {
+      "ncm": "8436.99",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o",
+      "condicao": "Codigo de partes (peca avulsa): o art. 1o da Lei 10.485 fala em maquinas, implementos e veiculos, e esta peca nao esta nos Anexos I/II nem na tabela 4.3.10 da EFD. Confirmar se o item e a maquina/implemento completo; peca avulsa, pela leitura literal, nao e monofasica."
+    },
+    {
       "ncm": "84.37",
       "categoria": "Maquinas e veiculos",
       "base": "Lei 10.485/2002, art. 1o"
+    },
+    {
+      "ncm": "8437.90",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o",
+      "condicao": "Codigo de partes (peca avulsa): o art. 1o da Lei 10.485 fala em maquinas, implementos e veiculos, e esta peca nao esta nos Anexos I/II nem na tabela 4.3.10 da EFD. Confirmar se o item e a maquina/implemento completo; peca avulsa, pela leitura literal, nao e monofasica."
     },
     {
       "ncm": "87.01",
@@ -645,7 +687,7 @@
       "ncm": "8481.20.90",
       "categoria": "Autopecas - Anexo II",
       "base": "Lei 10.485/2002, Anexo II",
-      "condicao": "Confirmar se a peca e valvula de transmissao oleo-hidraulica ou pneumatica propria para maquinas de 84.29 ou colheitadeiras (8433); peca de uso geral (oficina, lubrificacao, solda) nao entra."
+      "condicao": "Confirmar se a peca e valvula de transmissao oleo-hidraulica ou pneumatica propria para maquinas de 84.29, cortadores (8433.20), maquinas de fenacao (8433.30.00), enfardadeiras (8433.40.00) ou colheitadeiras (8433.5); peca de uso geral (oficina, lubrificacao, solda) nao entra."
     },
     {
       "ncm": "8481.80.92",

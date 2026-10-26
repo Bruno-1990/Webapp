@@ -43,7 +43,7 @@ test("classifica, limpa os códigos e aponta CST incoerente", async (t) => {
   t.after(r.limpar);
   assert.equal(r.status, 0, JSON.stringify(r.eventos));
   const done = r.eventos.find((e) => e.kind === "done");
-  assert.equal(done.linhas, 7);
+  assert.equal(done.linhas, 8);
   assert.equal(done.corrigir, 1);
 
   const { linhas, header } = await lerAba(r.output, "Produtos");
@@ -89,11 +89,16 @@ test("classifica, limpa os códigos e aponta CST incoerente", async (t) => {
   assert.equal(porNf["16"]["Observação"], null);
   assert.equal(porNf["16"]["Situação"], null);
 
+  // Peça avulsa de máquina da 84.36: o art. 1º fala em máquinas e implementos.
+  assert.equal(porNf["17"]["Monofásico"], "Depende");
+  assert.equal(porNf["17"]["Situação"], "Confirmar condição");
+  assert.match(porNf["17"]["O que conferir"], /peca avulsa/);
+
   // Monofásicos em ordem de prioridade: corrigir, conferir, OK, uso e consumo.
   const mono = await lerAba(r.output, "Monofásicos");
   assert.deepEqual(
     mono.linhas.map((l) => l["Nº NF."]),
-    ["10", "13", "12", "14"],
+    ["10", "17", "13", "12", "14"],
   );
 
   // Veredito primeiro: as 3 colunas de identificação ficam congeladas.
