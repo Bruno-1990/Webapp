@@ -128,10 +128,11 @@ def test_xlsx_formatacao_visual(tmp_path):
     wb = openpyxl.load_workbook(out)
     ws = wb["So em PDFs"]
 
-    # Altura do cabecalho (linha 1) = 25
-    assert ws.row_dimensions[1].height == 25
+    # Altura do cabecalho (linha 1) = 25. xlsxwriter >= 3.3 arredonda a altura
+    # para pixel inteiro (25pt vira 24.75pt), dai a tolerancia.
+    assert ws.row_dimensions[1].height == pytest.approx(25, abs=0.5)
     # Altura da linha de dados (2) = 20
-    assert ws.row_dimensions[2].height == 20
+    assert ws.row_dimensions[2].height == pytest.approx(20, abs=0.5)
 
     header_cell = ws.cell(row=1, column=1)
     # Header em negrito
