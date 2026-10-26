@@ -259,6 +259,17 @@ function defaultToolsManifest(): ToolManifestEntry[] {
       category: "fiscal",
     },
     {
+      id: "analise-produtos",
+      title: "Análise de Produtos",
+      subtitle: "SCI → Monofásicos",
+      description:
+        "Envie a exportação de produtos por nota do SCI. Receba uma planilha enxuta, só com o que o analista fiscal consulta, e cada item cruzado com a base de monofásicos de PIS/COFINS, com o CST conferido.",
+      route: "/tools/analise-produtos",
+      available: true,
+      category: "fiscal",
+      tag: { label: "PIS/COFINS · Monofásico", tone: "emerald" },
+    },
+    {
       id: "conferencia-sequencia",
       title: "Conferência de Sequência",
       subtitle: "Numeração das notas · SEFAZ",
@@ -1090,6 +1101,83 @@ export async function getConcatenadorPlanilhasJob(
 
 export function concatenadorPlanilhasDownloadUrl(id: string, token: string): string {
   return `${baseUrl()}${API_PREFIX}/tools/concatenador-planilhas/jobs/${id}/download?token=${encodeURIComponent(token)}`;
+}
+
+// ── Análise Fiscal de Produtos (engines/analise-produtos) ────────────────
+
+export type AnaliseProdutosResult = {
+  linhas?: number;
+  monofasicos?: number;
+  depende?: number;
+  corrigir?: number;
+  confirmar?: number;
+  baseVersao?: string;
+};
+
+export type AnaliseProdutosJobResponse = JobResponse & { result?: AnaliseProdutosResult };
+
+export async function createAnaliseProdutosJob(file: File): Promise<{ id: string }> {
+  const fd = new FormData();
+  fd.append("file", file);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl()}${API_PREFIX}/tools/analise-produtos/jobs`, {
+      method: "POST",
+      body: fd,
+      signal: controller.signal,
+    });
+  } catch (e) {
+    const aborted =
+      (e instanceof DOMException && e.name === "AbortError") ||
+      (e instanceof Error && e.name === "AbortError");
+    if (aborted) {
+      throw new Error(
+        `Envio excedeu ${Math.round(UPLOAD_TIMEOUT_MS / 60_000)} minutos. Verifique Redis, API e worker Análise de Produtos.`
+      );
+    }
+    if (!baseUrl() && isFetchNetworkError(e)) {
+      throw new Error(apiOfflineMessage());
+    }
+    throw e;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    let msg = (err as { error?: string }).error ?? res.statusText;
+    if (
+      !baseUrl() &&
+      (res.status === 500 || res.status === 502 || res.status === 503) &&
+      (msg === "Internal Server Error" || msg.length < 3)
+    ) {
+      msg =
+        "API ou worker Análise de Produtos inativo. Na raiz do projeto: npm run redis:up e npm run dev (worker-analise-produtos + engines/analise-produtos).";
+    }
+    throw new Error(msg);
+  }
+  return res.json() as Promise<{ id: string }>;
+}
+
+export async function getAnaliseProdutosJob(id: string): Promise<AnaliseProdutosJobResponse> {
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl()}${API_PREFIX}/tools/analise-produtos/jobs/${id}`);
+  } catch (e) {
+    if (!baseUrl() && isFetchNetworkError(e)) {
+      throw new Error(apiOfflineMessage());
+    }
+    throw e;
+  }
+  return res.json() as Promise<AnaliseProdutosJobResponse>;
+}
+
+export function analiseProdutosDownloadUrl(id: string, token: string): string {
+  return `${baseUrl()}${API_PREFIX}/tools/analise-produtos/jobs/${id}/download?token=${encodeURIComponent(token)}`;
 }
 
 // ── Comparador NFS-e (PDF × XML) ─────────────────────────────────────────

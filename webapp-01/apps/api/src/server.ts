@@ -15,6 +15,7 @@ import {
   SPED_MAX_SHEETS_PER_JOB,
   SPED_REG_CODE_RE,
   checkConcatenadorCompatibilidade,
+  type AnaliseProdutosResultado,
   type ConcatenadorAviso,
   type SpedMergeInspectXlsxResponse,
 } from "@webapp/contracts";
@@ -30,6 +31,7 @@ import {
   getGnreQueue,
   getSciPortalNacionalQueue,
   getConcatenadorPlanilhasQueue,
+  getAnaliseProdutosQueue,
   getSpedMergeQueue,
   getSpedMergeInspectQueue,
   getSpedMergeInspectEvents,
@@ -44,6 +46,7 @@ import {
   type GnreJobPayload,
   type SciPortalNacionalJobPayload,
   type ConcatenadorPlanilhasJobPayload,
+  type AnaliseProdutosJobPayload,
 } from "./queue.js";
 import { signDownloadToken, verifyDownloadToken } from "./tokens.js";
 import { buildSpedXlsxFileName, extractSpedRazaoFromBuffer } from "./sped-filename.js";
@@ -272,6 +275,7 @@ const comparacaoNfseQueue = getComparacaoNfseQueue(env);
 const gnreQueue = getGnreQueue(env);
 const sciPortalNacionalQueue = getSciPortalNacionalQueue(env);
 const concatenadorPlanilhasQueue = getConcatenadorPlanilhasQueue(env);
+const analiseProdutosQueue = getAnaliseProdutosQueue(env);
 
 function jobDir(id: string): string {
   /** Absoluto para o payload BullMQ: o worker/Python usa outro cwd e paths relativos quebram (ex.: SPED). */
@@ -378,6 +382,17 @@ app.get(`${API_PREFIX}/tools`, async () => ({
       route: "/tools/concatenador-planilhas",
       available: true,
       category: "fiscal",
+    },
+    {
+      id: "analise-produtos",
+      title: "Análise de Produtos",
+      subtitle: "SCI → Monofásicos",
+      description:
+        "Envie a exportação de produtos por nota do SCI. Receba uma planilha enxuta, só com o que o analista fiscal consulta, e cada item cruzado com a base de monofásicos de PIS/COFINS, com o CST conferido.",
+      route: "/tools/analise-produtos",
+      available: true,
+      category: "fiscal",
+      tag: { label: "PIS/COFINS · Monofásico", tone: "emerald" },
     },
   ],
 }));
@@ -1758,6 +1773,161 @@ app.get<{ Params: { id: string }; Querystring: { token?: string } }>(
     }
 
     const outPath = (job.data as ConcatenadorPlanilhasJobPayload).outputPath;
+    if (!outPath || !fs.existsSync(outPath)) {
+      return reply.code(404).send({ error: "Arquivo não encontrado" });
+    }
+
+    const stream = fs.createReadStream(outPath);
+    reply.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    const fn = claims.fileName.replace(/[\r\n"]/g, "_");
+    const asciiFallback = fn.replace(/[^\x20-\x7e]/g, "_");
+    reply.header(
+      "Content-Disposition",
+      `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(fn)}`
+    );
+    return reply.send(stream);
+  }
+);
+
+// ── Análise Fiscal de Produtos (engines/analise-produtos) ────────────────────
+
+const ALLOWED_ANALISE_EXT = new Set([".csv", ".txt", ".xlsx", ".xls"]);
+
+/** "Produtos_376.csv" → "Análise Fiscal de Produtos - Produtos_376.xlsx" (sem caracteres proibidos no Windows). */
+function analiseProdutosFileName(originalName: string): string {
+  const stem = originalName
+    .replace(/\.[^.]+$/, "")
+    .replace(/[\\/:*?"<>|\r\n]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+  return stem ? `Análise Fiscal de Produtos - ${stem}.xlsx` : "Análise Fiscal de Produtos.xlsx";
+}
+
+app.post(`${API_PREFIX}/tools/analise-produtos/jobs`, async (req, reply) => {
+  const jobId = randomUUID();
+  const inDir = path.join(jobDir(jobId), "in");
+  const outDir = path.join(jobDir(jobId), "out");
+
+  try {
+    const pong = await getRedis(env).ping();
+    if (pong !== "PONG") throw new Error("Redis não respondeu");
+  } catch (e) {
+    req.log.warn({ err: e }, "redis indisponível ao criar job análise de produtos");
+    return reply.code(503).send({
+      error:
+        "Redis não está acessível. Inicie o Redis e o worker Análise de Produtos (worker-analise-produtos).",
+    });
+  }
+
+  await fs.promises.mkdir(inDir, { recursive: true });
+  await fs.promises.mkdir(outDir, { recursive: true });
+
+  let originalName = "";
+  let inputPath = "";
+  let fileCount = 0;
+  for await (const part of req.parts()) {
+    if (part.type !== "file") continue;
+    fileCount += 1;
+    if (fileCount > 1) {
+      await fs.promises.rm(jobDir(jobId), { recursive: true, force: true });
+      return reply.code(400).send({ error: "Envie apenas um arquivo por vez." });
+    }
+    originalName = (part.filename ?? "entrada").replace(/[/\\]/g, "_");
+    const ext = path.extname(originalName).toLowerCase();
+    if (!ALLOWED_ANALISE_EXT.has(ext)) {
+      await fs.promises.rm(jobDir(jobId), { recursive: true, force: true });
+      return reply.code(400).send({ error: "Formato não suportado. Use .csv, .txt, .xlsx ou .xls." });
+    }
+    const buf = await part.toBuffer();
+    if (buf.length > env.MAX_UPLOAD_MB * 1024 * 1024) {
+      await fs.promises.rm(jobDir(jobId), { recursive: true, force: true });
+      return reply.code(413).send({ error: "Arquivo muito grande" });
+    }
+    inputPath = path.join(inDir, `entrada${ext}`);
+    await fs.promises.writeFile(inputPath, buf);
+  }
+
+  if (fileCount === 0) {
+    await fs.promises.rm(jobDir(jobId), { recursive: true, force: true });
+    return reply.code(400).send({ error: "Nenhum arquivo enviado" });
+  }
+
+  const payload: AnaliseProdutosJobPayload = {
+    jobId,
+    inputPath,
+    outputPath: path.join(outDir, analiseProdutosFileName(originalName)),
+    originalName,
+  };
+
+  try {
+    await Promise.race([
+      analiseProdutosQueue.add("analise", payload, { jobId }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Fila timeout")), 15_000)),
+    ]);
+  } catch (e) {
+    await fs.promises.rm(jobDir(jobId), { recursive: true, force: true });
+    req.log.error({ err: e }, "falha ao enfileirar job análise de produtos");
+    return reply.code(503).send({
+      error: "Não foi possível enfileirar o job. Verifique Redis e se o worker-analise-produtos está rodando.",
+    });
+  }
+
+  return reply.code(202).send({ id: jobId, status: "queued" as const });
+});
+
+app.get<{ Params: { id: string } }>(`${API_PREFIX}/tools/analise-produtos/jobs/:id`, async (req, reply) => {
+  const { id } = req.params;
+  const job = await analiseProdutosQueue.getJob(id);
+  if (!job) {
+    return reply.code(404).send({ id, status: "not_found" as const });
+  }
+  const status = mapBullState(await job.getState());
+  const progress = typeof job.progress === "number" ? Math.round(job.progress) : undefined;
+
+  let downloadToken: string | undefined;
+  let fileName: string | undefined;
+  let error: string | undefined;
+  let result: AnaliseProdutosResultado | undefined;
+
+  if (status === "done") {
+    const rv = job.returnvalue as ({ fileName?: string } & AnaliseProdutosResultado) | undefined;
+    fileName = rv?.fileName ?? path.basename((job.data as AnaliseProdutosJobPayload).outputPath);
+    downloadToken = await signDownloadToken(env, id, fileName, "analise-produtos");
+    result = {
+      linhas: rv?.linhas,
+      monofasicos: rv?.monofasicos,
+      depende: rv?.depende,
+      corrigir: rv?.corrigir,
+      confirmar: rv?.confirmar,
+      baseVersao: rv?.baseVersao,
+    };
+  }
+  if (status === "failed") {
+    error = job.failedReason?.slice(0, 500) ?? "Falha no processamento";
+  }
+
+  return { id, status, progress, error, downloadToken, fileName, result };
+});
+
+app.get<{ Params: { id: string }; Querystring: { token?: string } }>(
+  `${API_PREFIX}/tools/analise-produtos/jobs/:id/download`,
+  async (req, reply) => {
+    const { id } = req.params;
+    const token = req.query.token;
+    if (!token) return reply.code(401).send({ error: "Token ausente" });
+
+    const claims = await verifyDownloadToken(env, token);
+    if (!claims || claims.jobId !== id || claims.tool !== "analise-produtos") {
+      return reply.code(401).send({ error: "Token inválido" });
+    }
+
+    const job = await analiseProdutosQueue.getJob(id);
+    if (!job || (await job.getState()) !== "completed") {
+      return reply.code(404).send({ error: "Job não concluído" });
+    }
+
+    const outPath = (job.data as AnaliseProdutosJobPayload).outputPath;
     if (!outPath || !fs.existsSync(outPath)) {
       return reply.code(404).send({ error: "Arquivo não encontrado" });
     }

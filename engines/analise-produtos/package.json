@@ -1,0 +1,18 @@
+{
+  "name": "analise-produtos",
+  "version": "0.1.0",
+  "description": "Análise Fiscal de Produtos — exportação de produtos por nota do SCI → planilha enxuta com consulta à base de monofásicos de PIS/COFINS (engine standalone Node.js).",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "analise-produtos": "./cli.mjs"
+  },
+  "scripts": {
+    "start": "node cli.mjs",
+    "test": "node --test test/cli.test.mjs"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  }
+}

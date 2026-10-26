@@ -27,6 +27,9 @@ export const SCI_PORTAL_NACIONAL_QUEUE_NAME = "sci-portal-nacional-comparacao" a
 /** N planilhas de mesmo layout → uma só, ordenadas pela coluna "#" (engines/concatenador-planilhas). */
 export const CONCATENADOR_PLANILHAS_QUEUE_NAME = "concatenador-planilhas" as const;
 
+/** Exportação de produtos do SCI → planilha enxuta + consulta monofásica (engines/analise-produtos). */
+export const ANALISE_PRODUTOS_QUEUE_NAME = "analise-produtos" as const;
+
 /**
  * Tipo do relatório de NF-e da SEFAZ, lido do nome do arquivo
  * (`<CNPJ>_NFEs_<Emitente|Destinatario>_periodo_...`).
@@ -185,6 +188,28 @@ export const ConcatenadorPlanilhasJobPayloadSchema = z.object({
 export type ConcatenadorPlanilhasJobPayload = z.infer<
   typeof ConcatenadorPlanilhasJobPayloadSchema
 >;
+
+export const AnaliseProdutosJobPayloadSchema = z.object({
+  jobId: z.string(),
+  inputPath: z.string(),
+  outputPath: z.string(),
+  /** Nome do arquivo enviado (vai para a aba Resumo; o disco guarda "entrada.<ext>"). */
+  originalName: z.string(),
+});
+
+export type AnaliseProdutosJobPayload = z.infer<typeof AnaliseProdutosJobPayloadSchema>;
+
+/** Contagens que a engine devolve no evento "done" (exibidas na tela de download). */
+export type AnaliseProdutosResultado = {
+  linhas?: number;
+  monofasicos?: number;
+  depende?: number;
+  /** Linhas com Situação "Corrigir CST" (monofásico certo, CST incoerente). */
+  corrigir?: number;
+  /** Linhas com Situação "Confirmar condição" (depende de Ex ou destinação). */
+  confirmar?: number;
+  baseVersao?: string;
+};
 
 export const SciConsolidadoJobPayloadSchema = z.object({
   jobId: z.string(),

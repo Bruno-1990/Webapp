@@ -27,7 +27,8 @@ webapp/
 │  ├─ comparacao-nfse/
 │  ├─ gnre/
 │  ├─ sci-portal-nacional/    #   engine Node (cli.mjs), não Python
-│  └─ concatenador-planilhas/ #   engine Node (cli.mjs), não Python
+│  ├─ concatenador-planilhas/ #   engine Node (cli.mjs), não Python
+│  └─ analise-produtos/       #   engine Node (cli.mjs) + base-monofasicos.json
 ├─ docs/                      # esta documentação
 ├─ knowledge/                 # referência de domínio (guia EFD, exemplos SPED)
 ├─ docker-compose.yml         # orquestra tudo (raiz)
@@ -74,6 +75,7 @@ ver tabela). No Docker, o Dockerfile copia a engine e fixa essa env var.
 | Extrator GNRE | `gnre` | `GnreHomePage.tsx` | `worker-gnre-bridge` | `gnre` | `GNRE_PY_DIR` | `gnre-extract` | `Dockerfile.worker-gnre` | `worker-gnre` | `gnre` |
 | Conciliador NFS-e | `sci-portal-nacional` | `SciPortalNacionalHomePage.tsx` | `worker-sci-portal-nacional` | `sci-portal-nacional` (Node) | `SCI_PORTAL_DIR` | `sci-portal-nacional-comparacao` | `Dockerfile.worker-sci-portal-nacional` | `worker-sci-portal-nacional` | `comparacao` |
 | Concatenador de Planilhas | `concatenador-planilhas` | `ConcatenadorPlanilhasHomePage.tsx` | `worker-concatenador-planilhas` | `concatenador-planilhas` (Node) | `CONCATENADOR_DIR` | `concatenador-planilhas` | `Dockerfile.worker-concatenador-planilhas` | `worker-concatenador-planilhas` | `comparacao` |
+| Análise Fiscal de Produtos | `analise-produtos` | `AnaliseProdutosHomePage.tsx` | `worker-analise-produtos` | `analise-produtos` (Node) | `ANALISE_PRODUTOS_DIR` | `analise-produtos` | `Dockerfile.worker-analise-produtos` | `worker-analise-produtos` | `comparacao` |
 | **Editor de Extrato** | `extrato-edit` | `ExtratoEditHomePage.tsx` | — (rotas na `api`) | — | — | — | — | `api` (DB SQLite) | core |
 | **NFS-e → PDF (DANFSe)** | `nfse-pdf` | `NfsePdfHomePage.tsx` | — | — | — | — | — | — | — |
 | **Conferência de Sequência** | `conferencia-sequencia` | `ConferenciaSequenciaHomePage.tsx` | — | — | — | — | — | — | — |
@@ -95,7 +97,7 @@ carregada sob demanda).
 
 Categorias do hub: **Fiscal** = nfe, sped, sped-merge, sci-consolidado,
 comparacao-planilhas, comparacao-nfse, sci-portal-nacional, nfse-pdf,
-concatenador-planilhas, conferencia-sequencia. **Contábil** = gnre, extrato-edit.
+concatenador-planilhas, conferencia-sequencia, analise-produtos. **Contábil** = gnre, extrato-edit.
 
 ## Como o frontend descobre as ferramentas
 

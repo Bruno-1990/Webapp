@@ -71,6 +71,15 @@ só "onde clicar" para cada ferramenta. Caminhos relativos à raiz `webapp/`.
 - **Confronto antes de concatenar** (mesma regra na API e no frontend, em [`packages/contracts`](../webapp-01/packages/contracts/src/index.ts) → `checkConcatenadorCompatibilidade`): o **CNPJ no início do nome do arquivo** (titular do relatório) e o **tipo** (`Emitente`/`Destinatario`) têm de ser iguais em todas as partes. Divergiu → `400` com `reasons: ["cnpjs_diferentes" | "tipos_misturados"]` e modal na tela. As colunas de CNPJ/CPF *dentro* da planilha não entram na conta — são de clientes/fornecedores de cada nota. Nomes fora do padrão são ignorados na comparação (a ferramenta serve para planilhas genéricas).
 - Nome do arquivo de saída: [`concatenador-filename.ts`](../webapp-01/apps/api/src/concatenador-filename.ts) — reaproveita o prefixo dos nomes de entrada (`<CNPJ>_NFEs_<Emitente|Destinatario>`) e recalcula o período com a **menor data inicial** e a **maior data final** das partes. Prefixos divergentes ou nomes fora do padrão → `Planilha Unificada.xlsx`.
 
+### Análise Fiscal de Produtos — `id: analise-produtos`
+- Página: [`AnaliseProdutosHomePage.tsx`](../webapp-01/frontend/src/pages/AnaliseProdutosHomePage.tsx) · download pela `DownloadPage` compartilhada
+- Worker: [`worker-analise-produtos`](../webapp-01/apps/worker-analise-produtos) → Engine: [`engines/analise-produtos`](../engines/analise-produtos) (Node, `cli.mjs`)
+- Dockerfile: [`Dockerfile.worker-analise-produtos`](../webapp-01/docker/Dockerfile.worker-analise-produtos) · env `ANALISE_PRODUTOS_DIR` · profile `comparacao`
+- Entrada: a exportação **de produtos por nota do SCI** (CSV `;` cp1252 ou Excel, ~170 colunas). Saída com 4 abas (Resumo, Produtos, Monofásicos, Resumo por NCM): 29 colunas fixas + 5 de análise, no padrão do [EXPORT-STANDARD](EXPORT-STANDARD.md).
+- Cada NCM é cruzado com [`base-monofasicos.json`](../engines/analise-produtos/base-monofasicos.json) — cópia **versionada** da planilha `produtos_monofasicos_pis_cofins` (Google Sheets). Atualizou a planilha → atualize o JSON, troque `versao` e rode `npm test` na engine. A versão sai no Resumo de toda planilha.
+- Cada linha ganha uma **Situação** (Corrigir CST, Confirmar condição, Conferir devolução/perfil, OK, Uso e consumo) e o **CST esperado** (entrada para revenda: 70/73; saída: 04; bebidas frias no varejo: 06). A Situação é a única célula colorida — exceção registrada no EXPORT-STANDARD. Regras completas no [README do engine](../engines/analise-produtos/README.md).
+- Nome do arquivo de saída: `Análise Fiscal de Produtos - <nome enviado>.xlsx` (montado na API, `analiseProdutosFileName` em [`server.ts`](../webapp-01/apps/api/src/server.ts)).
+
 ### NFS-e → PDF (DANFSe) — `id: nfse-pdf`
 - **Sem backend** — roda 100% no navegador. Seleciona uma **pasta** de XMLs de NFS-e (padrão nacional), gera um PDF DANFSe por nota e baixa tudo num `.zip`. XMLs de evento (cancelamento) viram PDF de evento.
 - Entrada por **pasta**: picker nativo (Chrome/Edge) com fallback `webkitdirectory`; reaproveita `pickDirectoryAndReadFiles("xml-only")`/`getXmlOnlyFilesFromEvent` de `dropFiles.ts`.

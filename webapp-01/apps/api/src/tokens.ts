@@ -10,7 +10,8 @@ export type DownloadTool =
   | "comparacao-nfse"
   | "gnre"
   | "sci-portal-nacional"
-  | "concatenador-planilhas";
+  | "concatenador-planilhas"
+  | "analise-produtos";
 
 export async function signDownloadToken(
   env: Env,
@@ -46,6 +47,7 @@ export async function verifyDownloadToken(
     else if (rawTool === "gnre") tool = "gnre";
     else if (rawTool === "sci-portal-nacional") tool = "sci-portal-nacional";
     else if (rawTool === "concatenador-planilhas") tool = "concatenador-planilhas";
+    else if (rawTool === "analise-produtos") tool = "analise-produtos";
     return { jobId, fileName, tool };
   } catch {
     return null;

@@ -82,6 +82,10 @@ services:
     command: npx nodemon -L -q --watch apps/worker-concatenador-planilhas/dist --watch packages -e js apps/worker-concatenador-planilhas/dist/index.js
     volumes: *src-mounts
 
+  worker-analise-produtos:
+    command: npx nodemon -L -q --watch apps/worker-analise-produtos/dist --watch packages -e js apps/worker-analise-produtos/dist/index.js
+    volumes: *src-mounts
+
   worker-comparacao-nfse:
     command: npx nodemon -L -q --watch apps/worker-comparacao-nfse/dist --watch packages -e js apps/worker-comparacao-nfse/dist/index.js
     volumes: *src-mounts

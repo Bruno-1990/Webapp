@@ -15,6 +15,7 @@
 #   worker-gnre                -> engines/gnre                   (Extrator GNRE)
 #   worker-sci-portal-nacional -> engines/sci-portal-nacional    (Conciliador NFS-e, Node engine)
 #   worker-concatenador-planilhas -> engines/concatenador-planilhas (Concatenador, Node engine)
+#   worker-analise-produtos    -> engines/analise-produtos       (Analise Fiscal de Produtos, Node engine)
 #
 # Bind mount ./temp_jobs:/data/jobs e' compartilhado por todos: a API grava em
 # /data/jobs/<id>/... (caminho do container), que aparece no host Windows em
@@ -166,6 +167,22 @@ services:
       REDIS_URL: redis://redis:6379
       TEMP_JOBS_ROOT: /data/jobs
       CONCATENADOR_DIR: /app/engines/concatenador-planilhas
+    volumes:
+      - ./temp_jobs:/data/jobs
+    depends_on:
+      - redis
+
+  worker-analise-produtos:
+    profiles: ["comparacao"]
+    build:
+      context: .
+      dockerfile: webapp-01/docker/Dockerfile.worker-analise-produtos
+    env_file:
+      - ./.env
+    environment:
+      REDIS_URL: redis://redis:6379
+      TEMP_JOBS_ROOT: /data/jobs
+      ANALISE_PRODUTOS_DIR: /app/engines/analise-produtos
     volumes:
       - ./temp_jobs:/data/jobs
     depends_on:

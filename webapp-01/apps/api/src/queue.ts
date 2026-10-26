@@ -11,6 +11,7 @@ import {
   GNRE_QUEUE_NAME,
   SCI_PORTAL_NACIONAL_QUEUE_NAME,
   CONCATENADOR_PLANILHAS_QUEUE_NAME,
+  ANALISE_PRODUTOS_QUEUE_NAME,
   type SciConsolidadoJobPayload,
   type SpedJobPayload,
   type SpedMergeJobPayload,
@@ -20,6 +21,7 @@ import {
   type GnreJobPayload,
   type SciPortalNacionalJobPayload,
   type ConcatenadorPlanilhasJobPayload,
+  type AnaliseProdutosJobPayload,
 } from "@webapp/contracts";
 import type { Env } from "./env.js";
 
@@ -39,6 +41,7 @@ export type {
   GnreJobPayload,
   SciPortalNacionalJobPayload,
   ConcatenadorPlanilhasJobPayload,
+  AnaliseProdutosJobPayload,
 };
 
 let connection: Redis | null = null;
@@ -53,6 +56,7 @@ let comparacaoNfseQueue: Queue<ComparacaoNfseJobPayload> | null = null;
 let gnreQueue: Queue<GnreJobPayload> | null = null;
 let sciPortalNacionalQueue: Queue<SciPortalNacionalJobPayload> | null = null;
 let concatenadorPlanilhasQueue: Queue<ConcatenadorPlanilhasJobPayload> | null = null;
+let analiseProdutosQueue: Queue<AnaliseProdutosJobPayload> | null = null;
 
 export function getRedis(env: Env): Redis {
   if (!connection) {
@@ -217,4 +221,18 @@ export function getConcatenadorPlanilhasQueue(
     );
   }
   return concatenadorPlanilhasQueue;
+}
+
+export function getAnaliseProdutosQueue(env: Env): Queue<AnaliseProdutosJobPayload> {
+  if (!analiseProdutosQueue) {
+    analiseProdutosQueue = new Queue<AnaliseProdutosJobPayload>(ANALISE_PRODUTOS_QUEUE_NAME, {
+      connection: getRedis(env),
+      defaultJobOptions: {
+        attempts: 1,
+        removeOnComplete: { count: 200 },
+        removeOnFail: { count: 100 },
+      },
+    });
+  }
+  return analiseProdutosQueue;
 }
