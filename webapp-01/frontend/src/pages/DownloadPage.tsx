@@ -5,9 +5,11 @@ import { TitleNfeXmlXlsx } from "../components/TitleNfeXmlXlsx.js";
 import { ToolPageTitle } from "../components/ToolPageTitle.js";
 import { toolPageShellClass, toolPanelClass, toolProgressFillClass } from "../toolLayout.js";
 import {
+  analiseProdutosDownloadUrl,
   comparacaoPlanilhasDownloadUrl,
   concatenadorPlanilhasDownloadUrl,
   downloadUrl,
+  getAnaliseProdutosJob,
   getComparacaoPlanilhasJob,
   getConcatenadorPlanilhasJob,
   getJob,
@@ -19,6 +21,7 @@ import {
   sciPortalNacionalDownloadUrl,
   spedDownloadUrl,
   spedMergeDownloadUrl,
+  type AnaliseProdutosResult,
   type ConcatenadorJobResponse,
 } from "../api.js";
 import { fadeUp, transitionFast, transitionSmooth } from "../motion-variants.js";
@@ -38,12 +41,17 @@ export default function DownloadPage() {
   const isComparacao = pathname.includes("/tools/comparacao-planilhas/download");
   const isSciPortal = pathname.includes("/tools/sci-portal-nacional/download");
   const isConcat = pathname.includes("/tools/concatenador-planilhas/download");
+  const isAnalise = pathname.includes("/tools/analise-produtos/download");
   const isSped =
     pathname.includes("/tools/sped/download") && !isSpedMerge && !isSci && !isComparacao;
   const { jobId: rawId } = useParams<{ jobId: string }>();
   const jobId = rawId ? decodeURIComponent(rawId) : "";
-  /** Superset de JobResponse: só o Concatenador devolve `result`. */
-  const [job, setJob] = useState<ConcatenadorJobResponse | null>(null);
+  /** Superset de JobResponse: o Concatenador e a Análise de Produtos devolvem `result`. */
+  const [job, setJob] = useState<
+    (Omit<ConcatenadorJobResponse, "result"> & {
+      result?: ConcatenadorJobResponse["result"] & AnaliseProdutosResult;
+    }) | null
+  >(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -54,7 +62,9 @@ export default function DownloadPage() {
 
     const tick = async () => {
       try {
-        const j = isConcat
+        const j = isAnalise
+          ? await getAnaliseProdutosJob(jobId)
+          : isConcat
           ? await getConcatenadorPlanilhasJob(jobId)
           : isSpedMerge
           ? await getSpedMergeJob(jobId)
@@ -95,7 +105,7 @@ export default function DownloadPage() {
         timerRef.current = null;
       }
     };
-  }, [jobId, isSped, isSpedMerge, isSci, isComparacao, isSciPortal, isConcat]);
+  }, [jobId, isSped, isSpedMerge, isSci, isComparacao, isSciPortal, isConcat, isAnalise]);
 
   const showDeterminateBar =
     job?.status === "running" &&
@@ -104,7 +114,9 @@ export default function DownloadPage() {
 
   const progressLabel =
     job?.status === "running"
-      ? isConcat
+      ? isAnalise
+        ? "Cruzando os produtos com a base de monofásicos…"
+        : isConcat
         ? "Juntando as planilhas…"
         : isSpedMerge
         ? "Atualizando arquivo…"
@@ -118,6 +130,18 @@ export default function DownloadPage() {
       : job?.status === "queued"
         ? "Na fila…"
         : "Carregando…";
+
+  /** Resumo da Análise de Produtos: o que o analista precisa olhar primeiro. */
+  const analiseDoneHint = (() => {
+    const r = job?.result;
+    if (r?.linhas == null) return "A planilha tem as abas Resumo, Produtos, Monofásicos e Resumo por NCM.";
+    const fmt = (n: number | undefined) => (n ?? 0).toLocaleString("pt-BR");
+    return (
+      `${fmt(r.linhas)} linhas analisadas: ${fmt(r.corrigir)} com CST a corrigir e ` +
+      `${fmt(r.confirmar)} para confirmar condição. Comece pela aba Resumo` +
+      (r.baseVersao ? ` (base de monofásicos de ${r.baseVersao.split("-").reverse().join("/")}).` : ".")
+    );
+  })();
 
   /** Resumo do Concatenador: quantas partes viraram quantas linhas. */
   const concatDoneHint = (() => {
@@ -186,7 +210,9 @@ export default function DownloadPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...transitionSmooth, delay: 0.08 }}
         >
-          {isConcat ? (
+          {isAnalise ? (
+            <ToolPageTitle left="Produtos SCI" right="Análise fiscal" size="download" />
+          ) : isConcat ? (
             <ToolPageTitle left="Várias planilhas" right="Uma só" size="download" />
           ) : isSpedMerge ? (
             <ToolPageTitle left="XLSX" right="SPED" size="download" />
@@ -208,7 +234,9 @@ export default function DownloadPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...transitionSmooth, delay: 0.14 }}
         >
-          {isConcat
+          {isAnalise
+            ? "Baixe a análise fiscal dos produtos"
+            : isConcat
             ? "Baixe a planilha unificada"
             : isSpedMerge
             ? "Baixe o arquivo atualizado"
@@ -346,7 +374,9 @@ export default function DownloadPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={transitionFast}
               >
-                {isConcat
+                {isAnalise
+                  ? "Não foi possível analisar a planilha"
+                  : isConcat
                   ? "Não foi possível juntar as planilhas"
                   : isSpedMerge
                   ? "Não foi possível atualizar o arquivo"
@@ -397,7 +427,9 @@ export default function DownloadPage() {
                   {isSpedMerge ? "Arquivo pronto" : "Planilha pronta"}
                 </p>
                 <p className="mt-1 text-sm text-[#347891]">
-                  {isConcat
+                  {isAnalise
+                    ? analiseDoneHint
+                    : isConcat
                     ? concatDoneHint
                     : isSpedMerge
                     ? "Suas alterações na planilha já estão aplicadas no arquivo para download."
@@ -476,7 +508,9 @@ export default function DownloadPage() {
               <motion.a
                 className="pill-grad-cyan flex w-full max-w-md flex-col items-center gap-2 rounded-full px-5 py-4 text-center text-white shadow-btn"
                 href={
-                  isConcat
+                  isAnalise
+                    ? analiseProdutosDownloadUrl(job.id, job.downloadToken)
+                    : isConcat
                     ? concatenadorPlanilhasDownloadUrl(job.id, job.downloadToken)
                     : isSpedMerge
                     ? spedMergeDownloadUrl(job.id, job.downloadToken)
@@ -492,7 +526,9 @@ export default function DownloadPage() {
                 }
                 download={
                   job.fileName ??
-                  (isConcat
+                  (isAnalise
+                    ? "Análise Fiscal de Produtos.xlsx"
+                    : isConcat
                     ? "Planilha Unificada.xlsx"
                     : isSpedMerge
                     ? "SPED_mesclado.txt"
@@ -508,7 +544,9 @@ export default function DownloadPage() {
                 }
                 title={
                   job.fileName ??
-                  (isConcat
+                  (isAnalise
+                    ? "Análise Fiscal de Produtos.xlsx"
+                    : isConcat
                     ? "Planilha Unificada.xlsx"
                     : isSpedMerge
                     ? "SPED_mesclado.txt"
@@ -533,7 +571,9 @@ export default function DownloadPage() {
                 </span>
                 <span className="w-full break-all font-sans text-[12px] font-medium normal-case leading-snug tracking-normal text-white/95">
                   {job.fileName ??
-                    (isConcat
+                    (isAnalise
+                      ? "Análise Fiscal de Produtos.xlsx"
+                      : isConcat
                       ? "Planilha Unificada.xlsx"
                       : isSpedMerge
                       ? "SPED_mesclado.txt"
@@ -561,7 +601,9 @@ export default function DownloadPage() {
           <motion.div whileHover={{ x: -2 }} transition={transitionFast}>
             <Link
               to={
-                isConcat
+                isAnalise
+                  ? "/tools/analise-produtos"
+                  : isConcat
                   ? "/tools/concatenador-planilhas"
                   : isSpedMerge
                   ? "/tools/sped-merge"

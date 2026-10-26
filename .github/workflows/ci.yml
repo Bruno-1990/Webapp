@@ -50,6 +50,11 @@ jobs:
       - name: Testes — engines/comparacao-nfse
         working-directory: engines/comparacao-nfse
         run: python -m pytest tests -q
+      - name: Testes — engines/analise-produtos
+        working-directory: engines/analise-produtos
+        run: |
+          npm ci
+          npm test
       # PYTHON_CMD: no Linux não existe o launcher `py`, default dos scripts no Windows.
       - name: Smoke SPED (cli.py ponta a ponta)
         env:

@@ -242,6 +242,7 @@ SEFAZ×SCI passou para `CECECE`), sem refatorar a estrutura de cada arquivo.
 | **Consolidado SCI** | `engines/sci-consolidado/format.py` | ✅ `4169E1` | zebra/alturas |
 | **Comparador SEFAZ×SCI** | `engines/comparacao-planilhas/cli.py` | ✅ `4169E1` (borda→`CECECE`) | alturas |
 | **Comparador NFS-e** | `engines/comparacao-nfse/excel.py` | ✅ `4169E1` | alturas 25/20→30/22 |
+| **Análise Fiscal de Produtos** | `engines/analise-produtos/cli.mjs` | ✅ `4169E1` | — (conforme em todas as abas; padrão completo até 20 mil linhas, acima só estilo por coluna — §5). **Exceção aprovada:** cor de fundo na célula da coluna `Situação` (vermelho/amarelo/verde/cinza), para o analista achar a ação de cada linha |
 | **Conferência de Sequência** | `frontend/src/conferenciaSequencia/exportConferencia.ts` | ✅ `4169E1` | — (conforme: alturas 30/22, bordas, fonte, freeze e larguras em **todas** as abas) |
 
 > A coluna "Falta" lista o que ainda diverge do padrão (alturas, bordas, zebra,

@@ -17,6 +17,7 @@ const SciPortalNacionalHomePage = lazy(() => import("./pages/SciPortalNacionalHo
 const ConcatenadorPlanilhasHomePage = lazy(
   () => import("./pages/ConcatenadorPlanilhasHomePage.js")
 );
+const AnaliseProdutosHomePage = lazy(() => import("./pages/AnaliseProdutosHomePage.js"));
 const ConferenciaSequenciaHomePage = lazy(
   () => import("./pages/ConferenciaSequenciaHomePage.js")
 );
@@ -64,6 +65,8 @@ export default function App() {
             path="/tools/concatenador-planilhas/download/:jobId"
             element={<DownloadPage />}
           />
+          <Route path="/tools/analise-produtos" element={<AnaliseProdutosHomePage />} />
+          <Route path="/tools/analise-produtos/download/:jobId" element={<DownloadPage />} />
           {/* Roda 100% no navegador: sem rota de download por job. */}
           <Route path="/tools/conferencia-sequencia" element={<ConferenciaSequenciaHomePage />} />
         </Route>

@@ -1,0 +1,669 @@
+{
+  "versao": "2026-10-23",
+  "origem": "Planilha produtos_monofasicos_pis_cofins (Google Sheets), conferida contra Planalto, DOU, tabelas 4.3.10/4.3.13 da EFD-Contribuicoes e Confaz em 23/10/2026",
+  "vigencia": "Regimes monofasicos de PIS/COFINS validos ate 31/12/2026 (LC 214/2025, art. 542). Revisar a base para fatos geradores de 2027 em diante.",
+  "regras": [
+    {
+      "ncm": "2106.90.10",
+      "categoria": "Bebidas frias",
+      "base": "Lei 13.097/2015, art. 14",
+      "condicao": "Confirmar na NF se o item veio com o Ex 02 do 2106.90.10 (preparacao para bebida); sem esse Ex, nao entra."
+    },
+    {
+      "ncm": "22.01",
+      "categoria": "Bebidas frias",
+      "base": "Lei 13.097/2015, art. 14"
+    },
+    {
+      "ncm": "2201.10.00",
+      "categoria": "Bebidas frias",
+      "base": "Lei 13.097/2015, art. 14",
+      "condicao": "Agua mineral com Ex 01 ou Ex 02 tem aliquota zero propria e nao e bebida fria monofasica: confirmar o Ex na NF."
+    },
+    {
+      "ncm": "22.02",
+      "categoria": "Bebidas frias",
+      "base": "Lei 13.097/2015, art. 14"
+    },
+    {
+      "ncm": "2202.90.00",
+      "categoria": "Bebidas frias",
+      "base": "Lei 13.097/2015, art. 14",
+      "condicao": "Confirmar o Ex na NF: Ex 01 e Ex 02 do 2202.90.00 ficam fora; o Ex 03 entra."
+    },
+    {
+      "ncm": "22.03",
+      "categoria": "Bebidas frias",
+      "base": "Lei 13.097/2015, art. 14"
+    },
+    {
+      "ncm": "30.01",
+      "categoria": "Medicamentos",
+      "base": "Lei 10.147/2000, art. 1o, I, a"
+    },
+    {
+      "ncm": "30.03",
+      "categoria": "Medicamentos",
+      "base": "Lei 10.147/2000, art. 1o, I, a"
+    },
+    {
+      "ncm": "3003.90.56",
+      "categoria": "",
+      "base": "",
+      "fora": true
+    },
+    {
+      "ncm": "30.04",
+      "categoria": "Medicamentos",
+      "base": "Lei 10.147/2000, art. 1o, I, a"
+    },
+    {
+      "ncm": "3004.90.46",
+      "categoria": "",
+      "base": "",
+      "fora": true
+    },
+    {
+      "ncm": "3002.10.1",
+      "categoria": "Medicamentos",
+      "base": "Lei 10.147/2000, art. 1o, I, a"
+    },
+    {
+      "ncm": "3002.10.2",
+      "categoria": "Medicamentos",
+      "base": "Lei 10.147/2000, art. 1o, I, a"
+    },
+    {
+      "ncm": "3002.10.3",
+      "categoria": "Medicamentos",
+      "base": "Lei 10.147/2000, art. 1o, I, a"
+    },
+    {
+      "ncm": "3002.20.1",
+      "categoria": "Medicamentos",
+      "base": "Lei 10.147/2000, art. 1o, I, a"
+    },
+    {
+      "ncm": "3002.20.2",
+      "categoria": "Medicamentos",
+      "base": "Lei 10.147/2000, art. 1o, I, a"
+    },
+    {
+      "ncm": "3002.90.20",
+      "categoria": "Medicamentos",
+      "base": "Lei 10.147/2000, art. 1o, I, a"
+    },
+    {
+      "ncm": "3002.90.92",
+      "categoria": "Medicamentos",
+      "base": "Lei 10.147/2000, art. 1o, I, a"
+    },
+    {
+      "ncm": "3002.90.99",
+      "categoria": "Medicamentos",
+      "base": "Lei 10.147/2000, art. 1o, I, a"
+    },
+    {
+      "ncm": "3005.10.10",
+      "categoria": "Medicamentos",
+      "base": "Lei 10.147/2000, art. 1o, I, a"
+    },
+    {
+      "ncm": "3006.30.1",
+      "categoria": "Medicamentos",
+      "base": "Lei 10.147/2000, art. 1o, I, a"
+    },
+    {
+      "ncm": "3006.30.2",
+      "categoria": "Medicamentos",
+      "base": "Lei 10.147/2000, art. 1o, I, a"
+    },
+    {
+      "ncm": "3006.60.00",
+      "categoria": "Medicamentos",
+      "base": "Lei 10.147/2000, art. 1o, I, a"
+    },
+    {
+      "ncm": "33.03",
+      "categoria": "Higiene e perfumaria",
+      "base": "Lei 10.147/2000, art. 1o, I, b"
+    },
+    {
+      "ncm": "33.04",
+      "categoria": "Higiene e perfumaria",
+      "base": "Lei 10.147/2000, art. 1o, I, b"
+    },
+    {
+      "ncm": "33.05",
+      "categoria": "Higiene e perfumaria",
+      "base": "Lei 10.147/2000, art. 1o, I, b"
+    },
+    {
+      "ncm": "33.07",
+      "categoria": "Higiene e perfumaria",
+      "base": "Lei 10.147/2000, art. 1o, I, b"
+    },
+    {
+      "ncm": "3401.11.90",
+      "categoria": "Higiene e perfumaria",
+      "base": "Lei 10.147/2000, art. 1o, I, b",
+      "condicao": "Confirmar o Ex na NF: sabao de toucador com Ex 01 tem aliquota zero propria (CST 06) e nao e monofasico."
+    },
+    {
+      "ncm": "3401.20.10",
+      "categoria": "Higiene e perfumaria",
+      "base": "Lei 10.147/2000, art. 1o, I, b"
+    },
+    {
+      "ncm": "9603.21.00",
+      "categoria": "Higiene e perfumaria",
+      "base": "Lei 10.147/2000, art. 1o, I, b"
+    },
+    {
+      "ncm": "2710.12.59",
+      "categoria": "Combustiveis - gasolina",
+      "base": "Lei 9.718/1998, art. 4o, I"
+    },
+    {
+      "ncm": "2710.11.59",
+      "categoria": "Combustiveis - gasolina",
+      "base": "Lei 9.718/1998, art. 4o, I"
+    },
+    {
+      "ncm": "2710.19.21",
+      "categoria": "Combustiveis - diesel",
+      "base": "Lei 9.718/1998, art. 4o, II"
+    },
+    {
+      "ncm": "2711.19.10",
+      "categoria": "Combustiveis - GLP",
+      "base": "Lei 9.718/1998, art. 4o, III"
+    },
+    {
+      "ncm": "2207.10",
+      "categoria": "Combustiveis - etanol",
+      "base": "Lei 9.718/1998, art. 5o"
+    },
+    {
+      "ncm": "2207.20.1",
+      "categoria": "Combustiveis - etanol",
+      "base": "Lei 9.718/1998, art. 5o"
+    },
+    {
+      "ncm": "2208.90.00",
+      "categoria": "Combustiveis - etanol",
+      "base": "Lei 9.718/1998, art. 5o",
+      "condicao": "Confirmar na NF do fornecedor se o item veio com o Ex 01 da TIPI no codigo 2208.90.00; sem esse Ex, nao e monofasico."
+    },
+    {
+      "ncm": "2710.19.11",
+      "categoria": "Combustiveis - querosene de aviacao",
+      "base": "Lei 10.560/2002, art. 2o"
+    },
+    {
+      "ncm": "3826.00.00",
+      "categoria": "Combustiveis - biodiesel",
+      "base": "Lei 11.116/2005, art. 3o"
+    },
+    {
+      "ncm": "3824.90.29",
+      "categoria": "Combustiveis - biodiesel",
+      "base": "Lei 11.116/2005, art. 3o"
+    },
+    {
+      "ncm": "73.09",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o"
+    },
+    {
+      "ncm": "7310.29",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o"
+    },
+    {
+      "ncm": "7612.90.12",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o"
+    },
+    {
+      "ncm": "8424.81",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o"
+    },
+    {
+      "ncm": "84.29",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o"
+    },
+    {
+      "ncm": "8430.69.90",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o"
+    },
+    {
+      "ncm": "84.32",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o"
+    },
+    {
+      "ncm": "84.33",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o"
+    },
+    {
+      "ncm": "84.34",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o"
+    },
+    {
+      "ncm": "84.35",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o"
+    },
+    {
+      "ncm": "84.36",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o"
+    },
+    {
+      "ncm": "84.37",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o"
+    },
+    {
+      "ncm": "87.01",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o"
+    },
+    {
+      "ncm": "87.02",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o"
+    },
+    {
+      "ncm": "87.03",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o"
+    },
+    {
+      "ncm": "87.04",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o"
+    },
+    {
+      "ncm": "87.05",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o"
+    },
+    {
+      "ncm": "87.06",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o"
+    },
+    {
+      "ncm": "8716.20.00",
+      "categoria": "Maquinas e veiculos",
+      "base": "Lei 10.485/2002, art. 1o"
+    },
+    {
+      "ncm": "40.11",
+      "categoria": "Pneus e camaras de ar",
+      "base": "Lei 10.485/2002, art. 5o"
+    },
+    {
+      "ncm": "40.13",
+      "categoria": "Pneus e camaras de ar",
+      "base": "Lei 10.485/2002, art. 5o"
+    },
+    {
+      "ncm": "4016.10.10",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "4016.99.90",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I",
+      "condicao": "Confirmar na NF do fornecedor se o item veio com o Ex 03 ou Ex 05 da TIPI no codigo 4016.99.90; sem esse Ex, nao e monofasico."
+    },
+    {
+      "ncm": "68.13",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "7007.11.00",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "7007.21.00",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "7009.10.00",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "7320.10.00",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I",
+      "condicao": "Confirmar na NF do fornecedor se o item veio com o Ex 01 da TIPI no codigo 7320.10.00; sem esse Ex, nao e monofasico."
+    },
+    {
+      "ncm": "8301.20.00",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8302.30.00",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8407.33.90",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8407.34.90",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8408.20",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8409.91",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8409.99",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8413.30",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8413.91.00",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I",
+      "condicao": "Confirmar na NF do fornecedor se o item veio com o Ex 01 da TIPI no codigo 8413.91.00; sem esse Ex, nao e monofasico."
+    },
+    {
+      "ncm": "8414.80.21",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8414.80.22",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8415.20",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8421.23.00",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8421.31.00",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8431.41.00",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8431.42.00",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8433.90.90",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8481.80.99",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I",
+      "condicao": "Confirmar na NF do fornecedor se o item veio com o Ex 01 ou Ex 02 da TIPI no codigo 8481.80.99; sem esse Ex, nao e monofasico."
+    },
+    {
+      "ncm": "8483.10",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8483.20.00",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8483.30",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8483.40",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8483.50",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8505.20",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8507.10.00",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "85.11",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8512.20",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8512.30.00",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8512.40",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8512.90.00",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8527.2",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8536.50.90",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I",
+      "condicao": "Confirmar na NF do fornecedor se o item veio com o Ex 01 da TIPI no codigo 8536.50.90; sem esse Ex, nao e monofasico."
+    },
+    {
+      "ncm": "8539.10",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8544.30.00",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "8706.00",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "87.07",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "87.08",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "9029.20.10",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "9029.90.10",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "9030.39.21",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "9031.80.40",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "9032.89.2",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "9104.00.00",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "9401.20.00",
+      "categoria": "Autopecas - Anexo I",
+      "base": "Lei 10.485/2002, Anexo I"
+    },
+    {
+      "ncm": "40.09",
+      "categoria": "Autopecas - Anexo II",
+      "base": "Lei 10.485/2002, Anexo II",
+      "condicao": "Confirmar se a peca e tubo de borracha proprio para tratores, colheitadeiras, maquinas de 84.29 ou veiculos de 87.01 a 87.06; peca de uso geral (oficina, lubrificacao, solda) nao entra."
+    },
+    {
+      "ncm": "84.31",
+      "categoria": "Autopecas - Anexo II",
+      "base": "Lei 10.485/2002, Anexo II",
+      "condicao": "Confirmar se a peca e parte destinada a maquinas da posicao 84.29 (escavadeiras, carregadeiras, motoniveladoras); peca de uso geral (oficina, lubrificacao, solda) nao entra."
+    },
+    {
+      "ncm": "8408.90.90",
+      "categoria": "Autopecas - Anexo II",
+      "base": "Lei 10.485/2002, Anexo II",
+      "condicao": "Confirmar se a peca e motor proprio para maquinas de 84.29 ou colheitadeiras (8433.20 a 8433.5); peca de uso geral (oficina, lubrificacao, solda) nao entra."
+    },
+    {
+      "ncm": "8412.21.10",
+      "categoria": "Autopecas - Anexo II",
+      "base": "Lei 10.485/2002, Anexo II",
+      "condicao": "Confirmar se a peca e cilindro hidraulico proprio para maquinas de 84.29 ou colheitadeiras (8433); peca de uso geral (oficina, lubrificacao, solda) nao entra."
+    },
+    {
+      "ncm": "8412.21.90",
+      "categoria": "Autopecas - Anexo II",
+      "base": "Lei 10.485/2002, Anexo II",
+      "condicao": "Confirmar se a peca e cilindro proprio para maquinas de 84.29 ou colheitadeiras (8433); peca de uso geral (oficina, lubrificacao, solda) nao entra."
+    },
+    {
+      "ncm": "8412.31.10",
+      "categoria": "Autopecas - Anexo II",
+      "base": "Lei 10.485/2002, Anexo II",
+      "condicao": "Confirmar se a peca e cilindro pneumatico proprio para tratores rodoviarios (8701.20), onibus (87.02) ou caminhoes (87.04); peca de uso geral (oficina, lubrificacao, solda) nao entra."
+    },
+    {
+      "ncm": "8413.60.19",
+      "categoria": "Autopecas - Anexo II",
+      "base": "Lei 10.485/2002, Anexo II",
+      "condicao": "Confirmar se a peca e bomba propria para maquinas de 84.29, colheitadeiras (8433), tratores rodoviarios, onibus ou caminhoes; peca de uso geral (oficina, lubrificacao, solda) nao entra."
+    },
+    {
+      "ncm": "8414.80.19",
+      "categoria": "Autopecas - Anexo II",
+      "base": "Lei 10.485/2002, Anexo II",
+      "condicao": "Confirmar se a peca e compressor proprio para tratores rodoviarios (8701.20), onibus (87.02) ou caminhoes (87.04); peca de uso geral (oficina, lubrificacao, solda) nao entra."
+    },
+    {
+      "ncm": "8414.90.39",
+      "categoria": "Autopecas - Anexo II",
+      "base": "Lei 10.485/2002, Anexo II",
+      "condicao": "Confirmar se a peca e caixa de ventilacao de veiculo autopropulsado; peca de uso geral (oficina, lubrificacao, solda) nao entra."
+    },
+    {
+      "ncm": "8432.90.00",
+      "categoria": "Autopecas - Anexo II",
+      "base": "Lei 10.485/2002, Anexo II",
+      "condicao": "Confirmar se a peca e parte de maquina das posicoes 8432.40.00 ou 8432.80.00 (ex.: perfurador de solo, distribuidor de adubo); conferir a NCM da maquina; peca de uso geral (oficina, lubrificacao, solda) nao entra."
+    },
+    {
+      "ncm": "8481.10.00",
+      "categoria": "Autopecas - Anexo II",
+      "base": "Lei 10.485/2002, Anexo II",
+      "condicao": "Confirmar se a peca e valvula redutora de pressao propria para tratores, colheitadeiras, maquinas de 84.29 ou veiculos de 87.01 a 87.06; peca de uso geral (oficina, lubrificacao, solda) nao entra."
+    },
+    {
+      "ncm": "8481.20.90",
+      "categoria": "Autopecas - Anexo II",
+      "base": "Lei 10.485/2002, Anexo II",
+      "condicao": "Confirmar se a peca e valvula de transmissao oleo-hidraulica ou pneumatica propria para maquinas de 84.29 ou colheitadeiras (8433); peca de uso geral (oficina, lubrificacao, solda) nao entra."
+    },
+    {
+      "ncm": "8481.80.92",
+      "categoria": "Autopecas - Anexo II",
+      "base": "Lei 10.485/2002, Anexo II",
+      "condicao": "Confirmar se a peca e valvula solenoide propria para tratores, colheitadeiras, maquinas de 84.29 ou veiculos de 87.01 a 87.06; peca de uso geral (oficina, lubrificacao, solda) nao entra."
+    },
+    {
+      "ncm": "8483.60.1",
+      "categoria": "Autopecas - Anexo II",
+      "base": "Lei 10.485/2002, Anexo II",
+      "condicao": "Confirmar se a peca e embreagem de friccao propria para maquinas de 84.29 ou colheitadeiras (8433); peca de uso geral (oficina, lubrificacao, solda) nao entra."
+    },
+    {
+      "ncm": "8501.10.19",
+      "categoria": "Autopecas - Anexo II",
+      "base": "Lei 10.485/2002, Anexo II",
+      "condicao": "Confirmar se a peca e motor de corrente continua para acionar vidros eletricos de veiculos; peca de uso geral (oficina, lubrificacao, solda) nao entra."
+    }
+  ]
+}

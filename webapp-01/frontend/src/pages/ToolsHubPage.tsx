@@ -11,6 +11,7 @@ import {
   GitCompareArrows,
   Landmark,
   ListOrdered,
+  PackageSearch,
   Receipt,
   Rows3,
   ScrollText,
@@ -44,6 +45,7 @@ const TOOL_ICONS: Record<string, LucideIcon> = {
   "extrato-edit": TableProperties,
   "concatenador-planilhas": Rows3,
   "conferencia-sequencia": ListOrdered,
+  "analise-produtos": PackageSearch,
 };
 
 const TOOL_OWNER: Record<string, string> = {
@@ -59,6 +61,7 @@ const TOOL_OWNER: Record<string, string> = {
   "extrato-edit": "Bruno",
   "concatenador-planilhas": "Bruno",
   "conferencia-sequencia": "Bruno",
+  "analise-produtos": "Bruno",
 };
 
 const TAG_TONE_CLASS: Record<ToolTagTone, string> = {
@@ -82,6 +85,7 @@ const TOOL_ACCENT: Record<string, string> = {
   "extrato-edit": "from-[#3a6d85] via-[#4f8aa3] to-[#6fa3bb]",
   "concatenador-planilhas": "from-[#42798f] via-[#5590a8] to-[#6aa6be]",
   "conferencia-sequencia": "from-[#37718a] via-[#4d8da6] to-[#6aa6be]",
+  "analise-produtos": "from-[#3d7390] via-[#4f8aa3] to-[#629bb5]",
 };
 
 type CategoryDef = {
